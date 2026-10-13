@@ -1,7 +1,7 @@
 import { newId } from "@/lib/id";
 import { normalizeName, pairKey, resolveAthlete } from "@/domain/roster/identity";
 import type { AthleteAlias, Team } from "@/domain/roster/types";
-import type { Athlete, Modality } from "@/domain/types";
+import type { Athlete, Gender, Modality } from "@/domain/types";
 import type { ScoutDB } from "@/db/schema";
 import { createAthlete } from "./athlete-service";
 import { enqueue } from "./outbox-service";
@@ -18,7 +18,7 @@ export async function updateAthlete(
   db: ScoutDB,
   tenant_id: string,
   id: string,
-  changes: { name?: string; jersey_number?: number | null },
+  changes: { name?: string; jersey_number?: number | null; gender?: Gender | null },
 ): Promise<Athlete> {
   return db.transaction("rw", db.athletes, db.outbox, async () => {
     const current = await db.athletes.get(id);
@@ -28,6 +28,8 @@ export async function updateAthlete(
     const updated: Athlete = { ...current, ...(name ? { name } : {}) };
     if (changes.jersey_number === null) delete updated.jersey_number;
     else if (changes.jersey_number !== undefined) updated.jersey_number = changes.jersey_number;
+    if (changes.gender === null) delete updated.gender;
+    else if (changes.gender !== undefined) updated.gender = changes.gender;
     await db.athletes.put(updated);
     await enqueue(db, "athlete", updated, "upsert");
     return updated;

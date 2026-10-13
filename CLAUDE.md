@@ -60,5 +60,12 @@
 - **Agregação** (`src/domain/stats/aggregate.ts`): use `tallyRallies` (contadores brutos) + `finalizeTeam`/`athleteLines`; nunca agregue porcentagens já finalizadas. Rankings em `rankings.ts` com volume mínimo.
 - CSV comum em `src/domain/export/csv.ts` (Box Score e torneio).
 
+## Dashboards e temporada (Fase 6)
+- `src/domain/stats/season.ts` + `src/services/season-service.ts`; telas em `src/features/analytics/` (`/rankings`, `/athlete?id=`, `/team?key=`).
+- **Recharts só em `src/features/charts/`** e só importado por telas de análise — nunca no scout (`/match`).
+- Gênero no atleta (`gender`), categoria no torneio (`category`), gênero da dupla deduzido por `teamGender`. Campos opcionais: não exigem migração.
+- Gráficos: um eixo por gráfico, % sempre com volume, pouco volume esmaecido (nunca escondido).
+- Rota nova com query string → adicionar em `additionalPrecacheEntries` e o parâmetro em `ignoreURLParametersMatching` (`src/app/sw.ts`).
+
 ## Regras do Next.js (geradas pelo create-next-app)
 @AGENTS.md

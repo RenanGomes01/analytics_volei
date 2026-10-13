@@ -32,10 +32,14 @@ export interface Match extends TenantScoped {
   created_at: number;
 }
 
+export type Gender = "M" | "F";
+
 export interface Athlete extends TenantScoped {
   id: string;
   name: string;
   jersey_number?: number;
+  /** Fonte da verdade para rankings por gênero (cadastros antigos podem não ter). */
+  gender?: Gender;
   created_at: number;
 }
 

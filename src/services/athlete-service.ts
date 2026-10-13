@@ -1,5 +1,5 @@
 import { newId } from "@/lib/id";
-import type { Athlete } from "@/domain/types";
+import type { Athlete, Gender } from "@/domain/types";
 import type { ScoutDB } from "@/db/schema";
 import { enqueue } from "./outbox-service";
 
@@ -7,6 +7,7 @@ export interface CreateAthleteInput {
   tenant_id: string;
   name: string;
   jersey_number?: number;
+  gender?: Gender;
 }
 
 export async function createAthlete(db: ScoutDB, input: CreateAthleteInput): Promise<Athlete> {

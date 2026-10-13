@@ -12,8 +12,10 @@ declare const self: ServiceWorkerGlobalScope;
 
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
-  // /match?id=… deve casar com a página /match pré-cacheada (o id é lido no cliente).
-  precacheOptions: { ignoreURLParametersMatching: [/^id$/, /^utm_/, /^fbclid$/] },
+  // /match?id=…, /team?key=…, /rankings?year=… devem casar com a página pré-cacheada (os filtros são lidos no cliente).
+  precacheOptions: {
+    ignoreURLParametersMatching: [/^id$/, /^key$/, /^year$/, /^gender$/, /^view$/, /^category$/, /^friendlies$/, /^utm_/, /^fbclid$/],
+  },
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,

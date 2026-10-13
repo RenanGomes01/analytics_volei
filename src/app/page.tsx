@@ -17,6 +17,9 @@ export default function Home() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            <HardLink href="/rankings" className="min-h-14 rounded-2xl bg-zinc-800 px-5 py-4 text-lg font-semibold">
+              Rankings
+            </HardLink>
             <HardLink href="/roster" className="min-h-14 rounded-2xl bg-zinc-800 px-5 py-4 text-lg font-semibold">
               Atletas e duplas
             </HardLink>

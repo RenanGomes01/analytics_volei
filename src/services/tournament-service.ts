@@ -1,6 +1,6 @@
 import { newId } from "@/lib/id";
 import { rulesFor } from "@/domain/rules/modality";
-import type { Tournament, TournamentEntry } from "@/domain/roster/types";
+import type { Tournament, TournamentCategory, TournamentEntry } from "@/domain/roster/types";
 import type { Match, Modality, TeamSide } from "@/domain/types";
 import type { ScoutDB } from "@/db/schema";
 import { enqueue } from "./outbox-service";
@@ -13,6 +13,7 @@ export interface CreateTournamentInput {
   start_date: string;
   end_date?: string;
   modality: Modality;
+  category?: TournamentCategory;
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -38,12 +39,40 @@ export async function createTournament(
     created_at: now,
     ...(input.location?.trim() ? { location: input.location.trim() } : {}),
     ...(input.end_date ? { end_date: input.end_date } : {}),
+    ...(input.category ? { category: input.category } : {}),
   };
   await db.transaction("rw", db.tournaments, db.outbox, async () => {
     await db.tournaments.add(tournament);
     await enqueue(db, "tournament", tournament);
   });
   return tournament;
+}
+
+/** Edita nome, local e categoria do torneio (cadastro: upsert no outbox). */
+export async function updateTournament(
+  db: ScoutDB,
+  tenant_id: string,
+  id: string,
+  changes: { name?: string; location?: string; category?: TournamentCategory | null },
+): Promise<Tournament> {
+  return db.transaction("rw", db.tournaments, db.outbox, async () => {
+    const current = await db.tournaments.get(id);
+    if (!current || current.tenant_id !== tenant_id) throw new Error("Torneio não encontrado.");
+    const updated: Tournament = { ...current };
+    if (changes.name !== undefined) {
+      if (!changes.name.trim()) throw new Error("Dê um nome ao torneio.");
+      updated.name = changes.name.trim();
+    }
+    if (changes.location !== undefined) {
+      if (changes.location.trim()) updated.location = changes.location.trim();
+      else delete updated.location;
+    }
+    if (changes.category === null) delete updated.category;
+    else if (changes.category !== undefined) updated.category = changes.category;
+    await db.tournaments.put(updated);
+    await enqueue(db, "tournament", updated, "upsert");
+    return updated;
+  });
 }
 
 export async function listTournaments(db: ScoutDB, tenant_id: string): Promise<Tournament[]> {

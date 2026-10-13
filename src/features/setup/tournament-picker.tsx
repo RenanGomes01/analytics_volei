@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { getDB } from "@/db/client";
-import type { Tournament } from "@/domain/roster/types";
+import type { Tournament, TournamentCategory } from "@/domain/roster/types";
 import type { Modality } from "@/domain/types";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
 import { createTournament } from "@/services/tournament-service";
 import { inputClass, primaryButton, secondaryButton, segmentedClass } from "./form-styles";
 
 const today = () => new Date().toISOString().slice(0, 10);
+
+const CATEGORIES: [TournamentCategory, string][] = [["F", "Feminino"], ["M", "Masculino"], ["Mixed", "Misto"], ["Open", "Aberto"]];
 
 interface Props {
   tournaments: Tournament[];
@@ -19,7 +21,7 @@ interface Props {
 /** Escolhe o torneio da partida ("" = sem torneio) ou cria um novo na hora. */
 export function TournamentPicker({ tournaments, value, onChange }: Props) {
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ name: "", location: "", start_date: today(), modality: "beach" as Modality });
+  const [form, setForm] = useState({ name: "", location: "", start_date: today(), modality: "beach" as Modality, category: undefined as TournamentCategory | undefined });
   const [error, setError] = useState<string | null>(null);
 
   async function create() {
@@ -66,6 +68,19 @@ export function TournamentPicker({ tournaments, value, onChange }: Props) {
             {(["beach", "indoor"] as const).map((m) => (
               <button key={m} type="button" className={segmentedClass(form.modality === m)} onClick={() => setForm({ ...form, modality: m })}>
                 {m === "beach" ? "Beach 2×2" : "Indoor 6×6"}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label="Categoria do torneio">
+            {CATEGORIES.map(([c, text]) => (
+              <button
+                key={c}
+                type="button"
+                aria-pressed={form.category === c}
+                className={segmentedClass(form.category === c)}
+                onClick={() => setForm({ ...form, category: form.category === c ? undefined : c })}
+              >
+                {text}
               </button>
             ))}
           </div>

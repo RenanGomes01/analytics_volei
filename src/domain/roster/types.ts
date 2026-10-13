@@ -1,5 +1,8 @@
 import type { Modality, TenantScoped } from "../types";
 
+/** Categoria da etapa. */
+export type TournamentCategory = "M" | "F" | "Mixed" | "Open";
+
 /** Dupla (beach) ou elenco persistente (indoor). `pair_key` identifica o conjunto de atletas. */
 export interface Team extends TenantScoped {
   id: string;
@@ -19,6 +22,7 @@ export interface Tournament extends TenantScoped {
   start_date: string;
   end_date?: string;
   modality: Modality;
+  category?: TournamentCategory;
   created_at: number;
 }
 

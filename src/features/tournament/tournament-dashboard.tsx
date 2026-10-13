@@ -1,5 +1,6 @@
 "use client";
 
+import { athleteHref, EntityLink, teamHref } from "@/features/analytics/ui";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { HardLink } from "@/components/hard-link";
@@ -63,7 +64,9 @@ function RankingCards({ data, roster }: { data: CompetitionData; roster: RosterD
                 return (
                   <li key={row.athlete_id} className="flex items-baseline gap-2 tabular-nums">
                     <span className="w-5 text-right text-zinc-500">{i + 1}</span>
-                    <span className="flex-1 truncate">{athleteName(row.athlete_id)}</span>
+                    <span className="flex-1 truncate">
+                      <EntityLink href={athleteHref(row.athlete_id)}>{athleteName(row.athlete_id)}</EntityLink>
+                    </span>
                     <span className="font-bold">{f.main}</span>
                     <span className="w-20 text-right text-xs text-zinc-500">{f.detail}</span>
                   </li>
@@ -109,7 +112,7 @@ function TeamsTable({ data, roster }: { data: CompetitionData; roster: RosterDat
           {teams.map((t) => (
             <tr key={t.pair_key} className="odd:bg-zinc-900/60">
               <th scope="row" className="py-2.5 text-left font-medium">
-                {teamName(t.pair_key)}
+                <EntityLink href={teamHref(t.pair_key)}>{teamName(t.pair_key)}</EntityLink>
               </th>
               {cols.map(([label, , value]) => (
                 <td key={label} className="px-2 py-2.5">
@@ -159,7 +162,7 @@ function AthletesTable({ data, roster }: { data: CompetitionData; roster: Roster
           {athletes.map((a) => (
             <tr key={a.athlete_id} className="odd:bg-zinc-900/60">
               <th scope="row" className="sticky left-0 bg-inherit py-2.5 text-left font-medium">
-                {athleteName(a.athlete_id)}
+                <EntityLink href={athleteHref(a.athlete_id)}>{athleteName(a.athlete_id)}</EntityLink>
               </th>
               {cols.map(([label, , value]) => (
                 <td key={label} className="px-2 py-2.5">

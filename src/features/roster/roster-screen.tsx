@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { getDB } from "@/db/client";
 import { matchesSearch } from "@/domain/roster/identity";
-import type { Athlete } from "@/domain/types";
-import { inputClass, primaryButton, secondaryButton } from "@/features/setup/form-styles";
+import type { Athlete, Gender } from "@/domain/types";
+import { athleteHref, teamHref } from "@/features/analytics/ui";
+import { inputClass, primaryButton, secondaryButton, segmentedClass } from "@/features/setup/form-styles";
+import { HardLink } from "@/components/hard-link";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
 import { mergeAthletes, renameTeam, unmergeAthlete, updateAthlete } from "@/services/roster-service";
 import { useRosterData, type RosterData } from "./use-roster-data";
@@ -27,6 +29,7 @@ function AthleteRow({
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(athlete.name);
   const [number, setNumber] = useState(athlete.jersey_number?.toString() ?? "");
+  const [gender, setGender] = useState<Gender | null>(athlete.gender ?? null);
   const aliases = roster.aliasesOf.get(athlete.id) ?? [];
 
   async function run(action: () => Promise<unknown>) {
@@ -45,7 +48,14 @@ function AthleteRow({
         <div className="flex items-center gap-3">
           <input type="checkbox" checked={selected} onChange={onToggle} aria-label={`Selecionar ${athlete.name} para unir`} className="size-6" />
           <span className="w-8 text-right text-xl font-bold tabular-nums">{athlete.jersey_number ?? "–"}</span>
-          <span className="flex-1 truncate text-lg">{athlete.name}</span>
+          <HardLink href={athleteHref(athlete.id)} className="flex-1 truncate text-lg underline-offset-4 hover:underline">
+            {athlete.name}
+          </HardLink>
+          {athlete.gender ? (
+            <span className="text-sm text-zinc-400">{athlete.gender}</span>
+          ) : (
+            <span className="text-xs text-amber-300" title="Gênero não informado">sem gênero</span>
+          )}
           <span className="text-sm text-zinc-400">{plural(roster.matchCount.get(athlete.id) ?? 0, "jogo", "jogos")}</span>
           <button type="button" onClick={() => setEditing(true)} className={secondaryButton}>
             Editar
@@ -55,13 +65,25 @@ function AthleteRow({
         <div className="flex flex-wrap gap-2">
           <input className={`${inputClass} w-20 text-center`} inputMode="numeric" value={number} aria-label="Número" onChange={(e) => setNumber(e.target.value.replace(/\D/g, "").slice(0, 2))} />
           <input className={`${inputClass} min-w-0 flex-1`} value={name} aria-label="Nome" onChange={(e) => setName(e.target.value)} />
+          {(["F", "M"] as const).map((g) => (
+            <button
+              key={g}
+              type="button"
+              aria-pressed={gender === g}
+              aria-label={g === "F" ? "Feminino" : "Masculino"}
+              onClick={() => setGender(gender === g ? null : g)}
+              className={`${segmentedClass(gender === g)} w-14 flex-none`}
+            >
+              {g}
+            </button>
+          ))}
           <button type="button" onClick={() => setEditing(false)} className={secondaryButton}>
             Cancelar
           </button>
           <button
             type="button"
             className={primaryButton}
-            onClick={() => run(() => updateAthlete(getDB(), LOCAL_TENANT_ID, athlete.id, { name, jersey_number: number ? Number(number) : null }))}
+            onClick={() => run(() => updateAthlete(getDB(), LOCAL_TENANT_ID, athlete.id, { name, jersey_number: number ? Number(number) : null, gender }))}
           >
             Salvar
           </button>
@@ -106,7 +128,9 @@ function TeamRow({ team, roster }: { team: RosterData["teams"][number]; roster: 
       ) : (
         <>
           <span className="flex-1">
-            <span className="block text-lg font-semibold">{team.name}</span>
+            <HardLink href={teamHref(team.pair_key)} className="block text-lg font-semibold underline-offset-4 hover:underline">
+              {team.name}
+            </HardLink>
             {team.name !== members && <span className="text-sm text-zinc-400">{members}</span>}
           </span>
           <span className="text-xs uppercase text-zinc-500">{team.modality === "beach" ? "Beach" : "Indoor"}</span>
@@ -126,10 +150,14 @@ export function RosterScreen() {
   const [selected, setSelected] = useState<string[]>([]);
   const [principal, setPrincipal] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [onlyMissing, setOnlyMissing] = useState(false);
 
   if (!roster) return <p className="p-4 text-center text-zinc-400">Carregando cadastro…</p>;
 
-  const athletes = roster.canonical.filter((a) => matchesSearch(query, a.name, String(a.jersey_number ?? "")));
+  const missingGender = roster.canonical.filter((a) => !a.gender).length;
+  const athletes = roster.canonical.filter(
+    (a) => (!onlyMissing || !a.gender) && matchesSearch(query, a.name, String(a.jersey_number ?? "")),
+  );
   const toggle = (id: string) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   const target = principal && selected.includes(principal) ? principal : selected[0];
 
@@ -153,6 +181,18 @@ export function RosterScreen() {
           histórico. Os lances registrados não são alterados.
         </p>
         <input className={inputClass} placeholder="Buscar atleta" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Buscar atleta" />
+        {(missingGender > 0 || onlyMissing) && (
+          <button
+            type="button"
+            aria-pressed={onlyMissing}
+            onClick={() => setOnlyMissing(!onlyMissing)}
+            className={`min-h-12 rounded-xl px-4 text-left text-sm ${onlyMissing ? "bg-amber-400 font-semibold text-zinc-950" : "bg-amber-400/10 text-amber-200"}`}
+          >
+            {onlyMissing
+              ? "Mostrando só quem está sem gênero · toque para ver todas"
+              : `${plural(missingGender, "atleta sem gênero", "atletas sem gênero")} (necessário para os rankings M/F) · toque para filtrar`}
+          </button>
+        )}
 
         {selected.length >= 2 && (
           <div className="sticky top-2 z-10 flex flex-col gap-2 rounded-2xl border-2 border-amber-400 bg-zinc-950 p-3">

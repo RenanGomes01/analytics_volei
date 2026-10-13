@@ -70,3 +70,12 @@ Bola mandada para o outro lado **sem intenção de ataque**, só para mantê-la 
 - **Falta… (sempre disponível)**: toque na rede, invasão, dois toques, condução, quatro toques, pé na linha, demora no saque, ordem de saque, largada de dedos, ataque/bloqueio no saque, penalidade, outro/arbitragem → depois **quem cometeu** (ou "não sei quem").
 - O detalhe fica gravado no lance (`detail`) e no fim do rali, para estatísticas de "como os pontos aconteceram".
 - **Rali anulado (repetir)**: descarta os toques sem ponto para ninguém.
+
+## Temporada, gênero e rankings globais (Fase 6)
+- **Gênero mora no atleta** (`gender?: "M" | "F"`). O torneio tem **categoria** (`category?: "M" | "F" | "Mixed" | "Open"`). O gênero da dupla é **deduzido** (M+M → M, F+F → F, M+F → Misto; qualquer atleta sem gênero → indefinido).
+- **Recorte por gênero:** com o filtro M/F ativo, só entra quem tem gênero preenchido; a tela mostra quantos ficaram de fora ("N atletas fora do recorte por falta de gênero").
+- **Ano da temporada:** partidas de torneio usam o `start_date` do torneio; amistosos usam a data de criação da partida e só entram com "Incluir amistosos".
+- **Temporada = soma de contadores** de todas as partidas do recorte (mesma regra da etapa; nunca média de %).
+- **Rankings de duplas:** vitórias; % de vitórias (mín. 3 jogos decididos); virada de bola e quebra de saque (mín. 30 ralis); saldo de pontos.
+- **Gráficos:** toda porcentagem vem com o volume (ex.: 48% · 61-12/102); pontos de evolução com pouco volume (< 10 ataques ou < 10 recepções avaliadas) aparecem esmaecidos, nunca escondidos.
+- **Perfil do atleta** atravessa parcerias (aliases resolvidos: um cadastro antigo abre o perfil canônico); **perfil da dupla** só considera partidas daquele `pair_key`.

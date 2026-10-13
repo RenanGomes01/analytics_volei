@@ -21,3 +21,10 @@
 - **A partida não muda:** `team_a`/`team_b` são um retrato do jogo. A dupla é deduzida pelo `pair_key` (depois dos aliases) e o torneio vem do `tournament_entry`. Jogos do MVP entram no histórico unindo atletas (`/roster`) e vinculando a partida a um torneio.
 - **Cadastro editável:** atletas, duplas, torneios e aliases usam `op: "upsert" | "delete"` no outbox. Na importação, atleta existente = vale a versão local (sem conflito); partida e lances continuam estritos.
 - **Rotas:** `/tournament?id=` e `/roster` (estáticas, pré-cacheadas: funcionam offline).
+
+## Temporada e dashboards (Fase 6)
+- **Sem migração de banco:** `Athlete.gender` e `Tournament.category` são opcionais e sem índice; os filtros acontecem em memória.
+- **Serviço** `src/services/season-service.ts` (`loadSeason`): uma leitura de `rally_events` por `tenant_id`, agrupada por partida, + torneios, atletas, duplas e aliases.
+- **Domínio puro** `src/domain/stats/season.ts` (`filterSeason`, `seasonStats`, `athleteSeries`, `athletePartners`, `teamSeries`, `pointKinds`, recortes por gênero) e `team-rankings.ts` (`rankTeams`).
+- **Gráficos:** Recharts 3.10, só em `src/features/charts/` e importado apenas pelas telas de análise — a tela de scout (`/match`) não carrega o pacote. Paleta validada para daltonismo em `palette.ts`.
+- **Rotas estáticas por query string, pré-cacheadas:** `/rankings?year=&gender=&view=&category=&friendlies=`, `/athlete?id=`, `/team?key=`. O service worker ignora esses parâmetros ao casar com o pré-cache.

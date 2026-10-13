@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { getDB } from "@/db/client";
 import { matchesSearch } from "@/domain/roster/identity";
-import type { Athlete } from "@/domain/types";
+import type { Athlete, Gender } from "@/domain/types";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
 import { createAthlete } from "@/services/roster-service";
-import { inputClass, primaryButton, secondaryButton } from "./form-styles";
+import { inputClass, primaryButton, secondaryButton, segmentedClass } from "./form-styles";
 
 interface Props {
   label: string;
@@ -24,6 +24,7 @@ export function AthletePicker({ label: title, athletes, exclude, value, onChange
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
   const [number, setNumber] = useState("");
+  const [gender, setGender] = useState<Gender | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (value) {
@@ -49,6 +50,7 @@ export function AthletePicker({ label: title, athletes, exclude, value, onChange
         tenant_id: LOCAL_TENANT_ID,
         name: query.trim(),
         jersey_number: number ? Number(number) : undefined,
+        ...(gender ? { gender } : {}),
       });
       onChange(athlete);
     } catch (e) {
@@ -90,6 +92,18 @@ export function AthletePicker({ label: title, athletes, exclude, value, onChange
                 value={number}
                 onChange={(e) => setNumber(e.target.value.replace(/\D/g, "").slice(0, 2))}
               />
+              {(["F", "M"] as const).map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  aria-pressed={gender === g}
+                  aria-label={g === "F" ? "Feminino" : "Masculino"}
+                  onClick={() => setGender(gender === g ? null : g)}
+                  className={`${segmentedClass(gender === g)} w-14 flex-none`}
+                >
+                  {g}
+                </button>
+              ))}
               <button type="button" onClick={create} className={`${primaryButton} flex-1`}>
                 Criar atleta
               </button>

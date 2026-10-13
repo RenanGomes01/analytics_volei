@@ -42,6 +42,9 @@ export function validateExportData(data: unknown): string[] {
   if (!Array.isArray(athletes)) return [...errors, "Lista de atletas ausente."];
   const athleteIds = new Set(athletes.filter((a) => isObj(a) && isStr(a.id) && isStr(a.name)).map((a) => (a as Obj).id));
   if (athleteIds.size !== athletes.length) errors.push("Há atletas sem id ou sem nome.");
+  if (athletes.some((a) => isObj(a) && a.gender !== undefined && a.gender !== "M" && a.gender !== "F")) {
+    errors.push("Há atletas com gênero inválido.");
+  }
   for (const id of roster) if (!athleteIds.has(id)) errors.push(`Atleta ${id.slice(0, 8)} do elenco não está no arquivo.`);
 
   if (!Array.isArray(events)) return [...errors, "Lista de eventos ausente."];
