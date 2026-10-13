@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import type { ModalityRules } from "@/domain/rules/modality";
 import type { StatsFilter } from "@/domain/stats/types";
 import type { Athlete, Match, RallyEvent, TeamSide } from "@/domain/types";
+import { ExportButton } from "@/features/export/export-button";
+import { SyncBadge } from "@/features/sync/sync-badge";
 import { AthleteTable } from "./athlete-table";
 import { SetFilter } from "./set-filter";
 import { TeamSummary } from "./team-summary";
@@ -47,10 +49,14 @@ export function StatsSheet({ match, rules, events, athletes, sides, onClose }: P
       className="fixed inset-0 z-50 flex flex-col bg-zinc-950 text-zinc-100"
     >
       <header className="flex flex-wrap items-center gap-3 border-b border-zinc-800 px-4 py-2">
-        <h2 id="stats-title" className="mr-auto text-xl font-bold">
+        <h2 id="stats-title" className="text-xl font-bold">
           Estatísticas
         </h2>
+        <span className="mr-auto">
+          <SyncBadge />
+        </span>
         <SetFilter sets={box.sets_available} value={filter} onChange={setFilter} />
+        <ExportButton matchId={match.id} />
         <button
           ref={closeRef}
           type="button"

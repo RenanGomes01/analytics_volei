@@ -91,8 +91,13 @@ export interface OutboxEntry extends TenantScoped {
   payload: unknown;
   status: OutboxStatus;
   created_at: number;
+  /** Quantas vezes a mutação foi enviada (reivindicada pelo motor de sync). */
   attempts: number;
-  /** Atribuído pelo servidor no ack (Fase 4). Fica aqui, e não no evento, para o ledger continuar imutável. */
+  last_attempt_at: number | null;
+  /** Não reenviar antes disso (backoff). Igual a created_at enquanto nunca falhou. */
+  next_attempt_at: number;
+  last_error: string | null;
+  /** Atribuído pelo servidor no ack. Fica aqui, e não no evento, para o ledger continuar imutável. */
   server_seq: number | null;
 }
 

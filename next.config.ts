@@ -1,9 +1,15 @@
 import { withSerwist } from "@serwist/turbopack";
 import type { NextConfig } from "next";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+const { version } = JSON.parse(readFileSync(path.join(process.cwd(), "package.json"), "utf8")) as { version: string };
 
 // Sem `cacheComponents`: o app lê os dados do IndexedDB no cliente, e a rota do
 // Serwist (src/app/serwist/[path]/route.ts) usa segment config incompatível com ele.
 const nextConfig: NextConfig = {
+  // Vai no envelope de cada exportação JSON (app_version).
+  env: { NEXT_PUBLIC_APP_VERSION: version },
   turbopack: {
     rules: {
       "*.css": {

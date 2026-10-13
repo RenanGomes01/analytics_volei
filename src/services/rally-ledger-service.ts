@@ -11,6 +11,7 @@ import type {
   VoidEvent,
 } from "@/domain/types";
 import type { ScoutDB } from "@/db/schema";
+import { getDeviceId } from "./device-service";
 import { getMatch } from "./match-service";
 import { enqueue } from "./outbox-service";
 
@@ -29,16 +30,6 @@ export type TouchInput = Pick<TouchEvent, "team" | "athlete_id" | "skill" | "qua
 export interface RallyEndInput {
   point_to: TeamSide;
   reason: RallyEndReason;
-}
-
-const DEVICE_ID_KEY = "device_id";
-
-async function getDeviceId(db: ScoutDB): Promise<string> {
-  const stored = await db.meta.get(DEVICE_ID_KEY);
-  if (typeof stored?.value === "string") return stored.value;
-  const id = crypto.randomUUID();
-  await db.meta.add({ key: DEVICE_ID_KEY, value: id });
-  return id;
 }
 
 export async function listMatchEvents(db: ScoutDB, { tenant_id, match_id }: MatchScope): Promise<RallyEvent[]> {

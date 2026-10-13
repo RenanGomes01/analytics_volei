@@ -1,6 +1,18 @@
 import type { OutboxEntity, OutboxEntry } from "@/domain/types";
 import type { ScoutDB } from "@/db/schema";
 
+let lastStamp = 0;
+
+/**
+ * Relógio estritamente crescente nesta sessão. Várias mutações na mesma transação (ex.: atletas e
+ * partida) caem no mesmo milissegundo; sem isso o desempate do índice [status+created_at] seria o
+ * mutation_id aleatório e o envio FIFO perderia a ordem de gravação.
+ */
+function monotonicNow(): number {
+  lastStamp = Math.max(Date.now(), lastStamp + 1);
+  return lastStamp;
+}
+
 /**
  * Enfileira uma mutação. Deve ser chamado DENTRO da transação que grava a entidade,
  * para que entidade e outbox sejam persistidos juntos ou não sejam persistidos.
@@ -10,6 +22,7 @@ export async function enqueue(
   entity: OutboxEntity,
   row: { id: string; tenant_id: string },
 ): Promise<OutboxEntry> {
+  const now = monotonicNow();
   const entry: OutboxEntry = {
     mutation_id: crypto.randomUUID(),
     tenant_id: row.tenant_id,
@@ -18,8 +31,11 @@ export async function enqueue(
     op: "insert",
     payload: structuredClone(row),
     status: "pending",
-    created_at: Date.now(),
+    created_at: now,
     attempts: 0,
+    last_attempt_at: null,
+    next_attempt_at: now,
+    last_error: null,
     server_seq: null,
   };
   await db.outbox.add(entry);

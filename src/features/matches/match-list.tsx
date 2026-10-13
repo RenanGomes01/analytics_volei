@@ -3,6 +3,7 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { HardLink } from "@/components/hard-link";
 import { getDB } from "@/db/client";
+import { ExportButton } from "@/features/export/export-button";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
 import { listMatches } from "@/services/match-service";
 
@@ -19,10 +20,10 @@ export function MatchList() {
   return (
     <ul className="flex flex-col gap-2">
       {matches.map((m) => (
-        <li key={m.id}>
+        <li key={m.id} className="flex items-center gap-2 rounded-2xl bg-zinc-900 pr-2">
           <HardLink
             href={`/match?id=${encodeURIComponent(m.id)}`}
-            className="flex min-h-16 items-center justify-between gap-4 rounded-2xl bg-zinc-900 px-4 active:bg-zinc-800"
+            className="flex min-h-16 min-w-0 flex-1 items-center justify-between gap-4 rounded-2xl px-4 active:bg-zinc-800"
           >
             <span className="truncate text-lg font-semibold">
               {m.team_a.name} × {m.team_b.name}
@@ -31,6 +32,7 @@ export function MatchList() {
               {m.modality === "beach" ? "Beach" : "Indoor"} · {dateFormat.format(m.created_at)}
             </span>
           </HardLink>
+          <ExportButton matchId={m.id} compact />
         </li>
       ))}
     </ul>

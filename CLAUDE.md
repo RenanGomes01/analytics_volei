@@ -40,5 +40,12 @@
 - Definições: ataque bloqueado (próximo toque é bloqueio `#` do adversário) é erro do atacante; kill, ace e bloqueio exigem `#` **e** o rali ganho; "erros do adversário" = `error` + `four_touches` + `manual`.
 - A UI (`StatsSheet`) usa os `events` do mesmo `useLiveQuery` da tela de scout: não abra outra consulta ao banco.
 
+## Exportação e sync (Fase 4)
+- **Exportação:** `exportMatch()` (`src/services/export/`) gera o envelope `volei-scout/match-export` v1 com o ledger completo (inclusive VoidEvents), um hash SHA-256 do JSON canônico de `data` e uma assinatura ECDSA P-256 da chave **não-extraível** do aparelho (fica na `meta`). Mudou o formato de forma incompatível? Suba `EXPORT_SCHEMA_VERSION` e mantenha `verifyMatchExport` lendo as versões antigas.
+- **Outbox:** o sync só altera a tabela `outbox`, nunca `rally_events`. Envio FIFO por `created_at` (monotônico no `enqueue`), parando no primeiro retry; backoff em `src/services/sync/backoff.ts`; lease de 2 min para entradas presas em `sent`.
+- **Transporte:** a interface é `SyncTransport` (`src/services/sync/transport.ts`); hoje só existe o `MockTransport`. Um back-end real entra como outro transporte, sem mexer no motor. É obrigatório ser idempotente por `mutation_id`.
+- `NEXT_PUBLIC_SYNC_MODE` = `off` (padrão) ou `mock` (ver `.env.example`). O `SyncAgent` (no layout) nunca bloqueia a UI, e o status aparece só no `SyncBadge`, nunca na tela de scout.
+- Mudança de schema do IndexedDB = nova `version(n)` no `ScoutDB` com `upgrade()` e teste de migração (ver `tests/services/sync.test.ts`).
+
 ## Regras do Next.js (geradas pelo create-next-app)
 @AGENTS.md
