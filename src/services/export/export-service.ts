@@ -11,7 +11,7 @@ import { APP_VERSION } from "@/lib/app-version";
 import { getDeviceId } from "../device-service";
 import { getMatch } from "../match-service";
 import { listMatchEvents, type MatchScope } from "../rally-ledger-service";
-import { sha256Hex, toBase64, utf8 } from "./crypto-encoding";
+import { requireSecureCrypto, sha256Hex, toBase64, utf8 } from "./crypto-encoding";
 import { ECDSA_SHA256, getDeviceSigningKey } from "./device-key";
 
 export interface MatchExportFile {
@@ -36,6 +36,7 @@ export async function exportMatch(
   scope: MatchScope,
   { now = Date.now(), app_version = APP_VERSION }: { now?: number; app_version?: string } = {},
 ): Promise<MatchExportFile> {
+  requireSecureCrypto();
   const { match, athletes, events, device_id } = await db.transaction(
     "rw",
     [db.matches, db.athletes, db.rally_events, db.meta],

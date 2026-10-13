@@ -6,7 +6,7 @@ import {
   type MatchExportV1,
 } from "@/domain/export/match-export";
 import { validateExportData } from "@/domain/export/validate-export-data";
-import { fromBase64, sha256Hex, utf8 } from "./crypto-encoding";
+import { fromBase64, requireSecureCrypto, sha256Hex, utf8 } from "./crypto-encoding";
 import { ECDSA_P256, ECDSA_SHA256 } from "./device-key";
 
 export interface VerifyResult {
@@ -24,6 +24,11 @@ const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
  * aparelho só é garantida quando essa chave estiver registrada num servidor confiável.
  */
 export async function verifyMatchExport(input: string | unknown): Promise<VerifyResult> {
+  try {
+    requireSecureCrypto();
+  } catch (e) {
+    return { ok: false, errors: [(e as Error).message] };
+  }
   let parsed: unknown = input;
   if (typeof input === "string") {
     try {

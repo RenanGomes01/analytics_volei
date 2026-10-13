@@ -1,3 +1,4 @@
+import { newId } from "@/lib/id";
 import type { OutboxEntity, OutboxEntry, OutboxOp } from "@/domain/types";
 import type { ScoutDB } from "@/db/schema";
 
@@ -25,7 +26,7 @@ export async function enqueue(
 ): Promise<OutboxEntry> {
   const now = monotonicNow();
   const entry: OutboxEntry = {
-    mutation_id: crypto.randomUUID(),
+    mutation_id: newId(),
     tenant_id: row.tenant_id,
     entity,
     entity_id: row.id,

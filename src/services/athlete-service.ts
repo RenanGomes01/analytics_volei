@@ -1,3 +1,4 @@
+import { newId } from "@/lib/id";
 import type { Athlete } from "@/domain/types";
 import type { ScoutDB } from "@/db/schema";
 import { enqueue } from "./outbox-service";
@@ -9,7 +10,7 @@ export interface CreateAthleteInput {
 }
 
 export async function createAthlete(db: ScoutDB, input: CreateAthleteInput): Promise<Athlete> {
-  const athlete: Athlete = { ...input, id: crypto.randomUUID(), created_at: Date.now() };
+  const athlete: Athlete = { ...input, id: newId(), created_at: Date.now() };
   await db.transaction("rw", db.athletes, db.outbox, async () => {
     await db.athletes.add(athlete);
     await enqueue(db, "athlete", athlete);

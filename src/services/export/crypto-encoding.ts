@@ -1,3 +1,10 @@
+/** Hash e assinatura (crypto.subtle) só existem em contexto seguro: HTTPS ou localhost. */
+export function requireSecureCrypto(): void {
+  if (typeof crypto === "undefined" || !crypto.subtle) {
+    throw new Error("Exportar e importar JSON assinado exige conexão segura: abra o app por HTTPS ou em localhost.");
+  }
+}
+
 export const utf8 = (text: string): Uint8Array<ArrayBuffer> => new TextEncoder().encode(text);
 
 export function toHex(buffer: ArrayBuffer): string {

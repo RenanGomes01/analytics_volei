@@ -1,3 +1,4 @@
+import { newId } from "@/lib/id";
 import { rulesFor } from "@/domain/rules/modality";
 import type { Match, Modality, TeamSide } from "@/domain/types";
 import type { ScoutDB } from "@/db/schema";
@@ -15,7 +16,7 @@ export interface CreateMatchInput {
 export async function createMatch(db: ScoutDB, input: CreateMatchInput): Promise<Match> {
   const match: Match = {
     ...input,
-    id: crypto.randomUUID(),
+    id: newId(),
     rules_version: rulesFor(input.modality).version,
     created_at: Date.now(),
   };

@@ -1,3 +1,4 @@
+import { newId } from "@/lib/id";
 import { phaseForTouch } from "@/domain/rally/phase";
 import { activeEvents, replayMatch, type MatchState } from "@/domain/rally/replay";
 import { rulesFor } from "@/domain/rules/modality";
@@ -65,10 +66,10 @@ async function nextEventBase(
   const set_number = open?.set_number ?? state.current_set;
   return {
     ...scope,
-    id: crypto.randomUUID(),
+    id: newId(),
     set_id: `${scope.match_id}:s${set_number}`,
     set_number,
-    rally_id: open?.rally_id ?? crypto.randomUUID(),
+    rally_id: open?.rally_id ?? newId(),
     rally_number: open?.rally_number ?? state.rallies.filter((r) => r.set_number === set_number).length + 1,
     local_seq,
     device_id: await getDeviceId(db),
@@ -122,7 +123,7 @@ export function voidEvent(db: ScoutDB, scope: MatchScope, event_id: string): Pro
 
     return append(db, {
       ...scope,
-      id: crypto.randomUUID(),
+      id: newId(),
       set_id: target.set_id,
       set_number: target.set_number,
       rally_id: target.rally_id,

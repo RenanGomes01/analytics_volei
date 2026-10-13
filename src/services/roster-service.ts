@@ -1,3 +1,4 @@
+import { newId } from "@/lib/id";
 import { normalizeName, pairKey, resolveAthlete } from "@/domain/roster/identity";
 import type { AthleteAlias, Team } from "@/domain/roster/types";
 import type { Athlete, Modality } from "@/domain/types";
@@ -118,7 +119,7 @@ export async function findOrCreateTeam(
     const athletes = await db.athletes.bulkGet(ids);
     if (athletes.some((a) => !a || a.tenant_id !== tenant_id)) throw new Error("Atleta não encontrada.");
     const team: Team = {
-      id: crypto.randomUUID(),
+      id: newId(),
       tenant_id,
       name: name?.trim() || athletes.map((a) => a!.name).join(" / "),
       athlete_ids: ids,

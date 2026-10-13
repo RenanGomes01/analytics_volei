@@ -1,3 +1,4 @@
+import { newId } from "@/lib/id";
 import { rulesFor } from "@/domain/rules/modality";
 import type { Tournament, TournamentEntry } from "@/domain/roster/types";
 import type { Match, Modality, TeamSide } from "@/domain/types";
@@ -29,7 +30,7 @@ export async function createTournament(
     throw new Error("A data de fim deve ser igual ou depois da de início.");
   }
   const tournament: Tournament = {
-    id: crypto.randomUUID(),
+    id: newId(),
     tenant_id,
     name,
     start_date: input.start_date,
@@ -127,7 +128,7 @@ export async function createMatchFromTeams(db: ScoutDB, input: CreateMatchFromTe
     }
 
     const match: Match = {
-      id: crypto.randomUUID(),
+      id: newId(),
       tenant_id,
       modality: a.modality,
       rules_version: rulesFor(a.modality).version,
