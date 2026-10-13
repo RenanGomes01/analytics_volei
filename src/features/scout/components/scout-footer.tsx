@@ -11,6 +11,7 @@ interface Props {
   onUndo: () => void;
   onPoint: (team: TeamSide) => void;
   onSwapSides: () => void;
+  onOpenStats: () => void;
 }
 
 function describe(event: Props["lastActive"], athletes: Map<string, Athlete>, match: Match): string {
@@ -20,12 +21,23 @@ function describe(event: Props["lastActive"], athletes: Map<string, Athlete>, ma
   return `${SKILL_LABEL[event.skill]} ${event.team}${number} ${event.quality}`;
 }
 
-export function ScoutFooter({ match, sides, lastActive, athletes, saving, canScore, onUndo, onPoint, onSwapSides }: Props) {
+export function ScoutFooter({
+  match,
+  sides,
+  lastActive,
+  athletes,
+  saving,
+  canScore,
+  onUndo,
+  onPoint,
+  onSwapSides,
+  onOpenStats,
+}: Props) {
   const teamName = (t: TeamSide) => (t === "A" ? match.team_a.name : match.team_b.name);
   const button = "min-h-16 rounded-2xl px-4 text-lg font-semibold active:scale-[0.98] disabled:opacity-30";
 
   return (
-    <footer className="grid grid-cols-[minmax(0,1.6fr)_1fr_1fr_auto] gap-2 border-t border-zinc-800 p-2">
+    <footer className="grid grid-cols-[minmax(0,1.6fr)_1fr_1fr_auto_auto] gap-2 border-t border-zinc-800 p-2">
       <button
         type="button"
         onClick={onUndo}
@@ -49,6 +61,9 @@ export function ScoutFooter({ match, sides, lastActive, athletes, saving, canSco
           Ponto {teamName(team)}
         </button>
       ))}
+      <button type="button" onClick={onOpenStats} className={`${button} bg-zinc-800`}>
+        Estatísticas
+      </button>
       <button type="button" onClick={onSwapSides} className={`${button} min-w-16 bg-zinc-800`} aria-label="Inverter lados">
         ⇄
       </button>

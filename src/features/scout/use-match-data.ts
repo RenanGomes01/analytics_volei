@@ -32,6 +32,7 @@ export function useMatchData(matchId: string) {
     const rules = rulesFor(match.modality);
     const state = replayMatch(events, { rules, first_server: match.first_server });
     return {
+      events,
       rules,
       state,
       next: nextAction(state, match, rules),

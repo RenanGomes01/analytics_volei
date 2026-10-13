@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { useCallback, useState } from "react";
 import { HardLink } from "@/components/hard-link";
 import type { Emphasis } from "./components/athlete-button";
 import { ActionPad } from "./components/action-pad";
@@ -10,6 +11,7 @@ import { Scoreboard } from "./components/scoreboard";
 import { ScoutFooter } from "./components/scout-footer";
 import { TeamPanel } from "./components/team-panel";
 import type { NextAction } from "@/domain/rally/next-action";
+import { StatsSheet } from "@/features/stats/stats-sheet";
 import type { TeamSide } from "@/domain/types";
 import { useMatchData } from "./use-match-data";
 import { useScoutCommands } from "./use-scout-commands";
@@ -30,12 +32,14 @@ function ScoutBoard({ matchId }: { matchId: string }) {
   const { scope, match, athletes, derived } = useMatchData(matchId);
   const commands = useScoutCommands(scope, derived?.next ?? null, derived?.ledgerSize ?? null);
   const [swapped, toggleSides] = useSideSwap(matchId);
+  const [statsOpen, setStatsOpen] = useState(false);
+  const closeStats = useCallback(() => setStatsOpen(false), []);
   useWakeLock(!!match && !derived?.state.winner);
 
   if (match === null) return <Notice text="Partida não encontrada neste aparelho." />;
   if (!match || !athletes || !derived) return <Notice text="Carregando partida…" />;
 
-  const { state, next, rules, lastActive } = derived;
+  const { events, state, next, rules, lastActive } = derived;
   const sides: [TeamSide, TeamSide] = swapped ? ["B", "A"] : ["A", "B"];
   const { selection } = commands;
 
@@ -87,7 +91,12 @@ function ScoutBoard({ matchId }: { matchId: string }) {
         onUndo={commands.undo}
         onPoint={commands.pointTo}
         onSwapSides={toggleSides}
+        onOpenStats={() => setStatsOpen(true)}
       />
+
+      {statsOpen && (
+        <StatsSheet match={match} rules={rules} events={events} athletes={athletes} sides={sides} onClose={closeStats} />
+      )}
 
       {commands.ui.error && (
         <div

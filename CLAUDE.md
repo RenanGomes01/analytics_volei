@@ -33,5 +33,12 @@
 - A inferência destaca a equipe esperada, mas só bloqueia o que é fisicamente impossível. O analista precisa conseguir registrar o que viu, inclusive um 4º toque.
 - Tela de scout: `h-dvh overflow-hidden`, sem scroll; alvos de toque com no mínimo 48px (botões principais com 64px).
 
+## Estatísticas (`src/domain/stats/` + `src/features/stats/`)
+- As estatísticas partem de `replayMatch(...).rallies`, nunca do ledger cru. Assim usam as mesmas anulações, sets, sacador e resultado de rali do placar.
+- Invariante testada: os pontos da equipe (kills + aces + bloqueios + erros do adversário) são sempre iguais ao placar. Os testes de invariantes usam ledgers aleatórios com semente fixa.
+- Toda divisão passa por `rate()` / `efficiency()` (`rate.ts`): denominador 0 vira `null` e aparece como "–".
+- Definições: ataque bloqueado (próximo toque é bloqueio `#` do adversário) é erro do atacante; kill, ace e bloqueio exigem `#` **e** o rali ganho; "erros do adversário" = `error` + `four_touches` + `manual`.
+- A UI (`StatsSheet`) usa os `events` do mesmo `useLiveQuery` da tela de scout: não abra outra consulta ao banco.
+
 ## Regras do Next.js (geradas pelo create-next-app)
 @AGENTS.md
