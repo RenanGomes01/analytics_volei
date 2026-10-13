@@ -59,12 +59,7 @@ export async function getMatchState(db: ScoutDB, scope: MatchScope): Promise<Mat
 }
 
 /** Campos comuns do próximo evento: continua o rali aberto ou abre um novo no set atual. */
-async function nextEventBase(
-  db: ScoutDB,
-  scope: MatchScope,
-  state: MatchState,
-  local_seq: number,
-): Promise<RallyEventBase> {
+function eventBase(scope: MatchScope, state: MatchState, local_seq: number, device_id: string): RallyEventBase {
   const open = state.open_rally;
   const set_number = open?.set_number ?? state.current_set;
   return {
@@ -75,9 +70,13 @@ async function nextEventBase(
     rally_id: open?.rally_id ?? newId(),
     rally_number: open?.rally_number ?? state.rallies.filter((r) => r.set_number === set_number).length + 1,
     local_seq,
-    device_id: await getDeviceId(db),
+    device_id,
     timestamp: Date.now(),
   };
+}
+
+async function nextEventBase(db: ScoutDB, scope: MatchScope, state: MatchState, local_seq: number): Promise<RallyEventBase> {
+  return eventBase(scope, state, local_seq, await getDeviceId(db));
 }
 
 function ledgerTransaction<T>(db: ScoutDB, fn: () => Promise<T>): Promise<T> {
@@ -212,5 +211,48 @@ export function chooseServer(db: ScoutDB, scope: MatchScope, serving_team: TeamS
     if (state.serving_team === serving_team) return null;
     const base = await nextEventBase(db, scope, state, local_seq);
     return append(db, { ...base, kind: "set_start", serving_team } satisfies SetStartEvent);
+  });
+}
+
+export interface RallyInput {
+  touches: TouchInput[];
+  end: RallyEndInput;
+}
+
+/**
+ * Grava vários ralis completos numa ÚNICA transação (geração/carga em lote). O estado é reconstruído em memória
+ * entre um rali e outro, com as mesmas regras de `appendRally`. `next(state)` devolve o próximo rali ou `null`
+ * para parar; para sozinho quando a partida termina. Devolve o estado final.
+ */
+export function appendRallies(db: ScoutDB, scope: MatchScope, next: (state: MatchState) => RallyInput | null): Promise<MatchState> {
+  return ledgerTransaction(db, async () => {
+    const match = await getMatch(db, scope.tenant_id, scope.match_id);
+    if (!match) throw new Error(`Partida ${scope.match_id} não encontrada.`);
+    const rules = rulesFor(match.modality);
+    const options = { rules, first_server: match.first_server };
+    const events = await listMatchEvents(db, scope);
+    const device_id = await getDeviceId(db);
+    let local_seq = Math.max(0, ...events.map((e) => e.local_seq)) + 1;
+
+    for (;;) {
+      const state = replayMatch(events, options);
+      const rally = state.winner ? null : next(state);
+      if (!rally) return state;
+      const base = eventBase(scope, state, local_seq, device_id);
+      const rallyTouches: TouchEvent[] = [...(state.open_rally?.touches ?? [])];
+      let offset = 0;
+      const stamp = () => {
+        const i = offset++;
+        return { ...base, id: newId(), local_seq: local_seq + i, timestamp: base.timestamp + i };
+      };
+      for (const input of rally.touches) {
+        const phase = phaseForTouch(rallyTouches, input.team, state.serving_team, rules);
+        const event = await append(db, { ...stamp(), ...input, kind: "touch", phase } satisfies TouchEvent);
+        rallyTouches.push(event);
+        events.push(event);
+      }
+      events.push(await append(db, { ...stamp(), ...rally.end, kind: "rally_end" } satisfies RallyEndEvent));
+      local_seq += offset;
+    }
   });
 }

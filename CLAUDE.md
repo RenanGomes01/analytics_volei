@@ -67,5 +67,11 @@
 - Gráficos: um eixo por gráfico, % sempre com volume, pouco volume esmaecido (nunca escondido).
 - Rota nova com query string → adicionar em `additionalPrecacheEntries` e o parâmetro em `ignoreURLParametersMatching` (`src/app/sw.ts`).
 
+## Dados de teste (`/dev/seed`)
+- Gerador puro em `src/domain/dev/rally-generator.ts` (semente fixa, modo detalhado, fim do rali sempre por `impliedPoint`); serviço em `src/services/dev/seed-service.ts`, gravando pelos services reais (`appendRallies` = vários ralis numa transação).
+- Os ids criados ficam em `meta["dev_seed"]`. `removeDemoData` apaga **só** esses ids (exceção deliberada ao append-only, restrita a dados sintéticos).
+- A rota não tem link na home e não entra no pré-cache. Remover (ou esconder atrás de variável de ambiente) antes de um deploy público.
+- No `fake-indexeddb`, apagar milhares de linhas é muito lento: nos testes use `maxMatches`.
+
 ## Regras do Next.js (geradas pelo create-next-app)
 @AGENTS.md
