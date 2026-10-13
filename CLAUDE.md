@@ -49,6 +49,9 @@
 - **Transporte:** a interface é `SyncTransport` (`src/services/sync/transport.ts`); hoje só existe o `MockTransport`. Um back-end real entra como outro transporte, sem mexer no motor. É obrigatório ser idempotente por `mutation_id`.
 - **Versão nova do PWA:** o SW usa skipWaiting + clientsClaim, então abas abertas passam a ter código antigo sob um SW novo. `src/features/update/` detecta isso (`controllerchange`), mostra o banner "Nova versão disponível" e **pausa o SyncAgent** naquela aba até recarregar. Nunca recarregue automaticamente: `reloadOnOnline` fica desligado no `SerwistProvider`.
 - `NEXT_PUBLIC_SYNC_MODE` = `off` (padrão) ou `mock` (ver `.env.example`). O `SyncAgent` (no layout) nunca bloqueia a UI, e o status aparece só no `SyncBadge`, nunca na tela de scout.
+- **Importação** (`src/services/export/import-service.ts`): sempre `inspectMatchExport` (só lê) antes de `importMatchExport` (transação única). Nunca sobrescreva: as situações são new / up_to_date / append / diverged / conflict (ver `docs/architecture.md`). Toda validação nova de arquivo entra em `validateExportData` (estrutura) — hash e assinatura não bastam.
+- **CSV** (`src/domain/export/box-score-csv.ts`): formato Excel pt-BR (`;`, vírgula decimal, BOM). Todo texto vindo do usuário passa por `text()` (neutraliza fórmulas).
+- **Persistência:** `src/services/storage/persistence.ts`; nunca prometa na interface que os dados estão garantidos só porque `persist()` foi pedido.
 - Mudança de schema do IndexedDB = nova `version(n)` no `ScoutDB` com `upgrade()` e teste de migração (ver `tests/services/sync.test.ts`).
 
 ## Regras do Next.js (geradas pelo create-next-app)

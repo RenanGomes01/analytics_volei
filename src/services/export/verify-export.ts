@@ -5,6 +5,7 @@ import {
   SIGNATURE_ALGORITHM,
   type MatchExportV1,
 } from "@/domain/export/match-export";
+import { validateExportData } from "@/domain/export/validate-export-data";
 import { fromBase64, sha256Hex, utf8 } from "./crypto-encoding";
 import { ECDSA_P256, ECDSA_SHA256 } from "./device-key";
 
@@ -17,7 +18,8 @@ export interface VerifyResult {
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 
 /**
- * Verifica um arquivo de exportação: formato, versão, hash do `data` canônico e assinatura ECDSA.
+ * Verifica um arquivo de exportação: formato, versão, estrutura dos dados, hash do `data` canônico
+ * e assinatura ECDSA.
  * A assinatura prova integridade e origem no aparelho dono da chave pública — a identidade do
  * aparelho só é garantida quando essa chave estiver registrada num servidor confiável.
  */
@@ -45,8 +47,8 @@ export async function verifyMatchExport(input: string | unknown): Promise<Verify
   if (errors.length) return { ok: false, errors };
 
   const envelope = parsed as unknown as MatchExportV1;
-  const { match, events } = envelope.data;
-  if (events.some((e) => e.match_id !== match.id)) errors.push("Há eventos de outra partida no arquivo.");
+  // Estrutura dos dados: um arquivo assinado com outra chave pode ser íntegro e ainda assim malformado.
+  errors.push(...validateExportData(envelope.data));
 
   const canonical = canonicalJson(envelope.data);
   if ((await sha256Hex(canonical)) !== envelope.integrity.content_hash) {

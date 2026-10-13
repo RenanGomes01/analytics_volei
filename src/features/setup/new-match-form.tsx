@@ -5,6 +5,7 @@ import { getDB } from "@/db/client";
 import type { Modality, TeamSide } from "@/domain/types";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
 import { createMatchWithRoster } from "@/services/match-service";
+import { requestStorageProtection } from "@/services/storage/persistence";
 
 interface AthleteRow {
   name: string;
@@ -55,6 +56,8 @@ export function NewMatchForm() {
     }
 
     setSaving(true);
+    // Gesto do usuário: o momento certo para pedir a proteção do armazenamento (o Firefox exige).
+    void requestStorageProtection();
     try {
       const match = await createMatchWithRoster(getDB(), {
         tenant_id: LOCAL_TENANT_ID,

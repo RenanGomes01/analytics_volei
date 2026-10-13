@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ModalityRules } from "@/domain/rules/modality";
 import type { StatsFilter } from "@/domain/stats/types";
 import type { Athlete, Match, RallyEvent, TeamSide } from "@/domain/types";
+import { CsvExportButton } from "@/features/export/csv-export-button";
 import { ExportButton } from "@/features/export/export-button";
 import { SyncBadge } from "@/features/sync/sync-badge";
 import { AthleteTable } from "./athlete-table";
@@ -56,6 +57,7 @@ export function StatsSheet({ match, rules, events, athletes, sides, onClose }: P
           <SyncBadge />
         </span>
         <SetFilter sets={box.sets_available} value={filter} onChange={setFilter} />
+        <CsvExportButton box={box} match={match} athletes={athletes} filter={filter} />
         <ExportButton matchId={match.id} />
         <button
           ref={closeRef}

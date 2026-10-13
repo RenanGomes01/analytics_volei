@@ -5,8 +5,12 @@ export type DeliveryOutcome = "shared" | "downloaded" | "cancelled";
  * em aparelhos de toque, a folha de compartilhamento nativa (WhatsApp, Drive, AirDrop…);
  * nos demais, ou se o compartilhamento falhar, o download clássico.
  */
-export async function deliverFile(contents: string, filename: string): Promise<DeliveryOutcome> {
-  const file = new File([contents], filename, { type: "application/json" });
+export async function deliverFile(
+  contents: string,
+  filename: string,
+  type = "application/json",
+): Promise<DeliveryOutcome> {
+  const file = new File([contents], filename, { type });
   const touch = window.matchMedia?.("(pointer: coarse)").matches;
   if (touch && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
     try {

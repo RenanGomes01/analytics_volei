@@ -67,7 +67,7 @@ export function buildMatchExport(input: BuildMatchExportInput): UnsignedMatchExp
   };
 }
 
-const slug = (text: string) =>
+export const slug = (text: string) =>
   text
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
