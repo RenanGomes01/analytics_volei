@@ -3,6 +3,7 @@ import {
   otherTeam,
   type RallyEndEvent,
   type RallyEndReason,
+  type PointDetail,
   type RallyEvent,
   type SetStartEvent,
   type TeamSide,
@@ -31,6 +32,8 @@ export interface RallyResult {
   /** null enquanto o rali está aberto. */
   point_to: TeamSide | null;
   reason: RallyEndReason | null;
+  /** Detalhe de como foi o ponto (modo rápido), quando registrado. */
+  detail: PointDetail | null;
 }
 
 export interface SetResult {
@@ -124,6 +127,7 @@ export function replayMatch(events: readonly RallyEvent[], { rules, first_server
       touch_count,
       point_to,
       reason: outcome?.reason ?? null,
+      detail: end?.detail ?? (point_to ? (lastTouch?.detail ?? null) : null),
     });
     if (!point_to) continue;
 

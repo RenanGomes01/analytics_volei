@@ -64,3 +64,9 @@ Bola mandada para o outro lado **sem intenção de ataque**, só para mantê-la 
 ## Quem começa sacando (sorteio)
 - No 0×0 de cada set aparece "Quem começa sacando?". A escolha grava um evento `set_start` no ledger (não altera a partida, dá para desfazer). Depois do primeiro ponto do set, a escolha não vale mais.
 - Sem escolha: set 1 = "Primeiro saque" da criação da partida; sets seguintes alternam.
+
+## Como foi o ponto (modo rápido) — opções de vôlei de praia
+- Pelo último toque: saque (fora / na rede), passe (ace), ataque (fora / na rede / **bloqueado → quem bloqueou**), bloqueio (fora / na rede), levantamento (dois toques / condução / fora), defesa (defesa não segurou / erro de defesa); ponto de quem tocou por último: ace, ponto de ataque, largada/shot, explorou o bloqueio, ponto de bloqueio.
+- **Falta… (sempre disponível)**: toque na rede, invasão, dois toques, condução, quatro toques, pé na linha, demora no saque, ordem de saque, largada de dedos, ataque/bloqueio no saque, penalidade, outro/arbitragem → depois **quem cometeu** (ou "não sei quem").
+- O detalhe fica gravado no lance (`detail`) e no fim do rali, para estatísticas de "como os pontos aconteceram".
+- **Rali anulado (repetir)**: descarta os toques sem ponto para ninguém.

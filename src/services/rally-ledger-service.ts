@@ -6,6 +6,7 @@ import type {
   RallyEndEvent,
   RallyEndReason,
   RallyEvent,
+  PointDetail,
   RallyEventBase,
   SetStartEvent,
   TeamSide,
@@ -27,11 +28,12 @@ export interface MatchScope {
   match_id: string;
 }
 
-export type TouchInput = Pick<TouchEvent, "team" | "athlete_id" | "skill" | "quality">;
+export type TouchInput = Pick<TouchEvent, "team" | "athlete_id" | "skill" | "quality" | "detail">;
 
 export interface RallyEndInput {
   point_to: TeamSide;
   reason: RallyEndReason;
+  detail?: PointDetail;
 }
 
 export async function listMatchEvents(db: ScoutDB, { tenant_id, match_id }: MatchScope): Promise<RallyEvent[]> {

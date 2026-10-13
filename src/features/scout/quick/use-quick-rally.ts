@@ -7,8 +7,8 @@ import {
   buildQuickRally,
   pointOutcomes,
   tapsFromTouches,
+  type QuickChoice,
   type QuickOutcome,
-  type QuickOutcomeId,
   type QuickTap,
 } from "@/domain/rally/quick-rally";
 import type { MatchState } from "@/domain/rally/replay";
@@ -81,11 +81,11 @@ export function useQuickRally(scope: MatchScope, state: MatchState, next: NextAc
   );
 
   const choose = useCallback(
-    async (outcome: QuickOutcomeId) => {
+    async (choice: QuickChoice) => {
       if (!pending || saving) return;
       setSaving(true);
       try {
-        const { touches, end } = buildQuickRally(taps, pending.winner, outcome);
+        const { touches, end } = buildQuickRally(taps, pending.winner, choice);
         await appendRally(getDB(), scope, touches, end);
         setTaps([]);
         setPending(null);
@@ -121,6 +121,11 @@ export function useQuickRally(scope: MatchScope, state: MatchState, next: NextAc
     openPoint,
     pending,
     cancelPoint: () => setPending(null),
+    /** Rali anulado pela arbitragem (repetir): descarta os toques, sem ponto. */
+    replayRally: () => {
+      setPending(null);
+      setTaps([]);
+    },
     choose,
     undo,
     saving,

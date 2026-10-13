@@ -1,4 +1,4 @@
-import type { Quality, RallyEndReason, Skill, TeamSide } from "../types";
+import type { PointDetail, Quality, RallyEndReason, Skill, TeamSide } from "../types";
 
 /**
  * Modo rápido: durante o rali o analista só toca em QUEM tocou na bola; no fim marca o ponto e
@@ -18,6 +18,7 @@ export interface QuickTouch {
   athlete_id: string;
   skill: Skill;
   quality: Quality;
+  detail?: PointDetail;
 }
 
 /**
@@ -61,6 +62,7 @@ export type QuickOutcomeId =
   | "ace"
   | "kill"
   | "block_point"
+  | "blocked"
   | "serve_error"
   | "reception_error"
   | "attack_error"
@@ -73,83 +75,172 @@ export type QuickOutcomeId =
 export interface QuickOutcome {
   id: QuickOutcomeId;
   label: string;
+  detail?: PointDetail;
+  /** Precisa de mais um toque: em quem bloqueou (equipe que pontuou). */
+  pick?: "blocker";
 }
 
-/** Opções de "como foi o ponto", da mais provável para a menos, pelo último toque e por quem pontuou. */
+/** A escolha final do analista. */
+export interface QuickChoice {
+  outcome: QuickOutcomeId;
+  detail?: PointDetail;
+  /** Bloqueador ("Bloqueado") ou quem cometeu a falta ("Falta"); ausente = não sabe quem. */
+  athlete_id?: string;
+}
+
+/** Faltas do vôlei de praia: cometidas pela equipe que PERDEU o ponto. */
+export const BEACH_FAULTS: { detail: PointDetail; label: string }[] = [
+  { detail: "net_touch", label: "Toque na rede" },
+  { detail: "invasion", label: "Invasão" },
+  { detail: "double", label: "Dois toques" },
+  { detail: "lift", label: "Condução" },
+  { detail: "four_hits", label: "Quatro toques" },
+  { detail: "foot_fault", label: "Pé na linha (saque)" },
+  { detail: "serve_delay", label: "Demora no saque" },
+  { detail: "service_order", label: "Ordem de saque" },
+  { detail: "open_hand_tip", label: "Largada de dedos" },
+  { detail: "serve_attack", label: "Ataque/bloqueio no saque" },
+  { detail: "penalty", label: "Penalidade (cartão)" },
+  { detail: "other", label: "Outro / arbitragem" },
+];
+
+/** Rótulo curto do detalhe, para o rastro do rali e relatórios. */
+export const POINT_DETAIL_LABEL: Record<PointDetail, string> = {
+  out: "fora",
+  net: "na rede",
+  blocked: "bloqueado",
+  shot: "largada/shot",
+  block_out: "explorou o bloqueio",
+  foot_fault: "pé na linha",
+  net_touch: "toque na rede",
+  invasion: "invasão",
+  double: "dois toques",
+  lift: "condução",
+  four_hits: "4 toques",
+  serve_delay: "demora no saque",
+  service_order: "ordem de saque",
+  open_hand_tip: "largada de dedos",
+  serve_attack: "ataque/bloqueio no saque",
+  penalty: "penalidade",
+  other: "arbitragem",
+};
+
+/**
+ * Opções de "como foi o ponto", pelo último toque e por quem pontuou (a primeira é a mais provável).
+ * "Falta…" (BEACH_FAULTS) fica sempre disponível à parte, na tela.
+ */
 export function pointOutcomes(taps: readonly QuickTap[], winner: TeamSide): QuickOutcome[] {
   const touches = inferSkills(taps);
   const last = touches.at(-1);
-  const fault: QuickOutcome = { id: "fault", label: "Falta / outro (rede, invasão, arbitragem)" };
-  if (!last) return [fault];
+  if (!last) return [];
 
   if (last.team === winner) {
-    if (last.skill === "serve") return [{ id: "ace", label: "Ace" }, fault];
-    if (last.skill === "block") return [{ id: "block_point", label: "Ponto de bloqueio" }, fault];
-    return [{ id: "kill", label: "Ponto de ataque" }, fault];
+    if (last.skill === "serve") return [{ id: "ace", label: "Ace" }];
+    if (last.skill === "block") return [{ id: "block_point", label: "Ponto de bloqueio" }];
+    return [
+      { id: "kill", label: "Ponto de ataque" },
+      { id: "kill", label: "Largada / shot", detail: "shot" },
+      { id: "kill", label: "Explorou o bloqueio", detail: "block_out" },
+    ];
   }
 
   switch (last.skill) {
     case "serve":
-      return [{ id: "serve_error", label: "Erro de saque" }, fault];
+      return [
+        { id: "serve_error", label: "Saque fora", detail: "out" },
+        { id: "serve_error", label: "Saque na rede", detail: "net" },
+      ];
     case "reception":
-      return [{ id: "reception_error", label: "Ace (passe não segurou)" }, fault];
+      return [{ id: "reception_error", label: "Ace (passe não segurou)" }];
     case "dig": {
       const attacked = touches.at(-2)?.team === winner && touches.at(-2)?.skill === "attack";
       return [
         ...(attacked ? [{ id: "kill_through_defense" as const, label: "Ponto de ataque (defesa não segurou)" }] : []),
         { id: "dig_error", label: "Erro de defesa" },
-        fault,
       ];
     }
     case "attack":
-      return [{ id: "attack_error", label: "Erro de ataque (fora / rede)" }, fault];
+      return [
+        { id: "attack_error", label: "Ataque fora", detail: "out" },
+        { id: "attack_error", label: "Ataque na rede", detail: "net" },
+        { id: "blocked", label: "Bloqueado →", detail: "blocked", pick: "blocker" },
+      ];
     case "block":
-      return [{ id: "block_error", label: "Erro de bloqueio (rede / fora)" }, fault];
+      return [
+        { id: "block_error", label: "Bloqueio jogou fora", detail: "out" },
+        { id: "block_error", label: "Bloqueio na rede", detail: "net" },
+      ];
+    case "set":
+      return [
+        { id: "ball_error", label: "Dois toques", detail: "double" },
+        { id: "ball_error", label: "Condução", detail: "lift" },
+        { id: "ball_error", label: "Levantamento fora", detail: "out" },
+      ];
     default:
-      return [{ id: "ball_error", label: "Erro (levantamento / bola de graça)" }, fault];
+      return [
+        { id: "ball_error", label: "Bola fora", detail: "out" },
+        { id: "ball_error", label: "Bola na rede", detail: "net" },
+      ];
   }
 }
 
 export interface QuickRally {
   touches: QuickTouch[];
-  end: { point_to: TeamSide; reason: RallyEndReason };
+  end: { point_to: TeamSide; reason: RallyEndReason; detail?: PointDetail };
 }
 
-/** Eventos do rali: o lance final ganha a qualidade que o ponto revela; o fim do rali é explícito. */
-export function buildQuickRally(taps: readonly QuickTap[], winner: TeamSide, outcome: QuickOutcomeId): QuickRally {
+const other = (t: TeamSide): TeamSide => (t === "A" ? "B" : "A");
+
+/** Eventos do rali: o lance final ganha a qualidade (e o detalhe) que o ponto revela; o fim é explícito. */
+export function buildQuickRally(taps: readonly QuickTap[], winner: TeamSide, choice: QuickChoice): QuickRally {
   const touches = inferSkills(taps);
   const last = touches.at(-1);
-  const set = (t: QuickTouch | undefined, patch: Partial<QuickTouch>) => t && Object.assign(t, patch);
+  const { detail } = choice;
+  const set = (t: QuickTouch | undefined, patch: Partial<QuickTouch>) => t && Object.assign(t, patch, detail ? { detail } : {});
+  const end = (reason: RallyEndReason): QuickRally => ({ touches, end: { point_to: winner, reason, ...(detail ? { detail } : {}) } });
 
-  switch (outcome) {
+  switch (choice.outcome) {
     case "ace":
       set(last, { quality: "#" });
-      return { touches, end: { point_to: winner, reason: "ace" } };
+      return end("ace");
     case "kill":
       set(last, { skill: last?.skill === "serve" ? "serve" : "attack", quality: "#" }); // ataque de segunda, largada…
-      return { touches, end: { point_to: winner, reason: "kill" } };
+      return end("kill");
     case "block_point":
       set(last, { skill: "block", quality: "#" });
-      return { touches, end: { point_to: winner, reason: "kill" } };
+      return end("kill");
+    case "blocked": {
+      if (!choice.athlete_id) throw new Error("Escolha quem bloqueou.");
+      // O ataque (último toque) fica sem qualidade: o bloqueio # seguinte já o torna erro do atacante.
+      touches.push({ team: winner, athlete_id: choice.athlete_id, skill: "block", quality: "#", detail: "blocked" });
+      return end("kill");
+    }
     case "kill_through_defense":
       set(touches.at(-2), { quality: "#" });
       set(last, { quality: "=" });
-      return { touches, end: { point_to: winner, reason: "kill" } };
+      return end("kill");
     case "reception_error":
       set(last, { quality: "=" });
-      return { touches, end: { point_to: winner, reason: "ace" } };
+      return end("ace");
     case "serve_error":
     case "attack_error":
     case "dig_error":
     case "block_error":
     case "ball_error":
       set(last, { quality: "=" });
-      return { touches, end: { point_to: winner, reason: "error" } };
+      return end("error");
     case "fault":
-      return { touches, end: { point_to: winner, reason: "manual" } };
+      // Falta de quem perdeu o ponto: com a atleta, vira um lance "falta =" dela; sem, só o fim do rali.
+      if (choice.athlete_id) {
+        touches.push({ team: other(winner), athlete_id: choice.athlete_id, skill: "fault", quality: "=", ...(detail ? { detail } : {}) });
+        return end("error");
+      }
+      return end("manual");
   }
 }
 
-/** Toques de volta para o modo rápido (ex.: ao desfazer um ponto para corrigir). */
+/** Toques de volta para o modo rápido (ex.: ao desfazer um ponto para corrigir). Faltas não são toques. */
 export const tapsFromTouches = (touches: readonly Pick<QuickTouch, "team" | "athlete_id" | "skill">[]): QuickTap[] =>
-  touches.map((t) => ({ team: t.team, athlete_id: t.athlete_id, ...(t.skill === "block" ? { block: true } : {}) }));
+  touches
+    .filter((t) => t.skill !== "fault")
+    .map((t) => ({ team: t.team, athlete_id: t.athlete_id, ...(t.skill === "block" ? { block: true } : {}) }));

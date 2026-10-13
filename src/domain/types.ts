@@ -55,6 +55,26 @@ export interface RallyEventBase extends TenantScoped {
   timestamp: number;
 }
 
+/** Como o ponto aconteceu, com detalhe de vôlei de praia (modo rápido). Opcional nos eventos. */
+export type PointDetail =
+  | "out"
+  | "net"
+  | "blocked"
+  | "shot"
+  | "block_out"
+  | "foot_fault"
+  | "net_touch"
+  | "invasion"
+  | "double"
+  | "lift"
+  | "four_hits"
+  | "serve_delay"
+  | "service_order"
+  | "open_hand_tip"
+  | "serve_attack"
+  | "penalty"
+  | "other";
+
 export interface TouchEvent extends RallyEventBase {
   kind: "touch";
   phase: RallyPhase;
@@ -62,6 +82,7 @@ export interface TouchEvent extends RallyEventBase {
   athlete_id: string;
   skill: Skill;
   quality: Quality;
+  detail?: PointDetail;
 }
 
 export type RallyEndReason = "kill" | "ace" | "error" | "four_touches" | "manual";
@@ -70,6 +91,7 @@ export interface RallyEndEvent extends RallyEventBase {
   kind: "rally_end";
   point_to: TeamSide;
   reason: RallyEndReason;
+  detail?: PointDetail;
 }
 
 /** Correção = evento compensatório que anula outro evento do ledger. */

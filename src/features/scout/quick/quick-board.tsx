@@ -7,7 +7,9 @@ import type { Athlete, Match, TeamSide } from "@/domain/types";
 import type { MatchScope } from "@/services/rally-ledger-service";
 import { SKILL_LABEL } from "../labels";
 import { MatchOver } from "../components/match-over";
+import { reasonLabel } from "../components/rally-trail";
 import { ServeChooser } from "../components/serve-chooser";
+import { PointSheet } from "./point-sheet";
 import { useQuickRally } from "./use-quick-rally";
 
 interface Props {
@@ -35,6 +37,7 @@ export function QuickBoard({ scope, match, state, next, athletes, sides, onDetai
   const lastId = quick.taps.at(-1)?.athlete_id;
   const over = !!state.winner;
   const waitingServe = quick.taps.length === 0;
+  const lastPoint = state.rallies.at(-1);
 
   const column = (team: TeamSide) => {
     const ids = team === "A" ? match.team_a.athlete_ids : match.team_b.athlete_ids;
@@ -100,6 +103,11 @@ export function QuickBoard({ scope, match, state, next, athletes, sides, onDetai
                     : `Toque em quem sacou (${teamName(state.serving_team)})`
                   : "Toque em quem tocou na bola…"}
               </p>
+              {lastPoint?.point_to && waitingServe && (
+                <p className="text-center text-sm text-zinc-400">
+                  Último ponto: {teamName(lastPoint.point_to)} — {reasonLabel(lastPoint)}
+                </p>
+              )}
               <ol aria-label="Toques do rali" className="flex min-h-0 flex-1 flex-wrap content-start gap-1.5 overflow-hidden rounded-2xl bg-zinc-900 p-3">
                 {touches.map((t, i) => (
                   <li key={i} className={`rounded-lg px-2 py-1 text-sm ${t.team === sides[0] ? "bg-sky-900/70" : "bg-fuchsia-900/60"}`}>
@@ -138,27 +146,17 @@ export function QuickBoard({ scope, match, state, next, athletes, sides, onDetai
       </footer>
 
       {quick.pending && (
-        <div role="dialog" aria-modal="true" aria-label="Como foi o ponto" className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="flex w-full max-w-lg flex-col gap-3 rounded-3xl bg-zinc-900 p-4">
-            <h2 className="text-center text-2xl font-bold">
-              Ponto {teamName(quick.pending.winner)} — como foi?
-            </h2>
-            {quick.pending.options.map((o, i) => (
-              <button
-                key={o.id}
-                type="button"
-                disabled={quick.saving}
-                onClick={() => quick.choose(o.id)}
-                className={`${big} min-h-20 px-4 text-xl ${i === 0 ? "bg-emerald-600 text-white" : o.id === "fault" ? "bg-zinc-700 text-zinc-100" : "bg-zinc-200 text-zinc-950"}`}
-              >
-                {o.label}
-              </button>
-            ))}
-            <button type="button" onClick={quick.cancelPoint} className="min-h-14 rounded-2xl text-zinc-300">
-              Cancelar (o rali continua)
-            </button>
-          </div>
-        </div>
+        <PointSheet
+          winner={quick.pending.winner}
+          options={quick.pending.options}
+          teamName={teamName}
+          roster={(t) => (t === "A" ? match.team_a.athlete_ids : match.team_b.athlete_ids)}
+          athletes={athletes}
+          saving={quick.saving}
+          onChoose={quick.choose}
+          onCancel={quick.cancelPoint}
+          onReplay={quick.replayRally}
+        />
       )}
 
       {quick.error && (

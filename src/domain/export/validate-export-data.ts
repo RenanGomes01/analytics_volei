@@ -1,10 +1,14 @@
 import { replayMatch } from "../rally/replay";
 import { rulesFor } from "../rules/modality";
-import type { RallyEndReason, Quality, Skill } from "../types";
+import type { PointDetail, RallyEndReason, Quality, Skill } from "../types";
 
 const SKILLS: readonly Skill[] = ["serve", "reception", "set", "attack", "block", "dig", "freeball", "fault"];
 const QUALITIES: readonly Quality[] = ["#", "+", "!", "-", "/", "=", "?"];
 const REASONS: readonly RallyEndReason[] = ["kill", "ace", "error", "four_touches", "manual"];
+const DETAILS: readonly PointDetail[] = [
+  "out", "net", "blocked", "shot", "block_out", "foot_fault", "net_touch", "invasion", "double", "lift",
+  "four_hits", "serve_delay", "service_order", "open_hand_tip", "serve_attack", "penalty", "other",
+];
 const MAX_REPORTED = 10;
 
 type Obj = Record<string, unknown>;
@@ -62,8 +66,10 @@ export function validateExportData(data: unknown): string[] {
       if (!isTeam(e.team) || !isStr(e.athlete_id)) errors.push(`${at}: equipe ou atleta inválido.`);
       if (!SKILLS.includes(e.skill as Skill)) errors.push(`${at}: fundamento desconhecido.`);
       if (!QUALITIES.includes(e.quality as Quality)) errors.push(`${at}: qualidade fora da escala.`);
+      if (e.detail !== undefined && !DETAILS.includes(e.detail as PointDetail)) errors.push(`${at}: detalhe do ponto desconhecido.`);
     } else if (e.kind === "rally_end") {
       if (!isTeam(e.point_to) || !REASONS.includes(e.reason as RallyEndReason)) errors.push(`${at}: fim de rali inválido.`);
+      if (e.detail !== undefined && !DETAILS.includes(e.detail as PointDetail)) errors.push(`${at}: detalhe do ponto desconhecido.`);
     } else if (e.kind === "set_start") {
       if (!isTeam(e.serving_team)) errors.push(`${at}: sacador inicial inválido.`);
     } else if (e.kind === "void") {

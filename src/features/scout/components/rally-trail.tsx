@@ -1,6 +1,7 @@
 import type { NextAction } from "@/domain/rally/next-action";
 import type { MatchState, RallyResult } from "@/domain/rally/replay";
 import type { Athlete, Match, TeamSide } from "@/domain/types";
+import { POINT_DETAIL_LABEL } from "@/domain/rally/quick-rally";
 import { QUALITY_STYLE, REASON_LABEL, SKILL_LABEL } from "../labels";
 
 interface Props {
@@ -13,7 +14,8 @@ interface Props {
 const MAX_CHIPS = 6;
 
 /** Motivo do ponto em PT-BR; "kill" distingue ataque de bloqueio pelo último lance. */
-function reasonLabel(rally: RallyResult): string {
+export function reasonLabel(rally: RallyResult): string {
+  if (rally.detail) return POINT_DETAIL_LABEL[rally.detail];
   if (rally.reason === "kill" && rally.touches.at(-1)?.skill === "block") return "bloqueio";
   return rally.reason ? REASON_LABEL[rally.reason] : "";
 }
