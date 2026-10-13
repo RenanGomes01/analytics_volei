@@ -64,6 +64,8 @@ export function validateExportData(data: unknown): string[] {
       if (!QUALITIES.includes(e.quality as Quality)) errors.push(`${at}: qualidade fora da escala.`);
     } else if (e.kind === "rally_end") {
       if (!isTeam(e.point_to) || !REASONS.includes(e.reason as RallyEndReason)) errors.push(`${at}: fim de rali inválido.`);
+    } else if (e.kind === "set_start") {
+      if (!isTeam(e.serving_team)) errors.push(`${at}: sacador inicial inválido.`);
     } else if (e.kind === "void") {
       if (!isStr(e.voids_event_id)) errors.push(`${at}: anulação sem alvo.`);
     } else {

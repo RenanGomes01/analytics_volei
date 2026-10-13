@@ -18,6 +18,7 @@ interface Props {
 function describe(event: Props["lastActive"], athletes: Map<string, Athlete>, match: Match): string {
   if (!event) return "";
   if (event.kind === "rally_end") return `Ponto ${event.point_to === "A" ? match.team_a.name : match.team_b.name}`;
+  if (event.kind === "set_start") return `Saque inicial ${event.serving_team === "A" ? match.team_a.name : match.team_b.name}`;
   const number = athletes.get(event.athlete_id)?.jersey_number ?? "";
   return `${SKILL_LABEL[event.skill]} ${event.team}${number} ${event.quality}`;
 }

@@ -78,7 +78,16 @@ export interface VoidEvent extends RallyEventBase {
   voids_event_id: string;
 }
 
-export type RallyEvent = TouchEvent | RallyEndEvent | VoidEvent;
+/**
+ * Quem começa sacando no set (sorteio). Só vale no 0×0 do set; depois de um ponto é ignorado.
+ * Fica no ledger (append-only) em vez de alterar a partida: dá para desfazer e não invalida exportações.
+ */
+export interface SetStartEvent extends RallyEventBase {
+  kind: "set_start";
+  serving_team: TeamSide;
+}
+
+export type RallyEvent = TouchEvent | RallyEndEvent | VoidEvent | SetStartEvent;
 
 // ---- Outbox ----
 

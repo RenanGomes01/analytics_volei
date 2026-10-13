@@ -4,6 +4,7 @@ import {
   type RallyEndEvent,
   type RallyEndReason,
   type RallyEvent,
+  type SetStartEvent,
   type TeamSide,
   type TouchEvent,
 } from "../types";
@@ -51,7 +52,7 @@ export interface MatchState {
   open_rally: RallyResult | null;
 }
 
-type ActiveEvent = TouchEvent | RallyEndEvent;
+type ActiveEvent = TouchEvent | RallyEndEvent | SetStartEvent;
 
 const byLedgerOrder = (a: RallyEvent, b: RallyEvent) =>
   a.local_seq - b.local_seq || a.timestamp - b.timestamp || a.id.localeCompare(b.id);
@@ -88,6 +89,16 @@ export function replayMatch(events: readonly RallyEvent[], { rules, first_server
 
   for (const group of groupByRally(activeEvents(events))) {
     if (winner) break;
+
+    // Escolha de quem saca: só vale antes do primeiro ponto do set.
+    const choice = group.findLast((e): e is SetStartEvent => e.kind === "set_start");
+    if (choice) {
+      if (currentSet.score.A + currentSet.score.B === 0) {
+        currentSet.first_server = choice.serving_team;
+        serving_team = choice.serving_team;
+      }
+      continue;
+    }
 
     const touches = group.filter((e): e is TouchEvent => e.kind === "touch");
     const end = group.findLast((e): e is RallyEndEvent => e.kind === "rally_end");
@@ -126,7 +137,7 @@ export function replayMatch(events: readonly RallyEvent[], { rules, first_server
       winner = point_to;
       break;
     }
-    // O saque inicial alterna a cada set. TODO(Fase 2): evento set_start para registrar o sorteio do set decisivo.
+    // O saque inicial alterna a cada set; um set_start no 0×0 do set pode trocar (sorteio).
     const nextFirstServer = otherTeam(currentSet.first_server);
     currentSet = { set_number: currentSet.set_number + 1, first_server: nextFirstServer, score: { A: 0, B: 0 }, winner: null };
     sets.push(currentSet);

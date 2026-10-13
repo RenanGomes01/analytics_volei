@@ -60,3 +60,7 @@ Bola mandada para o outro lado **sem intenção de ataque**, só para mantê-la 
 - Fundamentos deduzidos pela sequência (`src/domain/rally/quick-rally.ts`): 1º toque = saque; em cada posse, 1º = passe (após saque/bola de graça) ou defesa; último toque de posse que cruzou (2+ toques) = ataque; os do meio = levantamento. Bloqueio é marcado pelo analista ("Marcar próximo toque como bloqueio").
 - "Como foi o ponto" dá a qualidade do lance final (`#` ace/ponto de ataque/bloqueio, `=` erros); "defesa não segurou" credita o ponto de ataque a quem atacou. Os demais toques ficam `?` (não avaliado) e ficam fora da % de passe.
 - O rali é gravado inteiro, numa transação, ao marcar o ponto. "Desfazer último ponto" anula o rali inteiro e devolve os toques para corrigir.
+
+## Quem começa sacando (sorteio)
+- No 0×0 de cada set aparece "Quem começa sacando?". A escolha grava um evento `set_start` no ledger (não altera a partida, dá para desfazer). Depois do primeiro ponto do set, a escolha não vale mais.
+- Sem escolha: set 1 = "Primeiro saque" da criação da partida; sets seguintes alternam.

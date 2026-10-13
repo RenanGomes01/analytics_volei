@@ -7,6 +7,7 @@ import type { Athlete, Match, TeamSide } from "@/domain/types";
 import type { MatchScope } from "@/services/rally-ledger-service";
 import { SKILL_LABEL } from "../labels";
 import { MatchOver } from "../components/match-over";
+import { ServeChooser } from "../components/serve-chooser";
 import { useQuickRally } from "./use-quick-rally";
 
 interface Props {
@@ -91,6 +92,7 @@ export function QuickBoard({ scope, match, state, next, athletes, sides, onDetai
             <MatchOver match={match} state={state} />
           ) : (
             <>
+              {waitingServe && <ServeChooser scope={scope} match={match} state={state} sides={sides} />}
               <p className="text-center text-lg font-semibold">
                 {waitingServe
                   ? quick.suggestedServer

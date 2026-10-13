@@ -15,6 +15,7 @@ import { StatsSheet } from "@/features/stats/stats-sheet";
 import type { TeamSide } from "@/domain/types";
 import { useMatchData } from "./use-match-data";
 import { useScoutCommands } from "./use-scout-commands";
+import { ServeChooser } from "./components/serve-chooser";
 import { QuickBoard } from "./quick/quick-board";
 import { useScoutMode } from "./use-scout-mode";
 import { useSideSwap } from "./use-side-swap";
@@ -81,6 +82,7 @@ function ScoutBoard({ matchId }: { matchId: string }) {
           <main className="grid min-h-0 grid-cols-[1fr_1.4fr_1fr] gap-2 p-2 portrait:grid-cols-1 portrait:grid-rows-[minmax(0,0.8fr)_minmax(0,1.6fr)_minmax(0,0.8fr)]">
             {panel(sides[0])}
             <section aria-label="Lance" className="flex min-h-0 flex-col gap-2">
+              <ServeChooser scope={scope} match={match} state={state} sides={sides} />
               <RallyTrail match={match} state={state} next={next} athletes={athletes} />
               {state.winner ? (
                 <MatchOver match={match} state={state} />

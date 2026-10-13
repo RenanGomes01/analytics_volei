@@ -7,6 +7,7 @@ import type {
   RallyEndReason,
   RallyEvent,
   RallyEventBase,
+  SetStartEvent,
   TeamSide,
   TouchEvent,
   VoidEvent,
@@ -191,5 +192,23 @@ export function undoLastRally(db: ScoutDB, scope: MatchScope): Promise<TouchEven
     const inRally = active.filter((e) => e.rally_id === last.rally_id);
     for (const event of [...inRally].reverse()) await voidEvent(db, scope, event.id);
     return inRally.filter((e): e is TouchEvent => e.kind === "touch");
+  });
+}
+
+/**
+ * Quem começa sacando no set atual (sorteio no início do jogo ou do set decisivo). Só antes do
+ * primeiro ponto do set e sem rali em andamento. Grava um evento no ledger: dá para desfazer.
+ */
+export function chooseServer(db: ScoutDB, scope: MatchScope, serving_team: TeamSide): Promise<SetStartEvent | null> {
+  return ledgerTransaction(db, async () => {
+    const { state, local_seq } = await loadMatchContext(db, scope);
+    if (state.winner) throw new Error("Partida encerrada.");
+    const current = state.sets.at(-1)!;
+    if (current.score.A + current.score.B > 0 || state.open_rally) {
+      throw new Error("Só dá para escolher quem saca antes do primeiro ponto do set.");
+    }
+    if (state.serving_team === serving_team) return null;
+    const base = await nextEventBase(db, scope, state, local_seq);
+    return append(db, { ...base, kind: "set_start", serving_team } satisfies SetStartEvent);
   });
 }
