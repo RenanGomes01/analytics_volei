@@ -54,5 +54,11 @@
 - **Persistência:** `src/services/storage/persistence.ts`; nunca prometa na interface que os dados estão garantidos só porque `persist()` foi pedido.
 - Mudança de schema do IndexedDB = nova `version(n)` no `ScoutDB` com `upgrade()` e teste de migração (ver `tests/services/sync.test.ts`).
 
+## Cadastro e competições (Fase 5)
+- `src/domain/roster/` (tipos e identidade: `pairKey`, `resolveAthlete`), `src/services/roster-service.ts` e `tournament-service.ts`. Partidas novas nascem de `createMatchFromTeams` (reutiliza atletas e duplas).
+- **Nunca reescreva ids no ledger nem altere linhas antigas em migrações:** una cadastros com `athlete_aliases` e vincule partidas com `tournament_entries`.
+- **Agregação** (`src/domain/stats/aggregate.ts`): use `tallyRallies` (contadores brutos) + `finalizeTeam`/`athleteLines`; nunca agregue porcentagens já finalizadas. Rankings em `rankings.ts` com volume mínimo.
+- CSV comum em `src/domain/export/csv.ts` (Box Score e torneio).
+
 ## Regras do Next.js (geradas pelo create-next-app)
 @AGENTS.md

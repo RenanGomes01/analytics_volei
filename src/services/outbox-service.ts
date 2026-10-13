@@ -1,4 +1,4 @@
-import type { OutboxEntity, OutboxEntry } from "@/domain/types";
+import type { OutboxEntity, OutboxEntry, OutboxOp } from "@/domain/types";
 import type { ScoutDB } from "@/db/schema";
 
 let lastStamp = 0;
@@ -21,6 +21,7 @@ export async function enqueue(
   db: ScoutDB,
   entity: OutboxEntity,
   row: { id: string; tenant_id: string },
+  op: OutboxOp = "insert",
 ): Promise<OutboxEntry> {
   const now = monotonicNow();
   const entry: OutboxEntry = {
@@ -28,7 +29,7 @@ export async function enqueue(
     tenant_id: row.tenant_id,
     entity,
     entity_id: row.id,
-    op: "insert",
+    op,
     payload: structuredClone(row),
     status: "pending",
     created_at: now,

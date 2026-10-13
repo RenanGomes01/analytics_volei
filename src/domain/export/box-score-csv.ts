@@ -1,15 +1,9 @@
-import type { AthleteStats, BoxScore, Rate, StatsFilter, TeamStats } from "../stats/types";
+import type { AthleteStats, BoxScore, StatsFilter, TeamStats } from "../stats/types";
 import type { Athlete, Match, TeamSide } from "../types";
+import { document, pct, row } from "./csv";
 import { slug } from "./match-export";
 
-/**
- * Box Score em CSV para o Excel em português: separador `;` (o Excel pt-BR usa vírgula decimal),
- * decimais com vírgula, BOM UTF-8 (acentos) e CRLF. Sem assinatura: é um relatório, não um backup.
- */
-
-const SEP = ";";
-const EOL = "\r\n";
-const BOM = "﻿";
+/** Box Score de uma partida em CSV (formato Excel pt-BR, ver csv.ts). Sem assinatura: é relatório, não backup. */
 
 export interface BoxScoreCsvInput {
   box: BoxScore;
@@ -19,29 +13,6 @@ export interface BoxScoreCsvInput {
   /** Fuso para a data da partida (os testes fixam "UTC"). */
   timeZone?: string;
 }
-
-type Cell = string | number | null;
-
-/** Texto seguro: neutraliza fórmulas (=, +, -, @) e põe entre aspas quando precisa. */
-function text(value: string): string {
-  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
-  return /[;"\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
-}
-
-const decimal = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1).replace(".", ","));
-
-function cell(value: Cell): string {
-  if (value === null) return "";
-  return typeof value === "number" ? decimal(value) : text(value);
-}
-
-/** Porcentagem com 1 casa (62,5); vazio quando não há base de cálculo. */
-const pct = (value: Rate | number | null): number | null => {
-  const n = value !== null && typeof value === "object" ? value.pct : value;
-  return n === null ? null : Math.round(n * 1000) / 10;
-};
-
-const row = (cells: Cell[]) => cells.map(cell).join(SEP);
 
 export function boxScoreToCsv({ box, match, athletes, filter, timeZone }: BoxScoreCsvInput): string {
   const beach = match.modality === "beach";
@@ -114,7 +85,7 @@ export function boxScoreToCsv({ box, match, athletes, filter, timeZone }: BoxSco
     }
   }
 
-  return BOM + lines.join(EOL) + EOL;
+  return document(lines);
 }
 
 /** boxscore_areia-a-x-areia-b_set-2_2026-10-13.csv */

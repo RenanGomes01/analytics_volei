@@ -56,13 +56,10 @@ async function planImport(db: ScoutDB, envelope: MatchExportV1, tenant_id: strin
   const localMatch = await db.matches.get(match.id);
   if (localMatch && !same(localMatch, match)) return conflict("Os dados da partida neste aparelho são diferentes dos do arquivo.");
 
-  const newAthletes: Athlete[] = [];
+  // Atletas são CADASTRO (editáveis na Fase 5): se o id já existe, vale a versão local, sem conflito.
+  // Partida e lances continuam com comparação estrita.
   const localAthletes = await db.athletes.bulkGet(athletes.map((a) => a.id));
-  for (const [i, athlete] of athletes.entries()) {
-    const local = localAthletes[i];
-    if (!local) newAthletes.push(athlete);
-    else if (!same(local, athlete)) return conflict(`A atleta ${athlete.name} está diferente neste aparelho.`);
-  }
+  const newAthletes: Athlete[] = athletes.filter((_, i) => !localAthletes[i]);
 
   const incoming = new Map(events.map((e) => [e.id, e]));
   const localEvents = localMatch ? await listMatchEvents(db, { tenant_id, match_id: match.id }) : [];

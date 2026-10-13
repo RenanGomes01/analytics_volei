@@ -33,18 +33,21 @@ const receptionLine = (c: TouchCounters): ReceptionLine => ({
   errors: c.reception_errors,
 });
 
+/** Contadores BRUTOS de uma ou mais partidas: somáveis. Porcentagens só existem depois do finalize. */
+export interface BoxScoreTally {
+  athletes: Map<string, { team: TeamSide; counters: TouchCounters }>;
+  teamTouches: Record<TeamSide, TouchCounters>;
+  teamRallies: Record<TeamSide, RallyCounters>;
+}
+
 /**
- * Núcleo do Box Score: agrega os ralis já reconstruídos pelo replay (anulações, sets, sacador e
- * resultado de cada rali), num único passe. Puro e determinístico.
+ * Etapa 1 — soma os ralis já reconstruídos pelo replay (anulações, sets, sacador e resultado de cada
+ * rali), num único passe. Atletas do elenco começam zerados.
  */
-export function boxScoreFromRallies(
-  rallies: readonly RallyResult[],
-  roster: Roster,
-  filter: StatsFilter = ALL_SETS,
-): BoxScore {
-  const athleteCounters = new Map<string, { team: TeamSide; counters: TouchCounters }>();
+export function tallyRallies(rallies: readonly RallyResult[], roster: Roster, filter: StatsFilter = ALL_SETS): BoxScoreTally {
+  const athletes = new Map<string, { team: TeamSide; counters: TouchCounters }>();
   for (const team of TEAMS) {
-    for (const id of roster[team]) athleteCounters.set(id, { team, counters: emptyTouchCounters() });
+    for (const id of roster[team]) athletes.set(id, { team, counters: emptyTouchCounters() });
   }
   const teamTouches: Record<TeamSide, TouchCounters> = { A: emptyTouchCounters(), B: emptyTouchCounters() };
   const teamRallies: Record<TeamSide, RallyCounters> = { A: emptyRallyCounters(), B: emptyRallyCounters() };
@@ -52,52 +55,71 @@ export function boxScoreFromRallies(
   const selected = filter.set === "all" ? rallies : rallies.filter((r) => r.set_number === filter.set);
   for (const rally of selected) {
     tallyTouches(rally, (team, athlete_id, delta) => {
-      let entry = athleteCounters.get(athlete_id);
+      let entry = athletes.get(athlete_id);
       if (!entry) {
         entry = { team, counters: emptyTouchCounters() }; // atleta fora do elenco: não perde o lance
-        athleteCounters.set(athlete_id, entry);
+        athletes.set(athlete_id, entry);
       }
       addCounters(entry.counters, delta);
       addCounters(teamTouches[team], delta);
     });
     tallyRally(rally, teamRallies);
   }
+  return { athletes, teamTouches, teamRallies };
+}
 
-  const athletes: Record<string, AthleteStats> = {};
-  for (const [athlete_id, { team, counters: c }] of athleteCounters) {
-    athletes[athlete_id] = {
-      athlete_id,
-      team,
-      points: c.kills + c.aces + c.blocks,
-      attack: attackLine(c),
-      serve: serveLine(c),
-      reception: receptionLine(c),
-      blocks: c.blocks,
-      digs: c.digs,
-      errors: c.errors,
-    };
-  }
+export type AthleteLines = Omit<AthleteStats, "athlete_id" | "team">;
 
-  const teamStats = (team: TeamSide): TeamStats => {
-    const c = teamTouches[team];
-    const r = teamRallies[team];
-    return {
-      points: r.points,
-      attack: attackLine(c),
-      serve: serveLine(c),
-      reception: receptionLine(c),
-      blocks: c.blocks,
-      digs: c.digs,
-      errors: c.errors,
-      side_out: rate(r.receiving.won, r.receiving.total),
-      break_point: rate(r.serving.won, r.serving.total),
-    };
+/** Etapa 2 — linhas e porcentagens de um atleta a partir dos contadores (somados ou não). */
+export function athleteLines(c: TouchCounters): AthleteLines {
+  return {
+    points: c.kills + c.aces + c.blocks,
+    attack: attackLine(c),
+    serve: serveLine(c),
+    reception: receptionLine(c),
+    blocks: c.blocks,
+    digs: c.digs,
+    errors: c.errors,
   };
+}
 
+export const finalizeAthlete = (athlete_id: string, team: TeamSide, c: TouchCounters): AthleteStats => ({
+  athlete_id,
+  team,
+  ...athleteLines(c),
+});
+
+/** Etapa 2 — linhas e porcentagens de uma equipe: divide só depois de somar. */
+export function finalizeTeam(c: TouchCounters, r: RallyCounters): TeamStats {
+  return {
+    points: { ...r.points },
+    attack: attackLine(c),
+    serve: serveLine(c),
+    reception: receptionLine(c),
+    blocks: c.blocks,
+    digs: c.digs,
+    errors: c.errors,
+    side_out: rate(r.receiving.won, r.receiving.total),
+    break_point: rate(r.serving.won, r.serving.total),
+  };
+}
+
+/** Box Score de uma partida = finalize(tally). Puro e determinístico. */
+export function boxScoreFromRallies(
+  rallies: readonly RallyResult[],
+  roster: Roster,
+  filter: StatsFilter = ALL_SETS,
+): BoxScore {
+  const tally = tallyRallies(rallies, roster, filter);
+  const athletes: Record<string, AthleteStats> = {};
+  for (const [id, { team, counters }] of tally.athletes) athletes[id] = finalizeAthlete(id, team, counters);
   return {
     filter,
     sets_available: [...new Set(rallies.map((r) => r.set_number))].sort((a, b) => a - b),
-    teams: { A: teamStats("A"), B: teamStats("B") },
+    teams: {
+      A: finalizeTeam(tally.teamTouches.A, tally.teamRallies.A),
+      B: finalizeTeam(tally.teamTouches.B, tally.teamRallies.B),
+    },
     athletes,
   };
 }

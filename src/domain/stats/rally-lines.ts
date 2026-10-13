@@ -15,6 +15,15 @@ export const emptyRallyCounters = (): RallyCounters => ({
   serving: { won: 0, total: 0 },
 });
 
+/** Soma contadores de rali (para agregar várias partidas). */
+export function addRallyCounters(target: RallyCounters, source: RallyCounters): void {
+  for (const key of Object.keys(source.points) as (keyof PointsBreakdown)[]) target.points[key] += source.points[key];
+  target.receiving.won += source.receiving.won;
+  target.receiving.total += source.receiving.total;
+  target.serving.won += source.serving.won;
+  target.serving.total += source.serving.total;
+}
+
 type PointCategory = Exclude<keyof PointsBreakdown, "total">;
 
 /** Classifica o ponto pelo motivo do replay: a soma das categorias é sempre o placar. */

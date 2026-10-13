@@ -48,3 +48,9 @@ Na recepção do beach, a estatística "Passe na mão" = recepções `#` ÷ tota
 
 ### Bola de graça
 Bola mandada para o outro lado **sem intenção de ataque**, só para mantê-la viva. Conta como toque da equipe, mas **não entra na estatística de ataque** (não soma em TA nem na eficiência), para não penalizar a atacante.
+
+## Estatísticas agregadas (torneio, temporada)
+- **Somar numeradores e denominadores, dividir só no final.** Eficiência = (ΣPA − ΣE) ÷ ΣTA; virada de bola = Σ ganhos recebendo ÷ Σ recebidos. Nunca a média das porcentagens de cada jogo (ex.: 40% em 10 ataques + 100% em 2 ataques = 50%, não 70%).
+- **Rankings com volume mínimo:** eficiência de ataque exige ≥ 10 ataques; passe/recepção exige ≥ 10 recepções. Desempate por volume e depois pelo nome.
+- **V/D e sets** vêm do resultado reconstruído de cada partida; partidas em andamento contam nos números, mas não em vitórias/derrotas.
+- **Mesma pessoa = mesmo atleta:** cadastros duplicados são unidos por alias; é proibido unir dois atletas que jogaram a mesma partida.

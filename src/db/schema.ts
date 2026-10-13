@@ -1,4 +1,5 @@
 import Dexie, { type Table } from "dexie";
+import type { AthleteAlias, Team, Tournament, TournamentEntry } from "@/domain/roster/types";
 import type { Athlete, Match, OutboxEntry, RallyEvent } from "@/domain/types";
 
 export interface MetaEntry {
@@ -24,6 +25,10 @@ export class ScoutDB extends Dexie {
   rally_events!: Table<RallyEvent, string>;
   outbox!: Table<OutboxEntry, string>;
   meta!: Table<MetaEntry, string>;
+  teams!: Table<Team, string>;
+  tournaments!: Table<Tournament, string>;
+  tournament_entries!: Table<TournamentEntry, string>;
+  athlete_aliases!: Table<AthleteAlias, string>;
 
   constructor(name = DB_NAME) {
     super(name);
@@ -41,5 +46,13 @@ export class ScoutDB extends Dexie {
             entry.last_error ??= null;
           }),
       );
+    // v3 (Fase 5): cadastro central. Só tabelas novas: nenhuma linha existente é alterada, para não
+    // invalidar ledgers nem JSONs assinados do MVP.
+    this.version(3).stores({
+      teams: "id, tenant_id, [tenant_id+pair_key]",
+      tournaments: "id, tenant_id, start_date",
+      tournament_entries: "id, tenant_id, tournament_id, match_id",
+      athlete_aliases: "alias_id, tenant_id, canonical_id",
+    });
   }
 }

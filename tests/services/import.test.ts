@@ -109,14 +109,26 @@ describe("importação de partida", () => {
     expect(await target.rally_events.count()).toBe(before);
   });
 
-  it("recusa conflito: mesmo id com conteúdo diferente", async () => {
+  it("atleta editada neste aparelho não bloqueia a importação (cadastro): vale o nome local", async () => {
     const json = await exported();
     await importMatchExport(target, json, "local");
     const athlete = (await target.athletes.get(a1))!;
-    await target.athletes.put({ ...athlete, name: "Outra Ana" });
+    await target.athletes.put({ ...athlete, name: "Ana Paula" });
+
+    expect(await inspectMatchExport(target, json, "local")).toMatchObject({ situation: "up_to_date" });
+    await serve(source, scope);
+    expect(await importMatchExport(target, await exported(), "local")).toMatchObject({ imported: true });
+    expect((await target.athletes.get(a1))?.name).toBe("Ana Paula");
+  });
+
+  it("recusa conflito: um lance com o mesmo id e conteúdo diferente", async () => {
+    const json = await exported();
+    await importMatchExport(target, json, "local");
+    const [first] = await listMatchEvents(target, { ...local, match_id: scope.match_id });
+    await target.rally_events.put({ ...first, timestamp: first.timestamp + 1 }); // corrupção simulada
 
     const preview = await inspectMatchExport(target, json, "local");
-    expect(preview).toMatchObject({ situation: "conflict", reason: expect.stringMatching(/Ana está diferente/) });
+    expect(preview).toMatchObject({ situation: "conflict", reason: expect.stringMatching(/lance/) });
   });
 
   it("recusa arquivo adulterado sem gravar nada", async () => {

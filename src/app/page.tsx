@@ -1,5 +1,6 @@
 import { HardLink } from "@/components/hard-link";
 import { MatchList } from "@/features/matches/match-list";
+import { TournamentList } from "@/features/tournament/tournament-list";
 import { StorageStatus } from "@/features/storage/storage-status";
 import { SyncBadge } from "@/features/sync/sync-badge";
 
@@ -16,6 +17,9 @@ export default function Home() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            <HardLink href="/roster" className="min-h-14 rounded-2xl bg-zinc-800 px-5 py-4 text-lg font-semibold">
+              Atletas e duplas
+            </HardLink>
             <HardLink href="/import" className="min-h-14 rounded-2xl bg-zinc-800 px-5 py-4 text-lg font-semibold">
               ⇧ Importar JSON
             </HardLink>
@@ -24,7 +28,11 @@ export default function Home() {
             </HardLink>
           </div>
         </header>
-        <MatchList />
+        <TournamentList />
+        <section className="flex flex-col gap-2">
+          <h2 className="text-xl font-bold">Partidas</h2>
+          <MatchList />
+        </section>
       </main>
     </div>
   );

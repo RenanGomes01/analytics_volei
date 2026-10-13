@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { HardLink } from "@/components/hard-link";
 import { NewMatchForm } from "@/features/setup/new-match-form";
 
@@ -12,7 +13,10 @@ export default function NewMatchPage() {
         </HardLink>
         <h1 className="text-2xl font-bold">Nova partida</h1>
       </header>
-      <NewMatchForm />
+      {/* useSearchParams (?tournament=) numa rota estática exige Suspense. */}
+      <Suspense fallback={<p className="p-4 text-center text-zinc-400">Carregando cadastro…</p>}>
+        <NewMatchForm />
+      </Suspense>
     </div>
   );
 }

@@ -189,7 +189,7 @@ describe("runSyncCycle com MockTransport", () => {
   });
 });
 
-describe("migração Dexie v1 → v2", () => {
+describe("migração Dexie v1 → atual", () => {
   it("preenche os campos novos do outbox sem perder dados", async () => {
     await db.delete();
     const legacy = new Dexie(dbName);
@@ -214,7 +214,7 @@ describe("migração Dexie v1 → v2", () => {
     const migrated = (await db.outbox.get("m-1")) as OutboxEntry;
     expect(migrated).toEqual({ ...v1Entry, next_attempt_at: 1_000, last_attempt_at: null, last_error: null });
     expect(await db.rally_events.count()).toBe(1);
-    expect(db.verno).toBe(2);
+    expect(db.verno).toBe(3);
     expect(await claimBatch(db, "t1", 2_000)).toHaveLength(1); // o índice novo funciona
   });
 });

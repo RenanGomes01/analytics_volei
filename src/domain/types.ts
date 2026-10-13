@@ -79,7 +79,16 @@ export type RallyEvent = TouchEvent | RallyEndEvent | VoidEvent;
 
 // ---- Outbox ----
 
-export type OutboxEntity = "match" | "athlete" | "rally_event";
+export type OutboxEntity =
+  | "match"
+  | "athlete"
+  | "rally_event"
+  | "team"
+  | "tournament"
+  | "tournament_entry"
+  | "athlete_alias";
+/** insert: ledger e entidades novas. upsert/delete: cadastro editável (atletas, duplas, torneios, aliases). */
+export type OutboxOp = "insert" | "upsert" | "delete";
 export type OutboxStatus = "pending" | "sent" | "acked" | "conflict";
 
 export interface OutboxEntry extends TenantScoped {
@@ -87,7 +96,7 @@ export interface OutboxEntry extends TenantScoped {
   mutation_id: string;
   entity: OutboxEntity;
   entity_id: string;
-  op: "insert";
+  op: OutboxOp;
   payload: unknown;
   status: OutboxStatus;
   created_at: number;

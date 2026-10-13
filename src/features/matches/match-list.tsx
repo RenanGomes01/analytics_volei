@@ -4,6 +4,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { HardLink } from "@/components/hard-link";
 import { getDB } from "@/db/client";
 import { ExportButton } from "@/features/export/export-button";
+import { useRosterData } from "@/features/roster/use-roster-data";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
 import { listMatches } from "@/services/match-service";
 
@@ -11,6 +12,7 @@ const dateFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeSt
 
 export function MatchList() {
   const matches = useLiveQuery(() => listMatches(getDB(), LOCAL_TENANT_ID), []);
+  const roster = useRosterData();
 
   if (!matches) return null;
   if (matches.length === 0) {
@@ -28,8 +30,9 @@ export function MatchList() {
             <span className="truncate text-lg font-semibold">
               {m.team_a.name} × {m.team_b.name}
             </span>
-            <span className="shrink-0 text-sm text-zinc-400">
+            <span className="shrink-0 text-right text-sm text-zinc-400">
               {m.modality === "beach" ? "Beach" : "Indoor"} · {dateFormat.format(m.created_at)}
+              <span className="block text-xs text-zinc-500">{roster?.tournamentOfMatch.get(m.id)?.name ?? "Sem torneio"}</span>
             </span>
           </HardLink>
           <ExportButton matchId={m.id} compact />

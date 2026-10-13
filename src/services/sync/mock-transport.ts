@@ -53,6 +53,14 @@ export class MockTransport implements SyncTransport {
       const key = `${entry.tenant_id}:${entry.entity}:${entry.entity_id}`;
       const payload = canonicalJson(entry.payload);
       const previous = this.entities.get(key);
+      // Cadastro editável: upsert sobrescreve e delete remove; cada mudança ganha um server_seq novo.
+      if (entry.op === "upsert" || entry.op === "delete") {
+        this.seq += 1;
+        if (entry.op === "upsert") this.entities.set(key, { payload, seq: this.seq });
+        else this.entities.delete(key);
+        this.acked.set(mutation_id, this.seq);
+        return { mutation_id, status: "acked", server_seq: this.seq };
+      }
       if (previous && previous.payload !== payload) {
         return { mutation_id, status: "conflict", reason: `${entry.entity} ${entry.entity_id} já existe com outro conteúdo.` };
       }
