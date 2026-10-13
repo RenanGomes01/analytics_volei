@@ -60,10 +60,9 @@ describe("duplas", () => {
   });
 
   it("valida o tamanho da dupla e renomeia", async () => {
-    const [r] = await fourAthletes();
+    const [r, p] = await fourAthletes();
     await expect(findOrCreateTeam(db, T, { athlete_ids: [r.id, r.id], modality: "beach" })).rejects.toThrow(/2 atletas diferentes/);
     await expect(findOrCreateTeam(db, T, { athlete_ids: [r.id], modality: "indoor" })).rejects.toThrow(/de 6 a 14/);
-    const [, p] = (await db.athletes.toArray()).slice(0, 2);
     const team = await findOrCreateTeam(db, T, { athlete_ids: [r.id, p.id], modality: "beach" });
     expect((await renameTeam(db, T, team.id, "Renan e Pedro")).name).toBe("Renan e Pedro");
     expect((await listTeams(db, T, "beach")).map((t) => t.name)).toEqual(["Renan e Pedro"]);
