@@ -33,6 +33,23 @@ export function availableSkills(next: NextAction, team: TeamSide): Skill[] {
 
 export const defaultSkillFor = (next: NextAction, team: TeamSide): Skill => availableSkills(next, team)[0] ?? "serve";
 
+/**
+ * A qualidade diz que a bola já está do outro lado: passe, defesa ou levantamento `/` (de graça)
+ * e bloqueio `-`/`/` (tocou e voltou fácil para quem atacou).
+ */
+function ballCrossed(touch: TouchEvent): boolean {
+  switch (touch.skill) {
+    case "reception":
+    case "dig":
+    case "set":
+      return touch.quality === "/";
+    case "block":
+      return touch.quality === "-" || touch.quality === "/";
+    default:
+      return false;
+  }
+}
+
 const rosterOf = (match: Match, team: TeamSide) => (team === "A" ? match.team_a : match.team_b).athlete_ids;
 
 function partnerOf(match: Match, team: TeamSide, athlete_id: string): string | null {
@@ -96,16 +113,20 @@ export function nextAction(state: MatchState, match: Match, rules: ModalityRules
   let primary: TeamSide;
   let skills: Skill[];
   let allowed: TeamSide[] = ["A", "B"];
+  const crossed = ballCrossed(lastTouch);
   switch (lastTouch.skill) {
     case "serve":
       [primary, skills, allowed] = [other, ["reception"], [other]];
       break;
     case "reception":
+      // Passe de graça: a bola cai na mão de quem sacou, que normalmente ataca de primeira.
+      [primary, skills] = crossed ? [other, ["attack", "dig"]] : [same, ["set", "attack", "freeball"]];
+      break;
     case "dig":
-      [primary, skills] = [same, ["set", "attack", "freeball"]];
+      [primary, skills] = crossed ? [other, ["reception", "dig", "attack"]] : [same, ["set", "attack", "freeball"]];
       break;
     case "set":
-      [primary, skills] = [same, ["attack", "freeball"]];
+      [primary, skills] = crossed ? [other, ["reception", "dig", "attack"]] : [same, ["attack", "freeball"]];
       break;
     case "attack":
       [primary, skills] = [other, ["block", "dig"]];
@@ -113,8 +134,8 @@ export function nextAction(state: MatchState, match: Match, rules: ModalityRules
     case "freeball":
       [primary, skills] = [other, ["reception", "dig"]];
       break;
-    default: // block: a bola pode seguir com quem bloqueou ou voltar para o atacante
-      [primary, skills] = [same, ["dig", "set", "attack"]];
+    default: // block: segue com quem bloqueou (amorteceu) ou volta para quem atacou (voltou fácil)
+      [primary, skills] = crossed ? [other, ["dig", "set", "attack"]] : [same, ["dig", "set", "attack"]];
   }
   // Posse esgotada: destaca o adversário, mas permite lançar o 4º toque (o replay dá o ponto ao adversário).
   if (exhausted) [primary, skills] = [other, ["block", "dig"]];

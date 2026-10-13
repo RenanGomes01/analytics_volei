@@ -135,3 +135,63 @@ describe("availableSkills", () => {
     expect(skills).not.toContain("serve");
   });
 });
+
+describe("nextAction — fluxo clássico de virada de bola no beach", () => {
+  it("saque → passe → levantamento → ataque fica com a dupla que recebeu e arma a parceira a cada passo", () => {
+    const l = ledger().rally();
+    l.touch("A", "serve", { athlete_id: "A1" });
+    expect(next(l)).toMatchObject({ primary_team: "B", suggested_skills: ["reception"], suggested_athlete_id: null });
+
+    l.touch("B", "reception", { athlete_id: "B2", quality: "#" });
+    expect(next(l)).toMatchObject({ primary_team: "B", suggested_skills: ["set", "attack", "freeball"], suggested_athlete_id: "B1", phase: "side_out" });
+
+    l.touch("B", "set", { athlete_id: "B1", quality: "#" });
+    expect(next(l)).toMatchObject({ primary_team: "B", suggested_skills: ["attack", "freeball"], suggested_athlete_id: "B2", phase: "side_out" });
+
+    l.touch("B", "attack", { athlete_id: "B2", quality: "+" });
+    expect(next(l)).toMatchObject({ primary_team: "A", suggested_skills: ["block", "dig"], suggested_athlete_id: null, phase: "counter_attack" });
+  });
+});
+
+describe("nextAction — a qualidade diz quando a bola cruzou a rede", () => {
+  const afterServe = () => {
+    const l = ledger().rally();
+    l.touch("A", "serve", { athlete_id: "A1" });
+    return l;
+  };
+
+  it("passe de graça (/) vai para quem sacou, que ataca ou defende", () => {
+    const l = afterServe();
+    l.touch("B", "reception", { athlete_id: "B2", quality: "/" });
+    expect(next(l)).toMatchObject({ primary_team: "A", suggested_skills: ["attack", "dig"], suggested_athlete_id: null, allowed_teams: ["A", "B"] });
+  });
+
+  it.each(["dig", "set"] as const)("%s de graça (/) passa o destaque para o outro time", (skill) => {
+    const l = afterServe();
+    l.touch("B", "reception", { athlete_id: "B2", quality: "!" });
+    l.touch("B", skill, { athlete_id: "B1", quality: "/" });
+    expect(next(l)).toMatchObject({ primary_team: "A", suggested_skills: ["reception", "dig", "attack"], suggested_athlete_id: null });
+  });
+
+  it.each(["-", "/"] as const)("bloqueio %s (voltou fácil) devolve o destaque para quem atacou", (quality) => {
+    const l = afterServe();
+    l.touch("B", "reception");
+    l.touch("B", "attack", { athlete_id: "B2" });
+    l.touch("A", "block", { athlete_id: "A2", quality });
+    expect(next(l)).toMatchObject({ primary_team: "B", suggested_skills: ["dig", "set", "attack"], suggested_athlete_id: null });
+  });
+
+  it("bloqueio + (amorteceu) fica com quem bloqueou e arma a parceira", () => {
+    const l = afterServe();
+    l.touch("B", "reception");
+    l.touch("B", "attack", { athlete_id: "B2" });
+    l.touch("A", "block", { athlete_id: "A2", quality: "+" });
+    expect(next(l)).toMatchObject({ primary_team: "A", suggested_athlete_id: "A1" });
+  });
+
+  it("passe ! (quebrou, dá p/ jogar) continua com a dupla que recebeu", () => {
+    const l = afterServe();
+    l.touch("B", "reception", { athlete_id: "B2", quality: "!" });
+    expect(next(l)).toMatchObject({ primary_team: "B", suggested_athlete_id: "B1" });
+  });
+});

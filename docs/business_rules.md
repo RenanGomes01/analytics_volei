@@ -6,18 +6,36 @@
 Campos obrigatórios: match_id, set_id, rally_id, fase (side-out/contra-ataque), equipe, atleta_id, fundamento, qualidade, timestamp.
 
 ## Escala de qualidade e fim de rali
-Escala de 6 símbolos (estilo Data Volley). **Só `#` e `=` têm efeito de regra**; os demais são convenção de quadra, gravada no ledger para análises. Fonte única das dicas exibidas na tela: `src/features/scout/quality-hints.ts`.
+Escala de 6 símbolos (estilo Data Volley). **Só `#` e `=` têm efeito de regra**; os demais são convenção de quadra, gravada no ledger para análises. Os botões visíveis e as dicas de cada modalidade vêm de `qualityOptions()` em `src/features/scout/quality-hints.ts` (qualidade sem dica = botão oculto).
 
+### Beach (linguagem da areia)
+| Fundamento | `#` | `+` | `!` | `-` | `/` | `=` |
+|---|---|---|---|---|---|---|
+| Saque | Ace | Quebrou o passe | Passe regular | Passe na mão do adv. | Volta de graça | Erro de saque |
+| Recepção (4 botões) | Na mão | — | Quebrou, dá p/ jogar | — | De graça p/ o adv. | Ace sofrido |
+| Levantamento | Bola na pinta | Boa p/ atacar | Fora, dá p/ atacar | Ruim, só largar | Passou de graça | Erro (dois toques) |
+| Ataque | Ponto | Defesa difícil | Defendido | Defesa fácil | Contra-ataque fácil | Erro (fora/rede) |
+| Bloqueio | Ponto de bloqueio | Amorteceu | Tocou, segue | Tocou, volta fácil | Volta de graça | Erro (rede) |
+| Defesa | Defesa na mão | Boa defesa | Defesa jogável | Só bola alta | Volta de graça | Erro de defesa |
+| Bola de graça | Dificultou o adv. | Bem colocada | Neutra | Fácil p/ o adv. | Na mão do adv. | Erro (fora/rede) |
+| Falta (1 botão) | — | — | — | — | — | Ponto adversário |
+
+Na recepção do beach, a estatística "Passe na mão" = recepções `#` ÷ total (a fórmula `#+` do Box Score não muda; sem o botão `+`, ela mede o passe na mão).
+
+### Indoor (linguagem de quadra)
 | Fundamento | `#` | `+` | `!` | `-` | `/` | `=` |
 |---|---|---|---|---|---|---|
 | Saque | Ace | Quebrou recepção | Recepção regular | Recepção fácil | Volta de graça | Erro de saque |
 | Recepção | Passe perfeito | Passe bom | Levant. se desloca | Só bola alta | Volta de graça | Ace sofrido |
 | Levantamento | Atacante livre | Boa bola | Atacável | Difícil de atacar | Passou de graça | Erro de levant. |
-| Ataque | Ponto | Defesa difícil | Bola continua | Defesa fácil | Contra-ataque fácil | Erro (fora/rede) |
-| Bloqueio | Ponto de bloqueio | Amorteceu | Tocou, segue | Tocou, bola fácil | Bola de graça | Erro (rede) |
+| Ataque, Bloqueio | (iguais ao beach) | | | | | |
 | Defesa | Defesa perfeita | Boa defesa | Defesa jogável | Defesa ruim | Volta de graça | Erro de defesa |
-| Bola de graça | Bem colocada | Boa | Regular | Fácil p/ adv. | Muito fácil | Erro |
-| Falta | Não encerra | Não encerra | Não encerra | Não encerra | Não encerra | Ponto adversário |
+| Bola de graça, Falta | (iguais ao beach) | | | | | |
+
+### Para onde vai a bola (fluxo da tela)
+- Saque → destaca quem recebe; passe → mesma dupla, parceira armada p/ levantar; levantamento → quem passou armada p/ atacar; ataque → outro time (bloqueio/defesa).
+- **A qualidade diz quando a bola cruzou a rede:** passe, defesa ou levantamento `/` → outro time; bloqueio `-` ou `/` (voltou fácil) → time que atacou; bloqueio `+` (amorteceu) → fica com quem bloqueou.
+- A sugestão só destaca: os dois lados continuam tocáveis (exceto o time que sacou, logo após o próprio saque).
 
 ### O que encerra o rali (por prioridade)
 1. **Ponto A / Ponto B** (rede, invasão, condução, arbitragem).

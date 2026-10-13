@@ -71,13 +71,14 @@ export function StatsSheet({ match, rules, events, athletes, sides, onClose }: P
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
         <div className="grid gap-3 md:grid-cols-2">
           {sides.map((t) => (
-            <TeamSummary key={t} name={teamName(t)} stats={box.teams[t]} />
+            <TeamSummary key={t} modality={match.modality} name={teamName(t)} stats={box.teams[t]} />
           ))}
         </div>
         <div className="mt-6 flex flex-col gap-6 overflow-x-auto">
           {sides.map((t) => (
             <AthleteTable
               key={t}
+              modality={match.modality}
               side={t}
               teamName={teamName(t)}
               athleteIds={roster(t)}

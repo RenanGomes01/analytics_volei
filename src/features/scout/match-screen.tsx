@@ -69,6 +69,7 @@ function ScoutBoard({ matchId }: { matchId: string }) {
             <MatchOver match={match} state={state} />
           ) : (
             <ActionPad
+              modality={match.modality}
               next={next}
               selection={selection}
               athletes={athletes}

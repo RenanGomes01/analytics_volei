@@ -11,6 +11,21 @@ export const SKILL_LABEL: Record<Skill, string> = {
   fault: "Falta",
 };
 
+/** Pergunta no topo do painel, pelo fundamento esperado no momento do rali. */
+export const SKILL_PROMPT: Record<Skill, string> = {
+  serve: "Quem vai sacar?",
+  reception: "Quem recebeu?",
+  set: "Quem levantou?",
+  attack: "Quem atacou?",
+  block: "Quem bloqueou ou defendeu?",
+  dig: "Quem defendeu?",
+  freeball: "Quem passou de graça?",
+  fault: "Quem fez a falta?",
+};
+
+/** Fundamentos especiais: ficam numa fila separada dos fundamentos de jogo. */
+export const SPECIAL_SKILLS: readonly Skill[] = ["freeball", "fault"];
+
 export const QUALITIES: readonly Quality[] = ["#", "+", "!", "-", "/", "="];
 
 export const QUALITY_STYLE: Record<Quality, { hint: string; className: string }> = {

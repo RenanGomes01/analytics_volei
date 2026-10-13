@@ -33,7 +33,8 @@
 - A inferência destaca a equipe esperada, mas só bloqueia o que é fisicamente impossível. O analista precisa conseguir registrar o que viu, inclusive um 4º toque.
 - Tela de scout: `h-dvh overflow-hidden`, sem scroll; alvos de toque com no mínimo 48px (botões principais com 64px).
 - **Toda interface em PT-BR**, inclusive siglas e motivos de ponto (ex.: "Virada de bola", "Quebra de saque", "Bola de graça", "PA"). Identificadores no código continuam em inglês.
-- O significado de cada qualidade por fundamento vem de `quality-hints.ts` (dicas embaixo dos botões, até 20 caracteres) e está documentado em `docs/business_rules.md`. Ao mudar a regra de fim de rali, atualize os três: `implied-point.ts`, `quality-hints.ts` e o doc.
+- `qualityOptions(modality, skill)` (`quality-hints.ts`) é a fonte de **quais botões de qualidade aparecem** e das dicas embaixo deles (até 20 caracteres), separadas por beach e indoor. Exemplos: recepção do beach com 4 botões; falta só com `=`. Tudo documentado em `docs/business_rules.md`. Ao mudar a regra de fim de rali, atualize os três: `implied-point.ts`, `quality-hints.ts` e o doc.
+- `nextAction()` segue a bola: a **qualidade** pode indicar que ela cruzou a rede (`ballCrossed`: passe/defesa/levantamento `/`, bloqueio `-`/`/`). Use a linguagem da areia no beach (ver `labels.ts`: `SKILL_PROMPT`, `SPECIAL_SKILLS`).
 
 ## Estatísticas (`src/domain/stats/` + `src/features/stats/`)
 - As estatísticas partem de `replayMatch(...).rallies`, nunca do ledger cru. Assim usam as mesmas anulações, sets, sacador e resultado de rali do placar.

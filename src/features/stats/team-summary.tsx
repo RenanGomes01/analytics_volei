@@ -1,7 +1,9 @@
+import type { Modality } from "@/domain/types";
 import type { TeamStats } from "@/domain/stats/types";
 import { fraction, pct } from "./format";
 
 interface Props {
+  modality: Modality;
   name: string;
   stats: TeamStats;
 }
@@ -18,7 +20,7 @@ function Row({ label, value, detail }: { label: string; value: string; detail: s
   );
 }
 
-export function TeamSummary({ name, stats }: Props) {
+export function TeamSummary({ modality, name, stats }: Props) {
   const { points, attack, reception, serve } = stats;
   const chips: [string, number, string][] = [
     ["PA", points.kills, "Pontos de ataque (ataques #)"],
@@ -51,7 +53,7 @@ export function TeamSummary({ name, stats }: Props) {
           detail={`${attack.kills} pts · ${attack.errors} erros · ${attack.in_play} em jogo / ${attack.attempts}`}
         />
         <Row
-          label="Recepção #+"
+          label={modality === "beach" ? "Passe na mão" : "Recepção #+"}
           value={pct(reception.positive)}
           detail={`${fraction(reception.positive)} · ${reception.errors} erro${reception.errors === 1 ? "" : "s"}`}
         />
