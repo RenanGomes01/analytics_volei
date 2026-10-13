@@ -10,8 +10,11 @@ export type RallyPhase = "side_out" | "counter_attack";
 /** Fundamento. `fault` registra uma falta sem contato com a bola (rede, invasão, condução…). */
 export type Skill = "serve" | "reception" | "set" | "attack" | "block" | "dig" | "freeball" | "fault";
 
-/** Escala de qualidade de scout: # perfeito, + positivo, ! regular, - negativo, / ruim (bola de graça ao adversário), = erro. */
-export type Quality = "#" | "+" | "!" | "-" | "/" | "=";
+/**
+ * Escala de qualidade de scout: # perfeito, + positivo, ! regular, - negativo, / ruim (bola de graça
+ * ao adversário), = erro. `?` = não avaliado (modo rápido): nunca encerra rali e fica fora das taxas.
+ */
+export type Quality = "#" | "+" | "!" | "-" | "/" | "=" | "?";
 
 /** Isolamento de tenant local: toda linha persistida pertence a um tenant. */
 export interface TenantScoped {

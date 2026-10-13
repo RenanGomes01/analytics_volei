@@ -29,7 +29,7 @@ export interface ServeLine {
 
 export interface ReceptionLine {
   attempts: number;
-  /** `#` + `+` sobre o total. */
+  /** `#` + `+` sobre as recepções AVALIADAS (as `?` do modo rápido ficam fora). */
   positive: Rate;
   /** Recepção `=` (ace sofrido). */
   errors: number;

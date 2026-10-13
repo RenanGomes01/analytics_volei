@@ -54,3 +54,9 @@ Bola mandada para o outro lado **sem intenção de ataque**, só para mantê-la 
 - **Rankings com volume mínimo:** eficiência de ataque exige ≥ 10 ataques; passe/recepção exige ≥ 10 recepções. Desempate por volume e depois pelo nome.
 - **V/D e sets** vêm do resultado reconstruído de cada partida; partidas em andamento contam nos números, mas não em vitórias/derrotas.
 - **Mesma pessoa = mesmo atleta:** cadastros duplicados são unidos por alias; é proibido unir dois atletas que jogaram a mesma partida.
+
+## Modo rápido de scout (padrão)
+- Durante o rali o analista só toca em **quem tocou na bola**; no fim toca em **PONTO** e escolhe **como foi o ponto**.
+- Fundamentos deduzidos pela sequência (`src/domain/rally/quick-rally.ts`): 1º toque = saque; em cada posse, 1º = passe (após saque/bola de graça) ou defesa; último toque de posse que cruzou (2+ toques) = ataque; os do meio = levantamento. Bloqueio é marcado pelo analista ("Marcar próximo toque como bloqueio").
+- "Como foi o ponto" dá a qualidade do lance final (`#` ace/ponto de ataque/bloqueio, `=` erros); "defesa não segurou" credita o ponto de ataque a quem atacou. Os demais toques ficam `?` (não avaliado) e ficam fora da % de passe.
+- O rali é gravado inteiro, numa transação, ao marcar o ponto. "Desfazer último ponto" anula o rali inteiro e devolve os toques para corrigir.

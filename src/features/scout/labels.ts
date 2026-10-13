@@ -29,6 +29,7 @@ export const SPECIAL_SKILLS: readonly Skill[] = ["freeball", "fault"];
 export const QUALITIES: readonly Quality[] = ["#", "+", "!", "-", "/", "="];
 
 export const QUALITY_STYLE: Record<Quality, { hint: string; className: string }> = {
+  "?": { hint: "Não avaliado", className: "bg-zinc-600 text-zinc-50" },
   "#": { hint: "Perfeito", className: "bg-emerald-600 text-white" },
   "+": { hint: "Positivo", className: "bg-lime-600 text-white" },
   "!": { hint: "Regular", className: "bg-amber-500 text-zinc-950" },

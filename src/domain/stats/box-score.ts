@@ -29,7 +29,7 @@ const serveLine = (c: TouchCounters): ServeLine => ({ attempts: c.serve_attempts
 
 const receptionLine = (c: TouchCounters): ReceptionLine => ({
   attempts: c.receptions,
-  positive: rate(c.reception_positive, c.receptions),
+  positive: rate(c.reception_positive, c.receptions_rated),
   errors: c.reception_errors,
 });
 

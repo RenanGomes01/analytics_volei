@@ -144,3 +144,52 @@ export function undoLastAction(db: ScoutDB, scope: MatchScope): Promise<VoidEven
     return last ? voidEvent(db, scope, last.id) : null;
   });
 }
+
+/**
+ * Modo rápido: grava o rali inteiro (todos os toques + fim do rali) numa única transação, na ordem.
+ * Se houver um rali aberto (ex.: começado no modo detalhado), os toques entram nele.
+ */
+export function appendRally(
+  db: ScoutDB,
+  scope: MatchScope,
+  touches: TouchInput[],
+  end: RallyEndInput,
+): Promise<{ touches: TouchEvent[]; end: RallyEndEvent }> {
+  return ledgerTransaction(db, async () => {
+    const { rules, state, local_seq } = await loadMatchContext(db, scope);
+    if (state.winner) throw new Error("Partida encerrada: não é possível registrar novos pontos.");
+    const base = await nextEventBase(db, scope, state, local_seq);
+    const rallyTouches: TouchEvent[] = [...(state.open_rally?.touches ?? [])];
+    const written: TouchEvent[] = [];
+    let offset = 0;
+    // Cada evento ganha id próprio e local_seq/horário sequenciais dentro do mesmo rali.
+    const next = () => {
+      const i = offset++;
+      return { ...base, id: newId(), local_seq: local_seq + i, timestamp: base.timestamp + i };
+    };
+
+    for (const input of touches) {
+      const phase = phaseForTouch(rallyTouches, input.team, state.serving_team, rules);
+      const event = await append(db, { ...next(), ...input, kind: "touch", phase } satisfies TouchEvent);
+      rallyTouches.push(event);
+      written.push(event);
+    }
+    const endEvent = await append(db, { ...next(), ...end, kind: "rally_end" } satisfies RallyEndEvent);
+    return { touches: written, end: endEvent };
+  });
+}
+
+/**
+ * Modo rápido: desfaz o ÚLTIMO RALI inteiro (anula todos os seus eventos ativos) e devolve os toques,
+ * para o analista corrigir "como foi o ponto". Nada é apagado: só eventos de anulação são gravados.
+ */
+export function undoLastRally(db: ScoutDB, scope: MatchScope): Promise<TouchEvent[]> {
+  return ledgerTransaction(db, async () => {
+    const active = activeEvents(await listMatchEvents(db, scope));
+    const last = active.at(-1);
+    if (!last) return [];
+    const inRally = active.filter((e) => e.rally_id === last.rally_id);
+    for (const event of [...inRally].reverse()) await voidEvent(db, scope, event.id);
+    return inRally.filter((e): e is TouchEvent => e.kind === "touch");
+  });
+}

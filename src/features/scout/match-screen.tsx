@@ -15,6 +15,8 @@ import { StatsSheet } from "@/features/stats/stats-sheet";
 import type { TeamSide } from "@/domain/types";
 import { useMatchData } from "./use-match-data";
 import { useScoutCommands } from "./use-scout-commands";
+import { QuickBoard } from "./quick/quick-board";
+import { useScoutMode } from "./use-scout-mode";
 import { useSideSwap } from "./use-side-swap";
 import { useWakeLock } from "./use-wake-lock";
 
@@ -32,6 +34,7 @@ function ScoutBoard({ matchId }: { matchId: string }) {
   const { scope, match, athletes, derived } = useMatchData(matchId);
   const commands = useScoutCommands(scope, derived?.next ?? null, derived?.ledgerSize ?? null);
   const [swapped, toggleSides] = useSideSwap(matchId);
+  const [mode, setMode] = useScoutMode(matchId);
   const [statsOpen, setStatsOpen] = useState(false);
   const closeStats = useCallback(() => setStatsOpen(false), []);
   useWakeLock(!!match && !derived?.state.winner);
@@ -61,39 +64,56 @@ function ScoutBoard({ matchId }: { matchId: string }) {
     <div className="relative grid h-dvh touch-manipulation select-none grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden overscroll-none bg-zinc-950 text-zinc-100">
       <Scoreboard match={match} state={state} next={next} rules={rules} sides={sides} />
 
-      <main className="grid min-h-0 grid-cols-[1fr_1.4fr_1fr] gap-2 p-2 portrait:grid-cols-1 portrait:grid-rows-[minmax(0,0.8fr)_minmax(0,1.6fr)_minmax(0,0.8fr)]">
-        {panel(sides[0])}
-        <section aria-label="Lance" className="flex min-h-0 flex-col gap-2">
-          <RallyTrail match={match} state={state} next={next} athletes={athletes} />
-          {state.winner ? (
-            <MatchOver match={match} state={state} />
-          ) : (
-            <ActionPad
-              modality={match.modality}
-              next={next}
-              selection={selection}
-              athletes={athletes}
-              saving={commands.saving}
-              onSkill={commands.pickSkill}
-              onQuality={commands.commitQuality}
-            />
-          )}
-        </section>
-        {panel(sides[1])}
-      </main>
+      {mode === "quick" ? (
+        <QuickBoard
+          scope={scope}
+          match={match}
+          state={state}
+          next={next}
+          athletes={athletes}
+          sides={sides}
+          onDetailedMode={() => setMode("detailed")}
+          onOpenStats={() => setStatsOpen(true)}
+          onSwapSides={toggleSides}
+        />
+      ) : (
+        <>
+          <main className="grid min-h-0 grid-cols-[1fr_1.4fr_1fr] gap-2 p-2 portrait:grid-cols-1 portrait:grid-rows-[minmax(0,0.8fr)_minmax(0,1.6fr)_minmax(0,0.8fr)]">
+            {panel(sides[0])}
+            <section aria-label="Lance" className="flex min-h-0 flex-col gap-2">
+              <RallyTrail match={match} state={state} next={next} athletes={athletes} />
+              {state.winner ? (
+                <MatchOver match={match} state={state} />
+              ) : (
+                <ActionPad
+                  modality={match.modality}
+                  next={next}
+                  selection={selection}
+                  athletes={athletes}
+                  saving={commands.saving}
+                  onSkill={commands.pickSkill}
+                  onQuality={commands.commitQuality}
+                />
+              )}
+            </section>
+            {panel(sides[1])}
+          </main>
 
-      <ScoutFooter
-        match={match}
-        sides={sides}
-        lastActive={lastActive}
-        athletes={athletes}
-        saving={commands.saving}
-        canScore={!state.winner}
-        onUndo={commands.undo}
-        onPoint={commands.pointTo}
-        onSwapSides={toggleSides}
-        onOpenStats={() => setStatsOpen(true)}
-      />
+          <ScoutFooter
+            match={match}
+            sides={sides}
+            lastActive={lastActive}
+            athletes={athletes}
+            saving={commands.saving}
+            canScore={!state.winner}
+            onUndo={commands.undo}
+            onPoint={commands.pointTo}
+            onSwapSides={toggleSides}
+            onOpenStats={() => setStatsOpen(true)}
+            onQuickMode={() => setMode("quick")}
+          />
+        </>
+      )}
 
       {statsOpen && (
         <StatsSheet match={match} rules={rules} events={events} athletes={athletes} sides={sides} onClose={closeStats} />

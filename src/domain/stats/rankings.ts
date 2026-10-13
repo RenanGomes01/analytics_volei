@@ -34,7 +34,7 @@ export function rankingSpecs(modality: Modality): RankingSpec[] {
       metric: "reception",
       label: modality === "beach" ? "Melhor passe (na mão)" : "Melhor recepção (#+)",
       value: (a) => a.reception.positive.pct,
-      volume: (a) => a.reception.attempts,
+      volume: (a) => a.reception.positive.den, // só recepções avaliadas
       min: 10,
       kind: "rate",
     },

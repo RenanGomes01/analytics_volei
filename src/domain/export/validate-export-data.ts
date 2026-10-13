@@ -3,7 +3,7 @@ import { rulesFor } from "../rules/modality";
 import type { RallyEndReason, Quality, Skill } from "../types";
 
 const SKILLS: readonly Skill[] = ["serve", "reception", "set", "attack", "block", "dig", "freeball", "fault"];
-const QUALITIES: readonly Quality[] = ["#", "+", "!", "-", "/", "="];
+const QUALITIES: readonly Quality[] = ["#", "+", "!", "-", "/", "=", "?"];
 const REASONS: readonly RallyEndReason[] = ["kill", "ace", "error", "four_touches", "manual"];
 const MAX_REPORTED = 10;
 

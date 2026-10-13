@@ -10,6 +10,8 @@ export interface TouchCounters {
   aces: number;
   serve_errors: number;
   receptions: number;
+  /** Recepções com qualidade avaliada (sem `?`): denominador da % de passe bom. */
+  receptions_rated: number;
   reception_positive: number;
   reception_errors: number;
   blocks: number;
@@ -25,6 +27,7 @@ export const emptyTouchCounters = (): TouchCounters => ({
   aces: 0,
   serve_errors: 0,
   receptions: 0,
+  receptions_rated: 0,
   reception_positive: 0,
   reception_errors: 0,
   blocks: 0,
@@ -70,6 +73,7 @@ export function touchDelta(touch: TouchEvent, next: TouchEvent | undefined, { wo
     case "reception":
       return {
         receptions: 1,
+        receptions_rated: touch.quality === "?" ? 0 : 1,
         reception_positive: touch.quality === "#" || touch.quality === "+" ? 1 : 0,
         reception_errors: isError ? 1 : 0,
         errors: isError ? 1 : 0,
