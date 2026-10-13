@@ -1,9 +1,9 @@
+import { withSerwist } from "@serwist/turbopack";
 import type { NextConfig } from "next";
 
+// Sem `cacheComponents`: o app lê os dados do IndexedDB no cliente, e a rota do
+// Serwist (src/app/serwist/[path]/route.ts) usa segment config incompatível com ele.
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
   turbopack: {
     rules: {
       "*.css": {
@@ -14,4 +14,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSerwist(nextConfig);

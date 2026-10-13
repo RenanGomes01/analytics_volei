@@ -1,0 +1,38 @@
+"use client";
+
+import { useLiveQuery } from "dexie-react-hooks";
+import { HardLink } from "@/components/hard-link";
+import { getDB } from "@/db/client";
+import { LOCAL_TENANT_ID } from "@/lib/tenant";
+import { listMatches } from "@/services/match-service";
+
+const dateFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" });
+
+export function MatchList() {
+  const matches = useLiveQuery(() => listMatches(getDB(), LOCAL_TENANT_ID), []);
+
+  if (!matches) return null;
+  if (matches.length === 0) {
+    return <p className="text-center text-zinc-400">Nenhuma partida neste aparelho ainda.</p>;
+  }
+
+  return (
+    <ul className="flex flex-col gap-2">
+      {matches.map((m) => (
+        <li key={m.id}>
+          <HardLink
+            href={`/match?id=${encodeURIComponent(m.id)}`}
+            className="flex min-h-16 items-center justify-between gap-4 rounded-2xl bg-zinc-900 px-4 active:bg-zinc-800"
+          >
+            <span className="truncate text-lg font-semibold">
+              {m.team_a.name} × {m.team_b.name}
+            </span>
+            <span className="shrink-0 text-sm text-zinc-400">
+              {m.modality === "beach" ? "Beach" : "Indoor"} · {dateFormat.format(m.created_at)}
+            </span>
+          </HardLink>
+        </li>
+      ))}
+    </ul>
+  );
+}
