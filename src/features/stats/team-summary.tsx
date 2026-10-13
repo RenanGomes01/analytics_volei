@@ -21,8 +21,8 @@ function Row({ label, value, detail }: { label: string; value: string; detail: s
 export function TeamSummary({ name, stats }: Props) {
   const { points, attack, reception, serve } = stats;
   const chips: [string, number, string][] = [
-    ["K", points.kills, "Kills (ataques #)"],
-    ["Ace", points.aces, "Aces (saques #)"],
+    ["PA", points.kills, "Pontos de ataque (ataques #)"],
+    ["Ace", points.aces, "Aces (saque # ou recepção = do adversário logo após o saque)"],
     ["Blq", points.blocks, "Pontos de bloqueio"],
     ["Err. adv", points.opponent_errors, "Erros do adversário (=, 4 toques, faltas)"],
   ];
@@ -43,12 +43,12 @@ export function TeamSummary({ name, stats }: Props) {
         ))}
       </ul>
       <dl>
-        <Row label="Side-out (K1)" value={pct(stats.side_out)} detail={fraction(stats.side_out)} />
-        <Row label="Break-point (K2)" value={pct(stats.break_point)} detail={fraction(stats.break_point)} />
+        <Row label="Virada de bola (K1)" value={pct(stats.side_out)} detail={fraction(stats.side_out)} />
+        <Row label="Quebra de saque (K2)" value={pct(stats.break_point)} detail={fraction(stats.break_point)} />
         <Row
           label="Ataque · eficiência"
           value={pct(attack.efficiency)}
-          detail={`${attack.kills}K ${attack.errors}E ${attack.in_play}·0 / ${attack.attempts}`}
+          detail={`${attack.kills} pts · ${attack.errors} erros · ${attack.in_play} em jogo / ${attack.attempts}`}
         />
         <Row
           label="Recepção #+"

@@ -100,7 +100,7 @@ export function replayMatch(events: readonly RallyEvent[], { rules, first_server
       : violator
         ? { point_to: otherTeam(violator), reason: "four_touches" }
         : lastTouch
-          ? impliedPoint(lastTouch)
+          ? impliedPoint(lastTouch, touches.at(-2))
           : null;
     const point_to = outcome?.point_to ?? null;
 

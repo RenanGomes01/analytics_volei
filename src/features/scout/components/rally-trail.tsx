@@ -1,5 +1,5 @@
 import type { NextAction } from "@/domain/rally/next-action";
-import type { MatchState } from "@/domain/rally/replay";
+import type { MatchState, RallyResult } from "@/domain/rally/replay";
 import type { Athlete, Match, TeamSide } from "@/domain/types";
 import { QUALITY_STYLE, REASON_LABEL, SKILL_LABEL } from "../labels";
 
@@ -11,6 +11,12 @@ interface Props {
 }
 
 const MAX_CHIPS = 6;
+
+/** Motivo do ponto em PT-BR; "kill" distingue ataque de bloqueio pelo último lance. */
+function reasonLabel(rally: RallyResult): string {
+  if (rally.reason === "kill" && rally.touches.at(-1)?.skill === "block") return "bloqueio";
+  return rally.reason ? REASON_LABEL[rally.reason] : "";
+}
 
 export function RallyTrail({ match, state, next, athletes }: Props) {
   const teamName = (t: TeamSide) => (t === "A" ? match.team_a.name : match.team_b.name);
@@ -44,7 +50,7 @@ export function RallyTrail({ match, state, next, athletes }: Props) {
         {!open && shown?.point_to && (
           <li className="text-sm text-zinc-400">
             Último: ponto {teamName(shown.point_to)}
-            {shown.reason && ` (${REASON_LABEL[shown.reason]})`}
+            {shown.reason && ` (${reasonLabel(shown)})`}
           </li>
         )}
       </ol>

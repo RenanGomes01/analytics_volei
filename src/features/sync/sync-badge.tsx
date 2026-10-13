@@ -14,7 +14,7 @@ export function SyncBadge() {
   let text: string;
   let tone = "bg-zinc-800 text-zinc-300";
   if (SYNC_MODE === "off") {
-    text = `☁ sync desligado · ${status.pending} na fila`;
+    text = `☁ sincronização desligada · ${status.pending} na fila`;
   } else if (status.conflicts > 0) {
     text = `⚠ ${plural(status.conflicts, "conflito")}`;
     tone = "bg-red-900 text-red-100";

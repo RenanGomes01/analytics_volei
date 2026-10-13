@@ -2,6 +2,7 @@ import { availableSkills, type NextAction } from "@/domain/rally/next-action";
 import { impliedPoint } from "@/domain/rally/implied-point";
 import type { Athlete, Quality, Skill } from "@/domain/types";
 import { QUALITIES, QUALITY_STYLE, SKILL_LABEL } from "../labels";
+import { QUALITY_HINTS } from "../quality-hints";
 import type { Selection } from "../scout-ui-reducer";
 
 interface Props {
@@ -65,7 +66,9 @@ export function ActionPad({ next, selection, athletes, saving, onSkill, onQualit
               className={`relative flex min-h-16 flex-col items-center justify-center rounded-2xl active:scale-[0.97] disabled:opacity-30 ${QUALITY_STYLE[quality].className}`}
             >
               <span className="text-4xl font-black leading-none">{quality}</span>
-              <span className="text-xs font-medium uppercase opacity-80">{QUALITY_STYLE[quality].hint}</span>
+              <span className="px-1 text-center text-xs font-medium leading-tight opacity-90">
+                {selection ? QUALITY_HINTS[selection.skill][quality] : QUALITY_STYLE[quality].hint}
+              </span>
               {ends && (
                 <span className="absolute right-1.5 top-1.5 rounded bg-black/30 px-1 text-[10px] font-bold uppercase">
                   ponto

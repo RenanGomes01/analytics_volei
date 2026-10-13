@@ -32,12 +32,14 @@
 - O ponto sai da qualidade do lance (`domain/rally/implied-point.ts`): `#` em saque, ataque ou bloqueio e `=` em qualquer fundamento. Os botões Ponto A/B são só para faltas sem lance.
 - A inferência destaca a equipe esperada, mas só bloqueia o que é fisicamente impossível. O analista precisa conseguir registrar o que viu, inclusive um 4º toque.
 - Tela de scout: `h-dvh overflow-hidden`, sem scroll; alvos de toque com no mínimo 48px (botões principais com 64px).
+- **Toda interface em PT-BR**, inclusive siglas e motivos de ponto (ex.: "Virada de bola", "Quebra de saque", "Bola de graça", "PA"). Identificadores no código continuam em inglês.
+- O significado de cada qualidade por fundamento vem de `quality-hints.ts` (dicas embaixo dos botões, até 20 caracteres) e está documentado em `docs/business_rules.md`. Ao mudar a regra de fim de rali, atualize os três: `implied-point.ts`, `quality-hints.ts` e o doc.
 
 ## Estatísticas (`src/domain/stats/` + `src/features/stats/`)
 - As estatísticas partem de `replayMatch(...).rallies`, nunca do ledger cru. Assim usam as mesmas anulações, sets, sacador e resultado de rali do placar.
 - Invariante testada: os pontos da equipe (kills + aces + bloqueios + erros do adversário) são sempre iguais ao placar. Os testes de invariantes usam ledgers aleatórios com semente fixa.
 - Toda divisão passa por `rate()` / `efficiency()` (`rate.ts`): denominador 0 vira `null` e aparece como "–".
-- Definições: ataque bloqueado (próximo toque é bloqueio `#` do adversário) é erro do atacante; kill, ace e bloqueio exigem `#` **e** o rali ganho; "erros do adversário" = `error` + `four_touches` + `manual`.
+- Definições: ataque bloqueado (próximo toque é bloqueio `#` do adversário) é erro do atacante; ponto de ataque e de bloqueio exigem `#` **e** o rali ganho; ace = rali com motivo `ace` (saque `#` ou recepção `=` logo após o saque) creditado à sacadora; "erros do adversário" = `error` + `four_touches` + `manual`.
 - A UI (`StatsSheet`) usa os `events` do mesmo `useLiveQuery` da tela de scout: não abra outra consulta ao banco.
 
 ## Exportação e sync (Fase 4)

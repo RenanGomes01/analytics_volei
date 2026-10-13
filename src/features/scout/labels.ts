@@ -7,7 +7,7 @@ export const SKILL_LABEL: Record<Skill, string> = {
   attack: "Ataque",
   block: "Bloqueio",
   dig: "Defesa",
-  freeball: "Freeball",
+  freeball: "Bola de graça",
   fault: "Falta",
 };
 
@@ -23,12 +23,12 @@ export const QUALITY_STYLE: Record<Quality, { hint: string; className: string }>
 };
 
 export const PHASE_LABEL: Record<RallyPhase, string> = {
-  side_out: "K1 · side-out",
-  counter_attack: "K2 · contra-ataque",
+  side_out: "K1 · Virada de bola",
+  counter_attack: "K2 · Contra-ataque",
 };
 
 export const REASON_LABEL: Record<RallyEndReason, string> = {
-  kill: "kill",
+  kill: "ataque",
   ace: "ace",
   error: "erro",
   four_touches: "4 toques",

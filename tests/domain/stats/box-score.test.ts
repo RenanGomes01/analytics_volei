@@ -38,7 +38,7 @@ function referenceSet() {
     ["A2", "serve", "+"], ["B2", "reception", "#"], ["B1", "set", "+"], ["B2", "attack", "+"],
     ["A1", "block", "+"], ["A2", "dig", "+"], ["A1", "set", "+"], ["A2", "attack", "+"],
   ); // R7 A saca · 4 toques de A (bloqueio conta) → B
-  rally(l, ["B1", "serve", "+"], ["A1", "reception", "="]); // R8 B saca · recepção = (ace sofrido) → B
+  rally(l, ["B1", "serve", "+"], ["A1", "reception", "="]); // R8 B saca · recepção = logo após o saque → ace de B1
   rally(l, ["B1", "serve", "+"], ["A2", "reception", "#"], ["A1", "set", "+"], ["A2", "attack", "#"]); // R9 B saca · A kill A2
   rally(l, ["A1", "serve", "+"], ["B1", "reception", "+"]); // R10 A saca · rede de A (ponto manual) → B
   l.end("B", "manual");
@@ -50,7 +50,7 @@ describe("Box Score — set de referência (beach)", () => {
 
   it("pontos por equipe batem com o placar e com a classificação esperada", () => {
     expect(box.teams.A.points).toEqual({ total: 4, kills: 2, aces: 0, blocks: 0, opponent_errors: 2 });
-    expect(box.teams.B.points).toEqual({ total: 6, kills: 1, aces: 1, blocks: 1, opponent_errors: 3 });
+    expect(box.teams.B.points).toEqual({ total: 6, kills: 1, aces: 2, blocks: 1, opponent_errors: 2 });
   });
 
   it("side-out (K1) e break-point (K2)", () => {
@@ -69,7 +69,7 @@ describe("Box Score — set de referência (beach)", () => {
 
   it("saque e recepção", () => {
     expect(box.teams.A.serve).toEqual({ attempts: 5, aces: 0, errors: 0 });
-    expect(box.teams.B.serve).toEqual({ attempts: 5, aces: 1, errors: 1 });
+    expect(box.teams.B.serve).toEqual({ attempts: 5, aces: 2, errors: 1 });
     expect(box.teams.A.reception).toEqual({ attempts: 3, positive: { num: 2, den: 3, pct: 2 / 3 }, errors: 1 });
     expect(box.teams.B.reception).toEqual({ attempts: 5, positive: { num: 3, den: 5, pct: 0.6 }, errors: 0 });
   });
@@ -77,7 +77,9 @@ describe("Box Score — set de referência (beach)", () => {
   it("por atleta: pontos, bloqueios (só #), defesas e erros cometidos", () => {
     expect(box.athletes.A1).toMatchObject({ points: 1, blocks: 0, digs: 1, errors: 2 }); // bloqueado + recepção =
     expect(box.athletes.A2).toMatchObject({ points: 1, blocks: 0, digs: 1, errors: 0 });
-    expect(box.athletes.B1).toMatchObject({ points: 2, blocks: 1, digs: 0, errors: 0 }); // kill + bloqueio
+    expect(box.athletes.B1).toMatchObject({ points: 3, blocks: 1, digs: 0, errors: 0 }); // kill + bloqueio + ace (R8)
+    expect(box.athletes.B1.serve).toEqual({ attempts: 2, aces: 1, errors: 0 });
+    expect(box.athletes.A1.reception.errors).toBe(1); // o erro de recepção continua com quem recebeu
     expect(box.athletes.B2).toMatchObject({ points: 1, blocks: 0, errors: 2 }); // ace; erro de saque + de ataque
     expect(box.teams.B.blocks).toBe(1);
     expect(box.teams.A.digs).toBe(2);

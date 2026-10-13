@@ -1,5 +1,5 @@
 import type { RallyResult } from "../rally/replay";
-import type { TeamSide, TouchEvent } from "../types";
+import type { RallyEndReason, TeamSide, TouchEvent } from "../types";
 
 /** Contadores brutos de lances, somáveis por atleta e por equipe. */
 export interface TouchCounters {
@@ -39,14 +39,22 @@ function isStuffed(attack: TouchEvent, next: TouchEvent | undefined): boolean {
   return !!next && next.team !== attack.team && next.skill === "block" && next.quality === "#";
 }
 
-/** O que um lance soma às estatísticas. `won` = o rali terminou com ponto para a equipe do lance. */
-export function touchDelta(touch: TouchEvent, next: TouchEvent | undefined, won: boolean): TouchDelta {
+/** Resultado do rali do ponto de vista de um lance. */
+export interface TouchOutcome {
+  /** O rali terminou com ponto para a equipe do lance. */
+  won: boolean;
+  reason: RallyEndReason | null;
+}
+
+/** O que um lance soma às estatísticas. */
+export function touchDelta(touch: TouchEvent, next: TouchEvent | undefined, { won, reason }: TouchOutcome): TouchDelta {
   const isError = touch.quality === "=";
   switch (touch.skill) {
     case "serve":
       return {
         serve_attempts: 1,
-        aces: touch.quality === "#" && won ? 1 : 0,
+        // Ace = rali ganho com motivo "ace": saque # ou recepção = do adversário logo após o saque.
+        aces: won && reason === "ace" ? 1 : 0,
         serve_errors: isError ? 1 : 0,
         errors: isError ? 1 : 0,
       };
@@ -81,7 +89,8 @@ export function tallyTouches(
   add: (team: TeamSide, athlete_id: string, delta: TouchDelta) => void,
 ): void {
   rally.touches.forEach((touch, i) => {
-    add(touch.team, touch.athlete_id, touchDelta(touch, rally.touches[i + 1], rally.point_to === touch.team));
+    const outcome = { won: rally.point_to === touch.team, reason: rally.reason };
+    add(touch.team, touch.athlete_id, touchDelta(touch, rally.touches[i + 1], outcome));
   });
 }
 

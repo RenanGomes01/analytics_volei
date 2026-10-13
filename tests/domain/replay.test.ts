@@ -109,12 +109,19 @@ describe("ponto implícito pela qualidade terminal", () => {
     ["saque =: erro, ponto do receptor", [["A", "serve", "="]], "B", "error"],
     ["ataque #: kill", [["A", "serve", "+"], ["B", "reception", "+"], ["B", "set", "+"], ["B", "attack", "#"]], "B", "kill"],
     ["bloqueio #: ponto de bloqueio", [["A", "serve", "+"], ["B", "reception", "+"], ["B", "attack", "+"], ["A", "block", "#"]], "A", "kill"],
-    ["recepção =: ace sofrido", [["A", "serve", "+"], ["B", "reception", "="]], "A", "error"],
+    ["recepção = logo após o saque: ace de quem sacou", [["A", "serve", "+"], ["B", "reception", "="]], "A", "ace"],
+    ["recepção = de bola de graça: erro, não ace", [["A", "serve", "+"], ["B", "reception", "+"], ["B", "freeball", "+"], ["A", "reception", "="]], "B", "error"],
   ] as const)("%s", (_, seq, point_to, reason) => {
     const state = replayMatch(rallyWith(...seq).events, beach);
     expect(state.rallies[0]).toMatchObject({ point_to, reason });
     expect(state.open_rally).toBeNull();
     expect(state.serving_team).toBe(point_to);
+  });
+
+  it("rally_end manual tem precedência sobre a recepção = (ace)", () => {
+    const l = rallyWith(["A", "serve", "+"], ["B", "reception", "="]);
+    l.end("B", "manual"); // arbitragem: falta de quem sacou
+    expect(replayMatch(l.events, beach).rallies[0]).toMatchObject({ point_to: "B", reason: "manual" });
   });
 
   it("levantamento # não encerra o rali", () => {

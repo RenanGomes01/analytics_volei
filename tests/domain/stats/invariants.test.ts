@@ -88,6 +88,8 @@ describe.each([
       const sum = (read: (a: (typeof athletes)[number]) => number) => athletes.reduce((acc, a) => acc + read(a), 0);
       expect(sum((a) => a.attack.kills)).toBe(all.teams[team].attack.kills);
       expect(sum((a) => a.serve.aces)).toBe(all.teams[team].serve.aces);
+      // Aces do placar (motivo do rali) = aces creditados às sacadoras.
+      expect(all.teams[team].points.aces).toBe(all.teams[team].serve.aces);
       expect(sum((a) => a.reception.attempts)).toBe(all.teams[team].reception.attempts);
       expect(sum((a) => a.errors)).toBe(all.teams[team].errors);
     }

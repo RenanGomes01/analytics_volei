@@ -14,11 +14,11 @@ interface Props {
 type Line = Pick<AthleteStats, "attack" | "serve" | "reception" | "blocks" | "digs"> & { points: number };
 
 const COLUMNS: { label: string; title: string; value: (s: Line) => string | number }[] = [
-  { label: "Pts", title: "Pontos (kills + aces + bloqueios)", value: (s) => s.points },
-  { label: "K", title: "Kills (ataques #)", value: (s) => s.attack.kills },
+  { label: "Pts", title: "Pontos (ataques + aces + bloqueios)", value: (s) => s.points },
+  { label: "PA", title: "Pontos de ataque (ataques #)", value: (s) => s.attack.kills },
   { label: "E", title: "Erros de ataque (= ou bloqueado)", value: (s) => s.attack.errors },
   { label: "TA", title: "Total de ataques", value: (s) => s.attack.attempts },
-  { label: "Eff", title: "Eficiência de ataque: (K − E) / TA", value: (s) => pct(s.attack.efficiency) },
+  { label: "Efic.", title: "Eficiência de ataque: (PA − E) / TA", value: (s) => pct(s.attack.efficiency) },
   { label: "Ace", title: "Aces", value: (s) => s.serve.aces },
   { label: "ES", title: "Erros de saque", value: (s) => s.serve.errors },
   { label: "Sq", title: "Total de saques", value: (s) => s.serve.attempts },
