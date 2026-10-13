@@ -7,6 +7,7 @@ import { LOCAL_TENANT_ID } from "@/lib/tenant";
 import { MockTransport } from "@/services/sync/mock-transport";
 import { lastServerSeq, runSyncCycle } from "@/services/sync/sync-engine";
 import type { SyncTransport } from "@/services/sync/transport";
+import { isAppOutdated } from "@/features/update/app-update";
 import { SYNC_MODE } from "./sync-config";
 
 const INTERVAL_MS = 30_000;
@@ -38,7 +39,8 @@ export function SyncAgent() {
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     const run = async () => {
-      if (running || disposed) return;
+      // Aba com código antigo (versão nova já instalada): não envia o outbox até recarregar.
+      if (running || disposed || isAppOutdated()) return;
       running = true;
       try {
         transport ??= new MockTransport({ latencyMs: 300, startSeq: await lastServerSeq(db) });

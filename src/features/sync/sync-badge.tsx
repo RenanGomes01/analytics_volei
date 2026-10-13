@@ -1,5 +1,6 @@
 "use client";
 
+import { useAppOutdated } from "@/features/update/update-banner";
 import { SYNC_MODE } from "./sync-config";
 import { useSyncStatus } from "./use-sync-status";
 
@@ -8,12 +9,16 @@ const time = new Intl.DateTimeFormat("pt-BR", { timeStyle: "short" });
 /** Selo discreto do estado do outbox. Não aparece na tela de scout. */
 export function SyncBadge() {
   const status = useSyncStatus();
+  const outdated = useAppOutdated();
   if (!status) return null;
 
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
   let text: string;
   let tone = "bg-zinc-800 text-zinc-300";
-  if (SYNC_MODE === "off") {
+  if (outdated) {
+    text = "⚠ versão desatualizada · atualize o app";
+    tone = "bg-sky-800 text-sky-50";
+  } else if (SYNC_MODE === "off") {
     text = `☁ sincronização desligada · ${status.pending} na fila`;
   } else if (status.conflicts > 0) {
     text = `⚠ ${plural(status.conflicts, "conflito")}`;

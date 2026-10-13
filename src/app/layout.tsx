@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SerwistProvider } from "@serwist/turbopack/react";
 import { SyncAgent } from "@/features/sync/sync-agent";
+import { UpdateBanner } from "@/features/update/update-banner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -33,8 +34,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {/* Em dev o SW fica desligado para não servir código antigo do cache. */}
-        <SerwistProvider swUrl="/serwist/sw.js" disable={process.env.NODE_ENV === "development"}>
+        {/* Em dev o SW fica desligado para não servir código antigo do cache.
+            reloadOnOnline desligado: a volta do Wi-Fi não pode recarregar o scout no meio do rali. */}
+        <SerwistProvider
+          swUrl="/serwist/sw.js"
+          disable={process.env.NODE_ENV === "development"}
+          reloadOnOnline={false}
+        >
+          <UpdateBanner />
           <SyncAgent />
           {children}
         </SerwistProvider>
