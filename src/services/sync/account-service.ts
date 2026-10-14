@@ -13,7 +13,12 @@ export async function getLinkedAccount(db: ScoutDB): Promise<string | null> {
 
 /** Quantos registros deste aparelho sobem para a nuvem ao vincular (tudo, menos os dados de teste). */
 export async function countSyncable(db: ScoutDB, tenant_id: string): Promise<number> {
-  return db.outbox.where("tenant_id").equals(tenant_id).filter((e) => e.status !== "local_only").count();
+  // Conta pelo índice `status` (sem carregar o histórico do outbox). Monotenant na prática.
+  void tenant_id;
+  const counts = await Promise.all(
+    (["pending", "sent", "acked", "conflict"] as const).map((s) => db.outbox.where("status").equals(s).count()),
+  );
+  return counts.reduce((a, b) => a + b, 0);
 }
 
 /**

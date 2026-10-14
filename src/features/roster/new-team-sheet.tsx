@@ -1,5 +1,7 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
+import { useSubmit } from "@/components/use-submit";
 import { useState } from "react";
 import { getDB } from "@/db/client";
 import { pairKey } from "@/domain/roster/identity";
@@ -17,26 +19,18 @@ export function NewTeamSheet({ roster, onClose }: { roster: RosterData; onClose:
   const [picked, setPicked] = useState<(Athlete | null)[]>([null, null]);
   const [indoorIds, setIndoorIds] = useState<string[]>([]);
   const [name, setName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
 
   const chosen = modality === "beach" ? picked.filter((a): a is Athlete => !!a).map((a) => a.id) : indoorIds;
   const ready = modality === "beach" ? chosen.length === 2 : chosen.length >= 6 && chosen.length <= 14;
 
-  async function save() {
-    setSaving(true);
-    setError(null);
-    try {
+  const { busy: saving, error, run } = useSubmit();
+  const save = () =>
+    run(async () => {
       const existed = roster.teamByKey.has(pairKey(chosen, roster.aliases));
       const team = await findOrCreateTeam(getDB(), LOCAL_TENANT_ID, { athlete_ids: chosen, modality, name });
       toast[existed ? "info" : "success"](existed ? `${team.name} já estava cadastrada.` : `Dupla ${team.name} cadastrada.`);
       onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSaving(false);
-    }
-  }
+    });
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Cadastrar dupla" className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
@@ -93,9 +87,9 @@ export function NewTeamSheet({ roster, onClose }: { roster: RosterData; onClose:
           <button type="button" onClick={onClose} className={`${secondaryButton} flex-1`}>
             Cancelar
           </button>
-          <button type="button" disabled={!ready || saving} onClick={save} className={`${primaryButton} flex-1`}>
+          <SubmitButton type="button" busy={saving} disabled={!ready} onClick={save} className={`${primaryButton} flex-1`}>
             Salvar
-          </button>
+          </SubmitButton>
         </div>
       </div>
     </div>

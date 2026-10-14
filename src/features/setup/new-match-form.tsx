@@ -1,8 +1,9 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
 import { useSearchParams } from "next/navigation";
 import { toast } from "@/features/toast/toast";
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { getDB } from "@/db/client";
 import { pairKey } from "@/domain/roster/identity";
 import { PHASE_LABEL, TOURNAMENT_PHASES, type Team, type TournamentPhase } from "@/domain/roster/types";
@@ -30,6 +31,8 @@ export function NewMatchForm() {
   const [phase, setPhase] = useState<TournamentPhase>("group");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Trava no mesmo toque: dois toques em "Começar scout" não criam duas partidas.
+  const submitting = useRef(false);
 
   const tournament = roster?.tournaments.find((t) => t.id === tournamentId);
   const modality = tournament?.modality ?? freeModality;
@@ -67,6 +70,8 @@ export function NewMatchForm() {
       setError(`Escolha as duas ${modality === "beach" ? "duplas" : "equipes"}.`);
       return;
     }
+    if (submitting.current) return;
+    submitting.current = true;
     setSaving(true);
     setError(null);
     // Gesto do usuário: o momento certo para pedir a proteção do armazenamento (o Firefox exige).
@@ -87,6 +92,7 @@ export function NewMatchForm() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setSaving(false);
+      submitting.current = false;
     }
   }
 
@@ -159,9 +165,9 @@ export function NewMatchForm() {
         </p>
       )}
 
-      <button type="submit" disabled={saving} className="min-h-16 rounded-2xl bg-amber-400 text-xl font-bold text-zinc-950 disabled:opacity-50">
-        {saving ? "Criando…" : "Começar scout"}
-      </button>
+      <SubmitButton type="submit" busy={saving} busyLabel="Criando a partida…" className="min-h-16 rounded-2xl bg-amber-400 text-xl font-bold text-zinc-950 disabled:opacity-60">
+        Começar scout
+      </SubmitButton>
     </form>
   );
 }

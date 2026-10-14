@@ -103,11 +103,27 @@ export async function applyPulledPage(
     );
     const found: PullConflict[] = [];
 
+    // Sem N+1: as linhas locais da página saem num bulkGet por tabela, e as posições do ledger já
+    // ocupadas numa consulta por partida (não uma ida ao IndexedDB por mudança).
+    const localRows = new Map<string, unknown>();
+    const byEntity = new Map<OutboxEntity, string[]>();
+    for (const c of changes) byEntity.set(c.entity, [...(byEntity.get(c.entity) ?? []), c.entity_id]);
+    for (const [entity, entityIds] of byEntity) {
+      const rows = await tableOf(db, entity).bulkGet(entityIds);
+      entityIds.forEach((eid, i) => rows[i] !== undefined && localRows.set(`${entity}:${eid}`, rows[i]));
+    }
+    const usedSeqs = new Map<string, Set<number>>();
+    for (const matchId of new Set(changes.filter((c) => c.entity === "rally_event").map((c) => String(c.data.match_id)))) {
+      // Só as chaves do índice composto ([match_id, local_seq]): nenhum lance é carregado.
+      const keys = await db.rally_events.where("[match_id+local_seq]").between([matchId, -Infinity], [matchId, Infinity]).keys();
+      usedSeqs.set(matchId, new Set(keys.map((k) => (k as unknown as [string, number])[1])));
+    }
+
     for (const change of changes) {
       report.cursor = Math.max(report.cursor, change.server_seq);
       const table = tableOf(db, change.entity);
       const row = toLocalRow(change, tenant_id);
-      const local = await table.get(change.entity_id);
+      const local = localRows.get(`${change.entity}:${change.entity_id}`);
 
       if (change.entity === "rally_event") {
         if (change.deleted || (local && same(local, row))) {
@@ -120,9 +136,12 @@ export async function applyPulledPage(
         }
         // Outro aparelho já usou esta posição do ledger: a partida foi scouteada em dois aparelhos.
         const event = row as unknown as RallyEvent;
-        const clash = await db.rally_events.where("[match_id+local_seq]").equals([event.match_id, event.local_seq]).first();
-        if (clash) found.push({ entity: "rally_event", entity_id: event.id, match_id: event.match_id, reason: "Partida scouteada em mais de um aparelho." });
+        const used = usedSeqs.get(event.match_id) ?? new Set<number>();
+        if (used.has(event.local_seq)) found.push({ entity: "rally_event", entity_id: event.id, match_id: event.match_id, reason: "Partida scouteada em mais de um aparelho." });
+        used.add(event.local_seq);
+        usedSeqs.set(event.match_id, used);
         await table.add(row);
+        localRows.set(`${change.entity}:${change.entity_id}`, row);
         report.applied += 1;
         continue;
       }
@@ -137,6 +156,7 @@ export async function applyPulledPage(
         if (local && same(local, tombstone)) report.skipped += 1;
         else {
           await table.put(tombstone);
+          localRows.set(`${change.entity}:${change.entity_id}`, tombstone);
           report.applied += 1;
         }
         continue;
@@ -144,6 +164,7 @@ export async function applyPulledPage(
       if (change.deleted) {
         if (local) {
           await table.delete(change.entity_id);
+          localRows.delete(`${change.entity}:${change.entity_id}`);
           report.applied += 1;
         } else report.skipped += 1;
         continue;
@@ -153,6 +174,7 @@ export async function applyPulledPage(
         continue;
       }
       await table.put(row);
+      localRows.set(`${change.entity}:${change.entity_id}`, row);
       report.applied += 1;
     }
 

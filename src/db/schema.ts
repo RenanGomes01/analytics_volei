@@ -54,5 +54,11 @@ export class ScoutDB extends Dexie {
       tournament_entries: "id, tenant_id, tournament_id, match_id",
       athlete_aliases: "alias_id, tenant_id, canonical_id",
     });
+    // v4 (Fase 13): só índices — nenhuma linha é alterada. "Esta atleta tem lances?" e "em que duplas
+    // ela está?" viram buscas por índice (instantâneas também no tablet), sem varrer tabelas.
+    this.version(4).stores({
+      rally_events: "id, tenant_id, [match_id+local_seq], [match_id+set_number], rally_id, athlete_id",
+      teams: "id, tenant_id, [tenant_id+pair_key], *athlete_ids",
+    });
   }
 }

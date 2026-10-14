@@ -1,5 +1,7 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
+import { useSubmit } from "@/components/use-submit";
 import { useState } from "react";
 import { ConfirmSheet } from "@/components/confirm-sheet";
 import { getDB } from "@/db/client";
@@ -16,19 +18,15 @@ export function TournamentEditSheet({ tournament, matches, onClose }: { tourname
   const [name, setName] = useState(tournament.name);
   const [location, setLocation] = useState(tournament.location ?? "");
   const [category, setCategory] = useState<TournamentCategory | null>(tournament.category ?? null);
-  const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  async function save() {
-    setError(null);
-    try {
+  const { busy: saving, error, run } = useSubmit();
+  const save = () =>
+    run(async () => {
       await updateTournament(getDB(), LOCAL_TENANT_ID, tournament.id, { name, location, category });
       toast.success("Torneio salvo.");
       onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }
+    });
 
   if (confirmDelete) {
     return (
@@ -88,9 +86,9 @@ export function TournamentEditSheet({ tournament, matches, onClose }: { tourname
           <button type="button" onClick={onClose} className={secondaryButton}>
             Cancelar
           </button>
-          <button type="button" onClick={save} className={primaryButton}>
+          <SubmitButton type="button" busy={saving} onClick={save} className={primaryButton}>
             Salvar
-          </button>
+          </SubmitButton>
         </div>
       </div>
     </div>

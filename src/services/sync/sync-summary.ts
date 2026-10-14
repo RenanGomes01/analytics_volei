@@ -137,9 +137,14 @@ const toIssue = (e: OutboxEntry, label: string): SyncIssue => ({
 });
 
 export async function getSyncSummary(db: ScoutDB, tenant_id: string, { maxIssues = 50, maxMatches = 20 } = {}): Promise<SyncSummary> {
-  const all = await db.outbox.where("tenant_id").equals(tenant_id).toArray();
-  const waiting = all.filter((e) => e.status === "pending" || e.status === "sent").sort((a, b) => a.created_at - b.created_at);
-  const conflicts = all.filter((e) => e.status === "conflict").sort((a, b) => a.created_at - b.created_at);
+  // Só a fila de verdade (pendentes, enviando, recusados) — nunca o histórico confirmado, que tem
+  // milhares de linhas com payload e deixaria o tablet lento a cada gravação.
+  const [queue, dismissed] = await Promise.all([
+    db.outbox.where("status").anyOf("pending", "sent", "conflict").filter((e) => e.tenant_id === tenant_id).toArray(),
+    db.outbox.where("status").equals("dismissed").count(),
+  ]);
+  const waiting = queue.filter((e) => e.status === "pending" || e.status === "sent").sort((a, b) => a.created_at - b.created_at);
+  const conflicts = queue.filter((e) => e.status === "conflict").sort((a, b) => a.created_at - b.created_at);
   const label = await labeler(db, [...waiting.slice(0, 1), ...conflicts.slice(0, maxIssues), ...waiting.filter((e) => e.entity === "match" || e.entity === "rally_event")]);
 
   const pending: Record<SummaryGroup, number> = { match: 0, athlete: 0, team: 0, tournament: 0, link: 0 };
@@ -191,6 +196,6 @@ export async function getSyncSummary(db: ScoutDB, tenant_id: string, { maxIssues
     pendingMatches: [...perMatch.values()].sort((a, b) => b.events - a.events).slice(0, maxMatches),
     issues: conflicts.slice(0, maxIssues).map((e) => toIssue(e, label(e))),
     stalled,
-    dismissed: all.filter((e) => e.status === "dismissed").length,
+    dismissed,
   };
 }

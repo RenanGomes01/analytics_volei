@@ -167,17 +167,24 @@ export async function deleteTeam(db: ScoutDB, tenant_id: string, id: string): Pr
   });
 }
 
-/** Onde a atleta é usada: partidas (inclusive na lixeira), uniões e duplas do cadastro. */
+/**
+ * Onde a atleta é usada: partidas (inclusive na lixeira), lances, uniões e duplas do cadastro.
+ * Lances, uniões e duplas por índice (Dexie v4); a escalação das partidas fica dentro do retrato
+ * (`team_a/team_b`), que o IndexedDB não indexa — a tabela de partidas é pequena e leve.
+ */
 export async function athleteUsage(db: ScoutDB, tenant_id: string, id: string) {
-  const [matches, aliases, teams] = await Promise.all([
-    db.matches.where("tenant_id").equals(tenant_id).toArray(),
-    db.athlete_aliases.where("tenant_id").equals(tenant_id).toArray(),
-    db.teams.where("tenant_id").equals(tenant_id).toArray(),
+  const [matches, lance, asAlias, asCanonical, teams] = await Promise.all([
+    db.matches.where("tenant_id").equals(tenant_id).filter((m) => m.team_a.athlete_ids.includes(id) || m.team_b.athlete_ids.includes(id)).count(),
+    db.rally_events.where("athlete_id").equals(id).first(),
+    db.athlete_aliases.get(id),
+    db.athlete_aliases.where("canonical_id").equals(id).count(),
+    db.teams.where("athlete_ids").equals(id).toArray(),
   ]);
   return {
-    matches: matches.filter((m) => m.team_a.athlete_ids.includes(id) || m.team_b.athlete_ids.includes(id)).length,
-    merged: aliases.some((a) => a.alias_id === id || a.canonical_id === id),
-    teams: teams.filter((t) => t.athlete_ids.includes(id)),
+    // Atleta com lances numa partida em que não está na escalação (substituta) também conta.
+    matches: matches > 0 ? matches : lance ? 1 : 0,
+    merged: !!asAlias || asCanonical > 0,
+    teams: teams.filter((t) => t.tenant_id === tenant_id),
   };
 }
 
@@ -187,7 +194,7 @@ export async function athleteUsage(db: ScoutDB, tenant_id: string, id: string) {
  * incluem (sem partidas, portanto) vão junto. Lápides no outbox, numa transação.
  */
 export async function deleteAthlete(db: ScoutDB, tenant_id: string, id: string): Promise<{ teams: number }> {
-  return db.transaction("rw", [db.athletes, db.matches, db.athlete_aliases, db.teams, db.outbox], async () => {
+  return db.transaction("rw", [db.athletes, db.matches, db.rally_events, db.athlete_aliases, db.teams, db.outbox], async () => {
     const athlete = await db.athletes.get(id);
     if (!athlete || athlete.tenant_id !== tenant_id) throw new Error("Atleta não encontrada.");
     const usage = await athleteUsage(db, tenant_id, id);

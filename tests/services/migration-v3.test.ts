@@ -54,7 +54,7 @@ describe("migração Dexie v2 → v3 (cadastro central)", () => {
     expect(await v3.matches.toArray()).toEqual(before.matches);
     expect(await v3.outbox.toArray()).toEqual(before.outbox);
     expect([await v3.teams.count(), await v3.tournaments.count(), await v3.tournament_entries.count(), await v3.athlete_aliases.count()]).toEqual([0, 0, 0, 0]);
-    expect(v3.verno).toBe(3);
+    expect(v3.verno).toBeGreaterThanOrEqual(3);
     // A chave do aparelho é nova (a meta não foi copiada), mas o CONTEÚDO assinado é idêntico.
     expect((await exportMatch(v3, scope, { now: NOW })).envelope.integrity.content_hash).toBe(before.hash);
     v3.close();

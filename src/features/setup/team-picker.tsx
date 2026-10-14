@@ -1,8 +1,11 @@
 "use client";
 
+import { toast } from "@/features/toast/toast";
+import { useSubmit } from "@/components/use-submit";
+import { SubmitButton } from "@/components/submit-button";
 import { useState } from "react";
 import { getDB } from "@/db/client";
-import { matchesSearch } from "@/domain/roster/identity";
+import { matchesSearch, pairKey } from "@/domain/roster/identity";
 import type { Team } from "@/domain/roster/types";
 import type { Athlete, Modality } from "@/domain/types";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
@@ -32,7 +35,7 @@ export function TeamPicker({ side, modality, roster, preferredTeamIds, blockedAt
   const [building, setBuilding] = useState(false);
   const [picked, setPicked] = useState<(Athlete | null)[]>([null, null]);
   const [indoorIds, setIndoorIds] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useSubmit();
   const title = modality === "beach" ? `Dupla ${side}` : `Time ${side}`;
 
   if (value) {
@@ -55,17 +58,17 @@ export function TeamPicker({ side, modality, roster, preferredTeamIds, blockedAt
     .filter((t) => matchesSearch(query, t.name, ...t.athlete_ids.map((id) => roster.athleteById.get(id)?.name ?? "")))
     .sort((a, b) => Number(preferredTeamIds.has(b.id)) - Number(preferredTeamIds.has(a.id)));
 
-  async function create(athleteIds: string[]) {
-    setError(null);
-    try {
-      onChange(await findOrCreateTeam(getDB(), LOCAL_TENANT_ID, { athlete_ids: athleteIds, modality }));
+  // Trava no mesmo toque: tocar várias vezes em "Usar esta dupla" grava uma vez só.
+  const create = (athleteIds: string[]) =>
+    run(async () => {
+      const existed = roster.teamByKey.has(pairKey(athleteIds, roster.aliases));
+      const team = await findOrCreateTeam(getDB(), LOCAL_TENANT_ID, { athlete_ids: athleteIds, modality });
+      toast[existed ? "info" : "success"](existed ? `${team.name} já estava cadastrada.` : `Dupla ${team.name} cadastrada.`);
+      onChange(team);
       setBuilding(false);
       setPicked([null, null]);
       setIndoorIds([]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }
+    });
 
   const chosen = picked.filter((a): a is Athlete => !!a).map((a) => a.id);
 
@@ -118,9 +121,9 @@ export function TeamPicker({ side, modality, roster, preferredTeamIds, blockedAt
             <button type="button" onClick={() => setBuilding(false)} className={`${secondaryButton} flex-1`}>
               Cancelar
             </button>
-            <button type="button" disabled={chosen.length !== 2} onClick={() => create(chosen)} className={`${primaryButton} flex-1`}>
+            <SubmitButton type="button" busy={busy} busyLabel="Criando…" disabled={chosen.length !== 2} onClick={() => create(chosen)} className={`${primaryButton} flex-1`}>
               Usar esta dupla
-            </button>
+            </SubmitButton>
           </div>
         </div>
       )}
@@ -149,9 +152,9 @@ export function TeamPicker({ side, modality, roster, preferredTeamIds, blockedAt
             <button type="button" onClick={() => setBuilding(false)} className={`${secondaryButton} flex-1`}>
               Cancelar
             </button>
-            <button type="button" disabled={indoorIds.length < 6 || indoorIds.length > 14} onClick={() => create(indoorIds)} className={`${primaryButton} flex-1`}>
+            <SubmitButton type="button" busy={busy} busyLabel="Criando…" disabled={indoorIds.length < 6 || indoorIds.length > 14} onClick={() => create(indoorIds)} className={`${primaryButton} flex-1`}>
               Usar este time
-            </button>
+            </SubmitButton>
           </div>
         </div>
       )}

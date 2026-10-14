@@ -102,6 +102,13 @@
 - **Todo CRUD confirma com toast** (`toast.success` de `src/features/toast/toast.ts`), disparado na interface, não no serviço. Antes de navegar com `window.location`, use `{ afterNavigation: true }` (vai pelo sessionStorage). Exclusão reversível oferece `action: Desfazer`. Erro de formulário continua no formulário.
 - Rede: `useOnline()` (`src/features/network/use-network.ts`); a decisão da faixa é pura (`connection-banner.ts`, testada). Nada de rede/sync aparece no scout.
 
+## Performance no tablet (Fase 13)
+- **O outbox guarda todo o histórico** (cada lance com payload; dezenas de milhares de linhas). Consulta ao vivo (`useLiveQuery`) **nunca** lê o outbox inteiro: conte pelo índice `status` (`count()`) e leia só a fila (`pending`/`sent`/`conflict`). Ver `getSyncStatus`, `getSyncSummary`, `outbox-performance.test.ts`.
+- Não grave na `meta`/outbox sem mudança real (ex.: ciclo de sync vazio): toda escrita re-executa as consultas ao vivo de todas as telas.
+- Loops sobre muitas linhas usam `bulkGet`/consultas por índice, nunca `await table.get()` por item (ver `applyPulledPage`).
+- Dexie v4: índices `rally_events.athlete_id` e `teams.*athlete_ids`. Índice novo = nova `version(n)` só com índices + teste de migração.
+- **Todo botão que grava** usa `useSubmit()`/`runOnce` (trava por `ref`, vale no mesmo toque) e `SubmitButton` (desabilitado + spinner). Estado do React sozinho não impede o duplo toque no tablet.
+
 ## Dados de teste (`/dev/seed`)
 - Gerador puro em `src/domain/dev/rally-generator.ts` (semente fixa, modo detalhado, fim do rali sempre por `impliedPoint`); serviço em `src/services/dev/seed-service.ts`, gravando pelos services reais (`appendRallies` = vários ralis numa transação).
 - Os ids criados ficam em `meta["dev_seed"]`. `removeDemoData` apaga **só** esses ids (exceção deliberada ao append-only, restrita a dados sintéticos).

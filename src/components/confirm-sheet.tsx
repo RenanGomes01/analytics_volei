@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { SubmitButton } from "@/components/submit-button";
+import { useSubmit } from "@/components/use-submit";
+import type { ReactNode } from "react";
 
 interface Props {
   title: string;
@@ -20,21 +22,12 @@ interface Props {
  * explica nada). Mostra o erro do serviço — ex.: "joga em 3 partidas" — sem fechar.
  */
 export function ConfirmSheet({ title, children, confirmLabel, danger = false, canConfirm = true, onConfirm, onClose }: Props) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function confirm() {
-    setBusy(true);
-    setError(null);
-    try {
+  const { busy, error, run } = useSubmit();
+  const confirm = () =>
+    run(async () => {
       await onConfirm();
       onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
+    });
 
   return (
     <div role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
@@ -51,14 +44,14 @@ export function ConfirmSheet({ title, children, confirmLabel, danger = false, ca
             {canConfirm ? "Cancelar" : "Entendi"}
           </button>
           {canConfirm && (
-            <button
+            <SubmitButton
               type="button"
-              disabled={busy}
+              busy={busy}
               onClick={confirm}
               className={`min-h-14 flex-1 rounded-2xl font-bold disabled:opacity-50 ${danger ? "bg-red-700 text-white" : "bg-amber-400 text-zinc-950"}`}
             >
-              {busy ? "Salvando…" : confirmLabel}
-            </button>
+              {confirmLabel}
+            </SubmitButton>
           )}
         </div>
       </div>

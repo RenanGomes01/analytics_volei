@@ -1,5 +1,7 @@
 "use client";
 
+import { useSubmit } from "@/components/use-submit";
+import { SubmitButton } from "@/components/submit-button";
 import { useState } from "react";
 import { toast } from "@/features/toast/toast";
 import { getDB } from "@/db/client";
@@ -23,19 +25,15 @@ interface Props {
 export function TournamentPicker({ tournaments, value, onChange }: Props) {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ name: "", location: "", start_date: today(), modality: "beach" as Modality, category: undefined as TournamentCategory | undefined });
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useSubmit();
 
-  async function create() {
-    setError(null);
-    try {
+  const create = () =>
+    run(async () => {
       const t = await createTournament(getDB(), LOCAL_TENANT_ID, form);
       toast.success(`Torneio ${t.name} criado.`);
       onChange(t.id);
       setCreating(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }
+    });
 
   return (
     <fieldset className="flex flex-col gap-2">
@@ -90,9 +88,9 @@ export function TournamentPicker({ tournaments, value, onChange }: Props) {
             <button type="button" onClick={() => setCreating(false)} className={`${secondaryButton} flex-1`}>
               Cancelar
             </button>
-            <button type="button" onClick={create} className={`${primaryButton} flex-1`}>
+            <SubmitButton type="button" busy={busy} busyLabel="Criando…" onClick={create} className={`${primaryButton} flex-1`}>
               Criar torneio
-            </button>
+            </SubmitButton>
           </div>
           {error && <p className="text-sm text-red-400">{error}</p>}
         </div>

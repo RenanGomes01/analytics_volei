@@ -1,5 +1,7 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
+import { useSubmit } from "@/components/use-submit";
 import { useState } from "react";
 import { getDB } from "@/db/client";
 import { sameNameAthletes } from "@/domain/roster/identity";
@@ -14,14 +16,11 @@ export function NewAthleteSheet({ athletes, onClose }: { athletes: Athlete[]; on
   const [name, setName] = useState("");
   const [number, setNumber] = useState("");
   const [gender, setGender] = useState<Gender | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const twins = sameNameAthletes(athletes, name);
 
-  async function save(another: boolean) {
-    setSaving(true);
-    setError(null);
-    try {
+  const { busy: saving, error, run } = useSubmit();
+  const save = (another: boolean) =>
+    run(async () => {
       if (!name.trim()) throw new Error("Digite o nome da atleta.");
       const athlete = await createAthlete(getDB(), {
         tenant_id: LOCAL_TENANT_ID,
@@ -34,12 +33,7 @@ export function NewAthleteSheet({ athletes, onClose }: { athletes: Athlete[]; on
         setName("");
         setNumber("");
       } else onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSaving(false);
-    }
-  }
+    });
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Cadastrar atleta" className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
@@ -89,9 +83,9 @@ export function NewAthleteSheet({ athletes, onClose }: { athletes: Athlete[]; on
           <button type="button" disabled={saving} onClick={() => save(true)} className={secondaryButton}>
             Salvar e cadastrar outra
           </button>
-          <button type="submit" disabled={saving} className={primaryButton}>
+          <SubmitButton type="submit" busy={saving} className={primaryButton}>
             Salvar
-          </button>
+          </SubmitButton>
         </div>
       </form>
     </div>

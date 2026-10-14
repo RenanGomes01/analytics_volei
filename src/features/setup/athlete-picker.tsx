@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import { getDB } from "@/db/client";
-import { matchesSearch } from "@/domain/roster/identity";
+import { matchesSearch, sameNameAthletes } from "@/domain/roster/identity";
 import type { Athlete, Gender } from "@/domain/types";
+import { SubmitButton } from "@/components/submit-button";
+import { useSubmit } from "@/components/use-submit";
+import { toast } from "@/features/toast/toast";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
 import { createAthlete } from "@/services/roster-service";
 import { inputClass, primaryButton, secondaryButton, segmentedClass } from "./form-styles";
@@ -25,7 +28,7 @@ export function AthletePicker({ label: title, athletes, exclude, value, onChange
   const [creating, setCreating] = useState(false);
   const [number, setNumber] = useState("");
   const [gender, setGender] = useState<Gender | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useSubmit();
 
   if (value) {
     return (
@@ -43,20 +46,23 @@ export function AthletePicker({ label: title, athletes, exclude, value, onChange
 
   const options = athletes.filter((a) => !exclude.includes(a.id) && matchesSearch(query, a.name, String(a.jersey_number ?? "")));
 
-  async function create() {
-    setError(null);
-    try {
+  const twins = sameNameAthletes(athletes, query).filter((a) => !exclude.includes(a.id));
+
+  // Trava no mesmo toque (useSubmit): tocar várias vezes em "Criar" no tablet grava UMA atleta.
+  const create = () =>
+    run(async () => {
       const athlete = await createAthlete(getDB(), {
         tenant_id: LOCAL_TENANT_ID,
         name: query.trim(),
         jersey_number: number ? Number(number) : undefined,
         ...(gender ? { gender } : {}),
       });
+      toast.success(`${athlete.name} cadastrada.`);
+      setCreating(false);
+      setQuery("");
+      setNumber("");
       onChange(athlete);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }
+    });
 
   return (
     <div className="flex flex-col gap-2">
@@ -83,30 +89,40 @@ export function AthletePicker({ label: title, athletes, exclude, value, onChange
               </button>
             </li>
           ) : (
-            <li className="flex gap-2">
-              <input
-                className={`${inputClass} w-24 text-center`}
-                inputMode="numeric"
-                placeholder="nº"
-                aria-label="Número da nova atleta"
-                value={number}
-                onChange={(e) => setNumber(e.target.value.replace(/\D/g, "").slice(0, 2))}
-              />
-              {(["F", "M"] as const).map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  aria-pressed={gender === g}
-                  aria-label={g === "F" ? "Feminino" : "Masculino"}
-                  onClick={() => setGender(gender === g ? null : g)}
-                  className={`${segmentedClass(gender === g)} w-14 flex-none`}
-                >
-                  {g}
-                </button>
-              ))}
-              <button type="button" onClick={create} className={`${primaryButton} flex-1`}>
-                Criar atleta
-              </button>
+            <li className="flex flex-col gap-2">
+              {twins.length > 0 && (
+                <div className="flex flex-col gap-2 rounded-xl bg-amber-900/50 p-2 text-sm text-amber-100">
+                  <span>Já existe {twins.map((a) => label(a)).join(", ")}. É a mesma pessoa?</span>
+                  <button type="button" onClick={() => onChange(twins[0])} className={`${primaryButton} w-full`}>
+                    Usar {twins[0].name} (já cadastrada)
+                  </button>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  className={`${inputClass} w-24 text-center`}
+                  inputMode="numeric"
+                  placeholder="nº"
+                  aria-label="Número da nova atleta"
+                  value={number}
+                  onChange={(e) => setNumber(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                />
+                {(["F", "M"] as const).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    aria-pressed={gender === g}
+                    aria-label={g === "F" ? "Feminino" : "Masculino"}
+                    onClick={() => setGender(gender === g ? null : g)}
+                    className={`${segmentedClass(gender === g)} w-14 flex-none`}
+                  >
+                    {g}
+                  </button>
+                ))}
+                <SubmitButton type="button" busy={busy} busyLabel="Criando…" onClick={create} className={`${twins.length ? secondaryButton : primaryButton} flex-1`}>
+                  {twins.length ? "Criar mesmo assim" : "Criar atleta"}
+                </SubmitButton>
+              </div>
             </li>
           )}
         </ul>

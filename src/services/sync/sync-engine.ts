@@ -1,7 +1,7 @@
 import type { OutboxEntry } from "@/domain/types";
 import type { ScoutDB } from "@/db/schema";
 import { nextAttemptAt } from "./backoff";
-import { BLOCKED_KEY, LAST_PULL_KEY, LAST_SUCCESS_KEY, PULL_CONFLICTS_KEY, PULL_ERROR_KEY } from "./sync-keys";
+import { BLOCKED_KEY, LAST_PULL_KEY, LAST_SUCCESS_KEY, MAX_SEQ_KEY, PULL_CONFLICTS_KEY, PULL_ERROR_KEY } from "./sync-keys";
 import type { PushResult, SyncTransport } from "./transport";
 
 /**
@@ -10,7 +10,7 @@ import type { PushResult, SyncTransport } from "./transport";
  */
 
 export const CLAIM_LEASE_MS = 2 * 60_000;
-export const DEFAULT_BATCH_SIZE = 50;
+export const DEFAULT_BATCH_SIZE = 100;
 const MAX_BATCHES_PER_CYCLE = 20;
 
 export interface SyncCycleOptions {
@@ -110,7 +110,13 @@ export async function applyResults(
     };
   });
 
-  await db.transaction("rw", db.outbox, () => db.outbox.bulkUpdate(updates));
+  const maxSeq = Math.max(0, ...results.filter((r) => r.status === "acked").map((r) => r.server_seq ?? 0));
+  await db.transaction("rw", db.outbox, db.meta, async () => {
+    await db.outbox.bulkUpdate(updates);
+    if (maxSeq > 0 && maxSeq > ((await db.meta.get(MAX_SEQ_KEY))?.value as number | undefined ?? 0)) {
+      await db.meta.put({ key: MAX_SEQ_KEY, value: maxSeq });
+    }
+  });
   return counts;
 }
 
@@ -144,7 +150,9 @@ export async function runSyncCycle(
     if (counts.retried) break;
   }
 
-  if (!report.error && !report.retried) await db.meta.put({ key: LAST_SUCCESS_KEY, value: now() });
+  // Só registra o envio quando houve envio: gravar a `meta` a cada ciclo vazio (a cada 30 s)
+  // re-executaria todas as consultas ao vivo que leem a meta, à toa.
+  if (report.batches > 0 && !report.error && !report.retried) await db.meta.put({ key: LAST_SUCCESS_KEY, value: now() });
   return report;
 }
 
@@ -164,18 +172,28 @@ export interface SyncStatus {
   pull_error: string | null;
 }
 
+/**
+ * Estado do sync para selos e telas (consulta AO VIVO em todas as telas). O outbox guarda todo o
+ * histórico (milhares de linhas com payload): aqui só se CONTA pelo índice `status` — nunca se
+ * carrega o histórico nem a fila: lê uma linha só (a cabeça da fila, para o último erro). O app é
+ * monotenant na prática (LOCAL_TENANT_ID), então as contagens não filtram tenant.
+ */
 export async function getSyncStatus(db: ScoutDB, tenant_id: string): Promise<SyncStatus> {
-  const entries = await db.outbox.where("tenant_id").equals(tenant_id).toArray();
   const status: SyncStatus = { pending: 0, conflicts: 0, acked: 0, last_success_at: null, last_error: null, last_pull_at: null, pull_conflicts: 0, blocked: null, pull_error: null };
-  for (const e of entries) {
-    if (e.status === "local_only" || e.status === "dismissed") continue;
-    if (e.status === "acked") status.acked += 1;
-    else if (e.status === "conflict") status.conflicts += 1;
-    else {
-      status.pending += 1;
-      status.last_error ??= e.last_error;
-    }
-  }
+  void tenant_id;
+  const count = (s: OutboxEntry["status"]) => db.outbox.where("status").equals(s).count();
+  const [pending, sent, conflicts, acked, head] = await Promise.all([
+    count("pending"),
+    count("sent"),
+    count("conflict"),
+    count("acked"),
+    // O envio é FIFO e para na primeira falha: o erro que importa está na cabeça da fila.
+    db.outbox.where("[status+created_at]").between(["pending", -Infinity], ["pending", Infinity]).first(),
+  ]);
+  status.pending = pending + sent;
+  status.conflicts = conflicts;
+  status.acked = acked;
+  status.last_error = head?.last_error ?? null;
   const last = (await db.meta.get(LAST_SUCCESS_KEY))?.value;
   status.last_success_at = typeof last === "number" ? last : null;
   const pulled = (await db.meta.get(LAST_PULL_KEY))?.value;
@@ -193,6 +211,9 @@ export async function getSyncStatus(db: ScoutDB, tenant_id: string): Promise<Syn
 
 /** Maior server_seq já confirmado neste aparelho (para o MockTransport continuar a sequência). */
 export async function lastServerSeq(db: ScoutDB): Promise<number> {
+  const stored = (await db.meta.get(MAX_SEQ_KEY))?.value;
+  if (typeof stored === "number") return stored;
+  // Bancos de antes da Fase 13: varre uma vez as confirmadas (só no modo mock, ao abrir).
   let max = 0;
   await db.outbox
     .where("status")

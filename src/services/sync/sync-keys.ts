@@ -10,3 +10,5 @@ export const ACCOUNT_KEY = "sync:account";
 export const BLOCKED_KEY = "sync:blocked";
 /** Erro do último pull, ou ausente. */
 export const PULL_ERROR_KEY = "sync:pull_error";
+/** Maior server_seq confirmado (evita varrer o histórico do outbox). */
+export const MAX_SEQ_KEY = "sync:max_server_seq";

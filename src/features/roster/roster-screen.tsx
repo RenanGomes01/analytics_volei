@@ -1,7 +1,7 @@
 "use client";
 
 import { useLiveQuery } from "dexie-react-hooks";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { getDB } from "@/db/client";
 import { matchesSearch } from "@/domain/roster/identity";
 import type { Athlete, Gender } from "@/domain/types";
@@ -9,6 +9,7 @@ import { athleteHref, teamHref } from "@/features/analytics/ui";
 import { inputClass, primaryButton, secondaryButton, segmentedClass } from "@/features/setup/form-styles";
 import { ConfirmSheet } from "@/components/confirm-sheet";
 import { EmptyState } from "@/components/empty-state";
+import { runOnce } from "@/components/use-submit";
 import { HardLink } from "@/components/hard-link";
 import { toast } from "@/features/toast/toast";
 import { NewAthleteSheet } from "./new-athlete-sheet";
@@ -43,10 +44,12 @@ function AthleteRow({
   const games = usage?.matches ?? 0;
   const blocked = games > 0 || !!usage?.merged;
 
+  const lock = useRef(false);
   async function run(action: () => Promise<unknown>, done: string) {
     onError(null);
     try {
-      await action();
+      // Trava no mesmo toque: "Salvar" repetido grava uma vez só.
+      if (!(await runOnce(lock, action)).ran) return;
       toast.success(done);
       setEditing(false);
     } catch (e) {
@@ -149,6 +152,7 @@ function AthleteRow({
 }
 
 function TeamRow({ team, roster }: { team: RosterData["teams"][number]; roster: RosterData }) {
+  const lock = useRef(false);
   const [name, setName] = useState(team.name);
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -169,7 +173,7 @@ function TeamRow({ team, roster }: { team: RosterData["teams"][number]; roster: 
                 className={primaryButton}
                 onClick={async () => {
                   try {
-                    await renameTeam(getDB(), LOCAL_TENANT_ID, team.id, name);
+                    if (!(await runOnce(lock, () => renameTeam(getDB(), LOCAL_TENANT_ID, team.id, name))).ran) return;
                     toast.success("Dupla salva.");
                     setEditing(false);
                   } catch (e) {

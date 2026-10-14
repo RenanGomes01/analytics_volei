@@ -10,6 +10,7 @@ import { getSyncSummary, type SummaryGroup } from "@/services/sync/sync-summary"
 import { SYNC_MODE } from "@/features/sync/sync-config";
 import { nextConnectionBanner, type ConnectionBanner } from "./connection-banner";
 import { useOnline } from "./use-network";
+import { useSyncStatus } from "@/features/sync/use-sync-status";
 
 const SYNCED_MS = 4_000;
 const WORDS: [SummaryGroup, string, string][] = [
@@ -33,9 +34,11 @@ function describePending(pending: Record<SummaryGroup, number> | undefined, tota
 export function NetworkBanner() {
   const online = useOnline();
   const cloud = SYNC_MODE !== "off";
-  const summary = useLiveQuery(() => (cloud ? getSyncSummary(getDB(), LOCAL_TENANT_ID, { maxIssues: 0, maxMatches: 0 }) : null), [cloud]);
+  // Contagens leves (índice), compartilhadas com o cabeçalho; o detalhe por tipo só é lido quando a
+  // faixa de reconexão aparece.
+  const status = useSyncStatus();
   const linked = useLiveQuery(() => (cloud ? getLinkedAccount(getDB()) : null), [cloud]);
-  const pending = summary?.pendingTotal ?? 0;
+  const pending = cloud ? (status?.pending ?? 0) : 0;
   const [dismissed, setDismissed] = useState(false);
   const input = { online, pending, cloud, linked: !!linked, dismissed };
   const key = `${online}|${pending}|${cloud}|${!!linked}|${dismissed}`;
@@ -49,6 +52,12 @@ export function NetworkBanner() {
     setBanner((prev) => nextConnectionBanner(prev, input));
     if (!online && dismissed) setDismissed(false);
   }
+
+  const showDetail = banner.kind === "reconnected";
+  const summary = useLiveQuery(
+    () => (showDetail ? getSyncSummary(getDB(), LOCAL_TENANT_ID, { maxIssues: 0, maxMatches: 0 }) : null),
+    [showDetail],
+  );
 
   useEffect(() => {
     if (banner.kind !== "synced") return;

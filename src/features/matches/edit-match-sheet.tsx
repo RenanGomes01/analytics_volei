@@ -1,5 +1,7 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
+import { useSubmit } from "@/components/use-submit";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useState } from "react";
 import { ConfirmSheet } from "@/components/confirm-sheet";
@@ -36,15 +38,12 @@ export function EditMatchSheet({ match, roster, onClose }: Props) {
   const [teamB, setTeamB] = useState(teamIdOf(match.team_b));
   const [tournamentId, setTournamentId] = useState(entry?.tournament_id ?? "");
   const [phase, setPhase] = useState<TournamentPhase | null>(entry?.phase ?? null);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const locked = (scouted ?? 0) > 0;
 
-  async function save() {
-    setSaving(true);
-    setError(null);
-    try {
+  const { busy: saving, error, run } = useSubmit();
+  const save = () =>
+    run(async () => {
       const snapshot = (id: string, fallback: Match["team_a"]) => {
         const t = teams.find((x) => x.id === id);
         return t ? { name: t.name, athlete_ids: [...t.athlete_ids] } : fallback;
@@ -63,12 +62,7 @@ export function EditMatchSheet({ match, roster, onClose }: Props) {
       if (entryId && phase !== currentPhase) await setMatchPhase(getDB(), LOCAL_TENANT_ID, entryId, phase);
       toast.success("Partida salva.");
       onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSaving(false);
-    }
-  }
+    });
 
   if (confirmDelete) {
     return (
@@ -165,9 +159,9 @@ export function EditMatchSheet({ match, roster, onClose }: Props) {
           <button type="button" onClick={onClose} className={secondaryButton}>
             Cancelar
           </button>
-          <button type="button" disabled={saving || scouted === undefined} onClick={save} className={primaryButton}>
+          <SubmitButton type="button" busy={saving} disabled={scouted === undefined} onClick={save} className={primaryButton}>
             Salvar
-          </button>
+          </SubmitButton>
         </div>
       </div>
     </div>
