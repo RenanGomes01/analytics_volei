@@ -5,6 +5,7 @@ import { ConfirmSheet } from "@/components/confirm-sheet";
 import { getDB } from "@/db/client";
 import type { Tournament, TournamentCategory } from "@/domain/roster/types";
 import { inputClass, primaryButton, secondaryButton, segmentedClass } from "@/features/setup/form-styles";
+import { toast } from "@/features/toast/toast";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
 import { deleteTournament, updateTournament } from "@/services/tournament-service";
 
@@ -22,6 +23,7 @@ export function TournamentEditSheet({ tournament, matches, onClose }: { tourname
     setError(null);
     try {
       await updateTournament(getDB(), LOCAL_TENANT_ID, tournament.id, { name, location, category });
+      toast.success("Torneio salvo.");
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -34,7 +36,14 @@ export function TournamentEditSheet({ tournament, matches, onClose }: { tourname
         title={`Excluir o torneio ${tournament.name}?`}
         confirmLabel="Excluir torneio"
         danger
-        onConfirm={() => deleteTournament(getDB(), LOCAL_TENANT_ID, tournament.id)}
+        onConfirm={async () => {
+          const { unlinked } = await deleteTournament(getDB(), LOCAL_TENANT_ID, tournament.id);
+          toast.success(
+            `Torneio excluído.${unlinked ? ` ${unlinked === 1 ? "A partida virou amistoso" : `As ${unlinked} partidas viraram amistosos`}.` : ""}`,
+            { afterNavigation: true },
+          );
+          window.location.replace("/");
+        }}
         onClose={() => setConfirmDelete(false)}
       >
         <p>

@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@/components/empty-state";
 import { HardLink } from "@/components/hard-link";
 import { useRosterData } from "@/features/roster/use-roster-data";
 
@@ -15,7 +16,9 @@ export function TournamentList() {
     <section className="flex flex-col gap-2">
       <h2 className="text-xl font-bold">Torneios</h2>
       {roster.tournaments.length === 0 ? (
-        <p className="text-sm text-zinc-400">Nenhum torneio ainda. Crie um ao iniciar uma nova partida.</p>
+        <EmptyState icon="🏆" title="Nenhum torneio ainda." primary={{ label: "+ Criar torneio", href: "/new" }}>
+          O torneio é criado junto com a primeira partida dele, em “Nova partida”. Jogos sem torneio contam como amistosos.
+        </EmptyState>
       ) : (
         <ul className="flex flex-col gap-2">
           {roster.tournaments.map((t) => (

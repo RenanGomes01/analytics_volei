@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { toast } from "@/features/toast/toast";
 import { useMemo, useState, type FormEvent } from "react";
 import { getDB } from "@/db/client";
 import { pairKey } from "@/domain/roster/identity";
@@ -79,6 +80,7 @@ export function NewMatchForm() {
         tournament_id: tournamentId || undefined,
         ...(tournamentId ? { phase } : {}),
       });
+      toast.success(`Partida criada: ${match.team_a.name} × ${match.team_b.name}. Bom jogo!`, { afterNavigation: true });
       // Navegação completa: a tela de scout vem do pré-cache, mesmo offline (ver HardLink).
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.assign(`/match?id=${encodeURIComponent(match.id)}`);

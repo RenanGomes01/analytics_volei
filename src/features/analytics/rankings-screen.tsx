@@ -19,7 +19,8 @@ import { PointKindsChart } from "@/features/charts/point-kinds-chart";
 import { PointsMixChart } from "@/features/charts/points-mix-chart";
 import { pct } from "@/features/charts/palette";
 import { deliverFile } from "@/features/export/deliver-file";
-import { athleteHref, BackHome, Card, EntityLink, Segmented, teamHref } from "./ui";
+import { EmptyState } from "@/components/empty-state";
+import { athleteHref, Card, EntityLink, Segmented, teamHref } from "./ui";
 import { replaceQuery, useSeasonData } from "./use-season-data";
 
 type View = "athletes" | "teams";
@@ -56,9 +57,29 @@ export function RankingsScreen() {
   }, [season, year, category, friendlies, gender, phase]);
 
   if (!season) return <p className="p-8 text-center text-zinc-400">Carregando temporada…</p>;
-  if (year === undefined || !computed) return <p className="p-8 text-center text-zinc-400">Ainda não há partidas neste aparelho.</p>;
+  if (year === undefined || !computed) {
+    return (
+      <div className="mx-auto w-full max-w-3xl p-4">
+        <h1 className="mb-4 text-2xl font-bold">Rankings</h1>
+        <EmptyState icon="🏆" title="Ainda não temos partidas e por isso não há ranking." primary={{ label: "+ Iniciar nova partida", href: "/new" }}>
+          Inicie um jogo para gerar estatísticas. Cada partida scouteada entra aqui automaticamente.
+        </EmptyState>
+      </div>
+    );
+  }
 
   const update = (patch: Record<string, string | undefined>) => replaceQuery(patch);
+  const empty = computed.stats.totals.rallies === 0;
+  // Partidas do ano que só aparecem com amistosos (o padrão é deixá-los de fora).
+  const onlyFriendlies =
+    empty && !friendlies && seasonStats(filterSeason(season.matches, { year, category, includeFriendlies: true, phase }), season.aliases).totals.rallies > 0;
+  const clearFilters = () => {
+    setGender("all");
+    setCategory("all");
+    setPhase("all");
+    setFriendlies(true);
+    update({ gender: undefined, category: undefined, phase: undefined, friendlies: "1" });
+  };
   const { athleteName, teamName } = season;
   const missing = view === "athletes" ? computed.athletes.missingGender : computed.teams.missingGender;
   const unit = view === "athletes" ? "atletas" : "duplas";
@@ -84,7 +105,6 @@ export function RankingsScreen() {
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <BackHome />
           <h1 className="text-2xl font-bold">Rankings {year}</h1>
         </div>
         <button type="button" onClick={exportCsv} className="min-h-12 rounded-xl bg-emerald-200 px-4 font-semibold text-emerald-950">
@@ -165,7 +185,28 @@ export function RankingsScreen() {
         {missing > 0 && <span className="text-amber-300"> · {missing} {missingLabel} fora do recorte por falta de gênero no cadastro</span>}
       </p>
 
-      {view === "athletes" ? (
+      {empty && (
+        <EmptyState
+          icon="🔎"
+          title={onlyFriendlies ? "Neste recorte só há amistosos." : "Nenhum lance neste recorte."}
+          primary={
+            onlyFriendlies
+              ? {
+                  label: "Incluir amistosos",
+                  onClick: () => {
+                    setFriendlies(true);
+                    update({ friendlies: "1" });
+                  },
+                }
+              : { label: "Ver tudo (limpar filtros)", onClick: clearFilters }
+          }
+          secondary={{ label: "+ Nova partida", href: "/new" }}
+        >
+          {onlyFriendlies ? "Por padrão o ranking considera só jogos de torneio." : "Mude o ano ou os filtros acima, ou scouteie uma partida."}
+        </EmptyState>
+      )}
+
+      {empty ? null : view === "athletes" ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {rankingSpecs("beach")
             // Passe na mão só quando há recepções avaliadas no recorte (o modo rápido não avalia o passe).

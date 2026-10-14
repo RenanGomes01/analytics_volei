@@ -34,3 +34,9 @@ export const matchesSearch = (query: string, ...texts: string[]): boolean => {
   const q = normalizeName(query);
   return q === "" || texts.some((t) => normalizeName(t).includes(q));
 };
+
+/** Atletas já cadastradas com o mesmo nome (sem diferenciar acento/maiúsculas), para avisar antes de duplicar. */
+export function sameNameAthletes<T extends { name: string }>(athletes: readonly T[], name: string): T[] {
+  const key = normalizeName(name);
+  return key ? athletes.filter((a) => normalizeName(a.name) === key) : [];
+}

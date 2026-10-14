@@ -8,7 +8,8 @@ import { availableYears, filterSeason, pointKinds, seasonStats, teamSeries } fro
 import { PointKindsChart } from "@/features/charts/point-kinds-chart";
 import { pct } from "@/features/charts/palette";
 import { RatesChart } from "@/features/charts/rates-chart";
-import { athleteHref, BackHome, Card, EntityLink, Segmented, Stat, teamHref } from "./ui";
+import { athleteHref, Card, EntityLink, Segmented, Stat, teamHref } from "./ui";
+import { EmptyState } from "@/components/empty-state";
 import { replaceQuery, useSeasonData } from "./use-season-data";
 
 const GENDER_LABEL = { M: "Masculino", F: "Feminino", Mixed: "Misto" } as const;
@@ -30,7 +31,13 @@ export function TeamProfile() {
 
   if (!season || !computed) return <p className="p-8 text-center text-zinc-400">Carregando dupla…</p>;
   const ids = key.split("|").filter(Boolean);
-  if (ids.length === 0) return <p className="p-8 text-center">Dupla não informada.</p>;
+  if (ids.length === 0) {
+    return (
+      <div className="mx-auto w-full max-w-3xl p-4">
+        <EmptyState icon="🤝" title="Dupla não informada." primary={{ label: "Ver ranking de duplas", href: "/rankings?view=teams" }} />
+      </div>
+    );
+  }
 
   const { team, series, opponents, kinds } = computed;
   const gender = teamGender(ids.map((id) => season.athletes.get(id)?.gender));
@@ -38,7 +45,6 @@ export function TeamProfile() {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
       <header className="flex flex-wrap items-center gap-3">
-        <BackHome />
         <h1 className="text-2xl font-bold">{season.teamName(key)}</h1>
         {gender && <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs">{GENDER_LABEL[gender]}</span>}
         <HardLink href="/rankings?view=teams" className="ml-auto text-sm text-zinc-400 underline">
@@ -65,7 +71,22 @@ export function TeamProfile() {
       />
 
       {!team ? (
-        <p className="text-zinc-400">Esta dupla não jogou neste recorte.</p>
+        <EmptyState
+          icon="🔎"
+          title="Esta dupla não jogou neste recorte."
+          primary={{ label: "+ Nova partida", href: "/new" }}
+          secondary={
+            yearParam !== "all"
+              ? {
+                  label: "Ver todas as temporadas",
+                  onClick: () => {
+                    setYear("all");
+                    replaceQuery({ year: undefined });
+                  },
+                }
+              : undefined
+          }
+        />
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

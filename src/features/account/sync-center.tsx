@@ -1,6 +1,7 @@
 "use client";
 
 import { useLiveQuery } from "dexie-react-hooks";
+import { toast } from "@/features/toast/toast";
 import { useState } from "react";
 import { getDB } from "@/db/client";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
@@ -41,11 +42,12 @@ export function SyncCenter() {
 
   if (!summary || !status) return <p className="text-zinc-400">Carregando a fila…</p>;
 
-  async function act(key: string, fn: () => Promise<unknown>, thenSync = true) {
+  async function act(key: string, fn: () => Promise<unknown>, done: string, thenSync = true) {
     setBusy(key);
     setError(null);
     try {
       await fn();
+      toast.success(done);
       if (thenSync) requestSyncNow();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -144,7 +146,7 @@ export function SyncCenter() {
               <button
                 type="button"
                 disabled={busy !== null}
-                onClick={() => act("skip", () => skipHead(getDB(), LOCAL_TENANT_ID, summary.stalled!.mutation_id))}
+                onClick={() => act("skip", () => skipHead(getDB(), LOCAL_TENANT_ID, summary.stalled!.mutation_id), "Item movido para revisão; a fila voltou a andar.")}
                 className={`${action} bg-zinc-800`}
               >
                 Pular e revisar depois
@@ -194,7 +196,7 @@ function IssueRow({
 }: {
   issue: SyncIssue;
   busy: string | null;
-  onAct: (key: string, fn: () => Promise<unknown>, thenSync?: boolean) => void;
+  onAct: (key: string, fn: () => Promise<unknown>, done: string, thenSync?: boolean) => void;
 }) {
   const key = (k: string) => `${k}:${issue.mutation_id}`;
   const editable = issue.entity !== "rally_event";
@@ -206,7 +208,7 @@ function IssueRow({
         <button
           type="button"
           disabled={busy !== null}
-          onClick={() => onAct(key("retry"), () => retryEntry(getDB(), LOCAL_TENANT_ID, issue.mutation_id))}
+          onClick={() => onAct(key("retry"), () => retryEntry(getDB(), LOCAL_TENANT_ID, issue.mutation_id), "Reenviando a versão deste aparelho…")}
           className={`${action} bg-amber-400 text-zinc-950`}
         >
           {editable ? "Enviar a versão deste aparelho" : "Tentar de novo"}
@@ -215,7 +217,7 @@ function IssueRow({
           <button
             type="button"
             disabled={busy !== null}
-            onClick={() => onAct(key("remote"), () => acceptRemote(getDB(), LOCAL_TENANT_ID, issue.mutation_id))}
+            onClick={() => onAct(key("remote"), () => acceptRemote(getDB(), LOCAL_TENANT_ID, issue.mutation_id), "Baixando a versão da nuvem…")}
             className={`${action} bg-zinc-800`}
           >
             Usar a versão da nuvem
@@ -224,7 +226,7 @@ function IssueRow({
         <button
           type="button"
           disabled={busy !== null}
-          onClick={() => onAct(key("dismiss"), () => dismissEntry(getDB(), LOCAL_TENANT_ID, issue.mutation_id), false)}
+          onClick={() => onAct(key("dismiss"), () => dismissEntry(getDB(), LOCAL_TENANT_ID, issue.mutation_id), "Item ignorado (fica no histórico).", false)}
           className={`${action} bg-zinc-800 text-zinc-300`}
         >
           Ignorar

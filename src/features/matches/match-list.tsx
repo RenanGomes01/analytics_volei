@@ -2,6 +2,7 @@
 
 import { useLiveQuery } from "dexie-react-hooks";
 import { useState } from "react";
+import { EmptyState } from "@/components/empty-state";
 import { HardLink } from "@/components/hard-link";
 import { getDB } from "@/db/client";
 import { PHASE_LABEL } from "@/domain/roster/types";
@@ -10,6 +11,7 @@ import { useRosterData } from "@/features/roster/use-roster-data";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
 import { listDeletedMatches, listMatches, restoreMatch } from "@/services/match-service";
 import type { Match } from "@/domain/types";
+import { toast } from "@/features/toast/toast";
 import { EditMatchSheet } from "./edit-match-sheet";
 
 const dateFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" });
@@ -24,7 +26,13 @@ export function MatchList() {
   if (matches.length === 0) {
     return (
       <>
-        <p className="text-center text-zinc-400">Nenhuma partida neste aparelho ainda.</p>
+        <EmptyState
+          title="Nenhuma partida ainda."
+          primary={{ label: "+ Nova partida", href: "/new" }}
+          secondary={{ label: "Cadastrar atletas", href: "/roster" }}
+        >
+          Comece um jogo agora (dá para cadastrar as atletas na hora) ou prepare o cadastro antes.
+        </EmptyState>
         <Trash matches={deleted ?? []} />
       </>
     );
@@ -93,7 +101,16 @@ function Trash({ matches }: { matches: Match[] }) {
                 {dateFormat.format(m.created_at)} · excluída em {dateFormat.format(m.deleted_at!)}
               </span>
             </span>
-            <button type="button" onClick={() => restoreMatch(getDB(), LOCAL_TENANT_ID, m.id)} className="min-h-12 rounded-xl bg-zinc-800 px-4 font-semibold">
+            <button
+              type="button"
+              onClick={() =>
+                restoreMatch(getDB(), LOCAL_TENANT_ID, m.id).then(
+                  () => toast.success("Partida restaurada."),
+                  (e: unknown) => toast.error(e instanceof Error ? e.message : String(e)),
+                )
+              }
+              className="min-h-12 rounded-xl bg-zinc-800 px-4 font-semibold"
+            >
               Restaurar
             </button>
           </li>

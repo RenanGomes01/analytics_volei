@@ -1,6 +1,7 @@
 "use client";
 
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
+import { toast } from "@/features/toast/toast";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useEffect, useState, type FormEvent } from "react";
 import { getDB } from "@/db/client";
@@ -21,31 +22,10 @@ function loginError(message: string): string {
   return message;
 }
 
-function useOnline() {
-  const [online, setOnline] = useState(true);
-  useEffect(() => {
-    const update = () => setOnline(navigator.onLine);
-    update();
-    window.addEventListener("online", update);
-    window.addEventListener("offline", update);
-    return () => {
-      window.removeEventListener("online", update);
-      window.removeEventListener("offline", update);
-    };
-  }, []);
-  return online;
-}
-
 /** Conta da nuvem (Fase 8): entrar, confirmar o vínculo do aparelho e acompanhar o sync. */
 export function AccountScreen() {
-  const online = useOnline();
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 pt-0">
-      {!online && (
-        <p role="status" className="rounded-xl bg-amber-900/60 px-4 py-3 text-amber-100">
-          Sem internet — o scout continua funcionando normalmente. O que estiver na fila sobe quando a conexão voltar.
-        </p>
-      )}
       {SYNC_MODE === "supabase" && SUPABASE_CONFIG ? (
         <>
           <CloudAccount />
@@ -165,6 +145,7 @@ function SignedIn({ client, session }: { client: SupabaseClient; session: Sessio
     setBusy(true);
     try {
       await linkAccount(db, LOCAL_TENANT_ID, user.id);
+      toast.success("Aparelho vinculado. Enviando os dados para a nuvem…");
       requestSyncNow();
     } finally {
       setBusy(false);

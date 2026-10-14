@@ -18,13 +18,13 @@ import { pct } from "@/features/charts/palette";
 import { TrendChart } from "@/features/charts/trend-chart";
 import {
   athleteHref,
-  BackHome,
   Card,
   EntityLink,
   Segmented,
   Stat,
   teamHref,
 } from "./ui";
+import { EmptyState } from "@/components/empty-state";
 import { replaceQuery, useSeasonData } from "./use-season-data";
 
 const MIN_ATTACKS = 10;
@@ -87,7 +87,6 @@ export function AthleteProfile() {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
       <header className="flex flex-wrap items-center gap-3">
-        <BackHome />
         <h1 className="text-2xl font-bold">
           {athlete.jersey_number !== undefined && (
             <span className="mr-2 text-zinc-500">{athlete.jersey_number}</span>
@@ -136,7 +135,23 @@ export function AthleteProfile() {
       />
 
       {!me ? (
-        <p className="text-zinc-400">Nenhuma partida neste recorte.</p>
+        <EmptyState
+          icon="🔎"
+          title="Nenhuma partida neste recorte."
+          primary={{ label: "+ Nova partida", href: "/new" }}
+          secondary={
+            yearParam !== "all" || phase !== "all"
+              ? {
+                  label: "Ver todos os jogos",
+                  onClick: () => {
+                    setYear("all");
+                    setPhase("all");
+                    replaceQuery({ year: undefined, phase: undefined });
+                  },
+                }
+              : undefined
+          }
+        />
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

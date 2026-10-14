@@ -1,3 +1,4 @@
+import { HardLink } from "@/components/hard-link";
 import type { NextAction } from "@/domain/rally/next-action";
 import type { MatchState } from "@/domain/rally/replay";
 import { decidingSetNumber, type ModalityRules } from "@/domain/rules/modality";
@@ -49,7 +50,15 @@ export function Scoreboard({ match, state, next, rules, sides, onFinish }: Props
   const score = state.sets.at(-1)!.score;
 
   return (
-    <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-zinc-800 px-4 py-2">
+    <header className="grid grid-cols-[auto_1fr_auto_1fr] items-center gap-4 border-b border-zinc-800 px-4 py-2">
+      {/* Saída do scout: tudo já está salvo no aparelho (inclusive o rali em andamento). */}
+      <HardLink
+        href="/"
+        aria-label="Sair do scout e voltar às partidas (tudo fica salvo)"
+        className="min-h-12 content-center rounded-xl bg-zinc-800 px-3 font-semibold text-zinc-300"
+      >
+        ← Sair
+      </HardLink>
       <TeamHeader match={match} state={state} team={sides[0]} align="left" />
       <div className="flex flex-col items-center">
         <div className="text-5xl font-black tabular-nums leading-none">

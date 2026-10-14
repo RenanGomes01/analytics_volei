@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SerwistProvider } from "@serwist/turbopack/react";
 import { SyncAgent } from "@/features/sync/sync-agent";
+import { Toaster } from "@/features/toast/toaster";
 import { UpdateBanner } from "@/features/update/update-banner";
 import "./globals.css";
 
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <UpdateBanner />
           <SyncAgent />
           {children}
+          <Toaster />
         </SerwistProvider>
       </body>
     </html>

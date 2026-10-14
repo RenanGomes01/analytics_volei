@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ChangeEvent } from "react";
+import { toast } from "@/features/toast/toast";
 import { HardLink } from "@/components/hard-link";
 import { getDB } from "@/db/client";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
@@ -120,6 +121,7 @@ export function ImportScreen() {
     try {
       const result = await importMatchExport(getDB(), text, LOCAL_TENANT_ID);
       if (result.imported && result.match_id) {
+        toast.success("Partida importada.", { afterNavigation: true });
         // Navegação completa: a tela de scout vem do pré-cache, mesmo offline (ver HardLink).
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.assign(`/match?id=${encodeURIComponent(result.match_id)}`);

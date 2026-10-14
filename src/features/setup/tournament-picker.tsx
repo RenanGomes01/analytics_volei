@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "@/features/toast/toast";
 import { getDB } from "@/db/client";
 import type { Tournament, TournamentCategory } from "@/domain/roster/types";
 import type { Modality } from "@/domain/types";
@@ -28,6 +29,7 @@ export function TournamentPicker({ tournaments, value, onChange }: Props) {
     setError(null);
     try {
       const t = await createTournament(getDB(), LOCAL_TENANT_ID, form);
+      toast.success(`Torneio ${t.name} criado.`);
       onChange(t.id);
       setCreating(false);
     } catch (e) {

@@ -53,11 +53,3 @@ export function EntityLink({ href, children }: { href: string; children: ReactNo
     </HardLink>
   );
 }
-
-export function BackHome() {
-  return (
-    <HardLink href="/" className="inline-block min-h-12 rounded-xl bg-zinc-800 px-4 py-3 font-semibold">
-      ← Início
-    </HardLink>
-  );
-}

@@ -8,8 +8,9 @@ import { PHASE_LABEL, TOURNAMENT_PHASES, type TournamentPhase } from "@/domain/r
 import type { Match } from "@/domain/types";
 import type { RosterData } from "@/features/roster/use-roster-data";
 import { inputClass, primaryButton, secondaryButton, segmentedClass } from "@/features/setup/form-styles";
+import { toast } from "@/features/toast/toast";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
-import { countScoutedEvents, deleteMatch, updateMatchTeams } from "@/services/match-service";
+import { countScoutedEvents, deleteMatch, restoreMatch, updateMatchTeams } from "@/services/match-service";
 import { addMatchToTournament, removeMatchFromTournament, setMatchPhase } from "@/services/tournament-service";
 
 interface Props {
@@ -60,6 +61,7 @@ export function EditMatchSheet({ match, roster, onClose }: Props) {
       }
       const currentPhase = entryId === entry?.id ? (entry?.phase ?? null) : null;
       if (entryId && phase !== currentPhase) await setMatchPhase(getDB(), LOCAL_TENANT_ID, entryId, phase);
+      toast.success("Partida salva.");
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -74,7 +76,19 @@ export function EditMatchSheet({ match, roster, onClose }: Props) {
         title={`Excluir ${match.team_a.name} × ${match.team_b.name}?`}
         confirmLabel="Mandar para a lixeira"
         danger
-        onConfirm={() => deleteMatch(getDB(), LOCAL_TENANT_ID, match.id)}
+        onConfirm={async () => {
+          await deleteMatch(getDB(), LOCAL_TENANT_ID, match.id);
+          toast.success("Partida enviada para a lixeira.", {
+            action: {
+              label: "Desfazer",
+              run: () =>
+                restoreMatch(getDB(), LOCAL_TENANT_ID, match.id).then(
+                  () => toast.success("Partida restaurada."),
+                  (e: unknown) => toast.error(e instanceof Error ? e.message : String(e)),
+                ),
+            },
+          });
+        }}
         onClose={() => {
           setConfirmDelete(false);
           onClose();

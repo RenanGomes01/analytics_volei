@@ -4,6 +4,8 @@ import { athleteHref, EntityLink, teamHref } from "@/features/analytics/ui";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { TournamentEditSheet } from "./tournament-edit";
+import { EmptyState } from "@/components/empty-state";
+import { toast } from "@/features/toast/toast";
 import { HardLink } from "@/components/hard-link";
 import { getDB } from "@/db/client";
 import { competitionCsvFilename, competitionToCsv } from "@/domain/export/competition-csv";
@@ -190,10 +192,11 @@ function MatchesTab({ data, roster }: { data: CompetitionData; roster: RosterDat
   const { teamName } = useNames(roster, data.stats);
   const candidates = roster.matches.filter((m) => m.modality === data.tournament.modality && !roster.tournamentOfMatch.has(m.id));
 
-  async function run(action: () => Promise<unknown>) {
+  async function run(action: () => Promise<unknown>, done: string) {
     setError(null);
     try {
       await action();
+      toast.success(done);
       setAdding("");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -218,7 +221,12 @@ function MatchesTab({ data, roster }: { data: CompetitionData; roster: RosterDat
               </HardLink>
               <select
                 value={phase ?? ""}
-                onChange={(e) => run(() => setMatchPhase(getDB(), LOCAL_TENANT_ID, entry_id, (e.target.value || null) as TournamentPhase | null))}
+                onChange={(e) =>
+                  run(
+                    () => setMatchPhase(getDB(), LOCAL_TENANT_ID, entry_id, (e.target.value || null) as TournamentPhase | null),
+                    e.target.value ? `Fase: ${PHASE_LABEL[e.target.value as TournamentPhase]}.` : "Fase removida.",
+                  )
+                }
                 aria-label="Fase da partida"
                 className="min-h-12 max-w-40 rounded-xl border-2 border-zinc-700 bg-zinc-950 px-2 text-sm"
               >
@@ -229,13 +237,23 @@ function MatchesTab({ data, roster }: { data: CompetitionData; roster: RosterDat
                   </option>
                 ))}
               </select>
-              <button type="button" onClick={() => run(() => removeMatchFromTournament(getDB(), LOCAL_TENANT_ID, entry_id))} className="min-h-12 rounded-xl px-3 text-sm text-zinc-400" title="Tirar a partida deste torneio (a partida não é apagada)">
+              <button type="button" onClick={() => run(() => removeMatchFromTournament(getDB(), LOCAL_TENANT_ID, entry_id), "Partida tirada do torneio (virou amistoso).")} className="min-h-12 rounded-xl px-3 text-sm text-zinc-400" title="Tirar a partida deste torneio (a partida não é apagada)">
                 Remover
               </button>
             </li>
           );
         })}
-        {data.matches.length === 0 && <li className="text-zinc-500">Nenhuma partida neste torneio ainda.</li>}
+        {data.matches.length === 0 && (
+          <li>
+            <EmptyState
+              icon="📋"
+              title="Nenhuma partida neste torneio ainda."
+              primary={{ label: "+ Partida neste torneio", href: `/new?tournament=${encodeURIComponent(data.tournament.id)}` }}
+            >
+              {candidates.length > 0 ? "Ou adicione uma partida já scouteada, logo abaixo." : undefined}
+            </EmptyState>
+          </li>
+        )}
       </ul>
 
       {candidates.length > 0 && (
@@ -248,7 +266,7 @@ function MatchesTab({ data, roster }: { data: CompetitionData; roster: RosterDat
               </option>
             ))}
           </select>
-          <button type="button" disabled={!adding} className={secondaryButton} onClick={() => run(() => addMatchToTournament(getDB(), LOCAL_TENANT_ID, { tournament_id: data.tournament.id, match_id: adding }))}>
+          <button type="button" disabled={!adding} className={secondaryButton} onClick={() => run(() => addMatchToTournament(getDB(), LOCAL_TENANT_ID, { tournament_id: data.tournament.id, match_id: adding }), "Partida adicionada ao torneio.")}>
             Adicionar
           </button>
         </div>

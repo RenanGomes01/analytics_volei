@@ -7,7 +7,11 @@ import type { Athlete, Gender } from "@/domain/types";
 import { athleteHref, teamHref } from "@/features/analytics/ui";
 import { inputClass, primaryButton, secondaryButton, segmentedClass } from "@/features/setup/form-styles";
 import { ConfirmSheet } from "@/components/confirm-sheet";
+import { EmptyState } from "@/components/empty-state";
 import { HardLink } from "@/components/hard-link";
+import { toast } from "@/features/toast/toast";
+import { NewAthleteSheet } from "./new-athlete-sheet";
+import { NewTeamSheet } from "./new-team-sheet";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
 import { deleteAthlete, deleteTeam, mergeAthletes, renameTeam, unmergeAthlete, updateAthlete } from "@/services/roster-service";
 import { useRosterData, type RosterData } from "./use-roster-data";
@@ -35,10 +39,11 @@ function AthleteRow({
   const aliases = roster.aliasesOf.get(athlete.id) ?? [];
   const games = roster.matchCount.get(athlete.id) ?? 0;
 
-  async function run(action: () => Promise<unknown>) {
+  async function run(action: () => Promise<unknown>, done: string) {
     onError(null);
     try {
       await action();
+      toast.success(done);
       setEditing(false);
     } catch (e) {
       onError(e instanceof Error ? e.message : String(e));
@@ -89,7 +94,9 @@ function AthleteRow({
           <button
             type="button"
             className={primaryButton}
-            onClick={() => run(() => updateAthlete(getDB(), LOCAL_TENANT_ID, athlete.id, { name, jersey_number: number ? Number(number) : null, gender }))}
+            onClick={() =>
+              run(() => updateAthlete(getDB(), LOCAL_TENANT_ID, athlete.id, { name, jersey_number: number ? Number(number) : null, gender }), "Atleta salva.")
+            }
           >
             Salvar
           </button>
@@ -101,7 +108,10 @@ function AthleteRow({
           confirmLabel="Excluir atleta"
           danger
           canConfirm={games === 0}
-          onConfirm={() => deleteAthlete(getDB(), LOCAL_TENANT_ID, athlete.id)}
+          onConfirm={async () => {
+            await deleteAthlete(getDB(), LOCAL_TENANT_ID, athlete.id);
+            toast.success(`${athlete.name} excluída do cadastro.`);
+          }}
           onClose={() => setConfirmDelete(false)}
         >
           {games > 0 ? (
@@ -119,7 +129,7 @@ function AthleteRow({
           {aliases.map((a) => (
             <li key={a.id} className="flex items-center gap-1 rounded-lg bg-zinc-800 px-2 py-1">
               unida: {a.name}
-              <button type="button" onClick={() => run(() => unmergeAthlete(getDB(), LOCAL_TENANT_ID, a.id))} className="min-h-8 px-1 text-zinc-300" aria-label={`Desfazer união de ${a.name}`}>
+              <button type="button" onClick={() => run(() => unmergeAthlete(getDB(), LOCAL_TENANT_ID, a.id), `${a.name} voltou a ser um cadastro separado.`)} className="min-h-8 px-1 text-zinc-300" aria-label={`Desfazer união de ${a.name}`}>
                 ✕
               </button>
             </li>
@@ -139,36 +149,41 @@ function TeamRow({ team, roster }: { team: RosterData["teams"][number]; roster: 
     <li className="flex flex-wrap items-center gap-2 rounded-2xl bg-zinc-900 p-3">
       {editing ? (
         <>
-          <input className={`${inputClass} min-w-0 flex-1`} value={name} aria-label="Nome da dupla" onChange={(e) => setName(e.target.value)} />
-          <button type="button" onClick={() => setConfirmDelete(true)} className={`${secondaryButton} text-red-300`}>
-            Excluir
-          </button>
-          <button type="button" onClick={() => setEditing(false)} className={secondaryButton}>
-            Cancelar
-          </button>
-          <button
-            type="button"
-            className={primaryButton}
-            onClick={async () => {
-              await renameTeam(getDB(), LOCAL_TENANT_ID, team.id, name);
-              setEditing(false);
-            }}
-          >
-            Salvar
-          </button>
+              <input className={`${inputClass} min-w-0 flex-1`} value={name} aria-label="Nome da dupla" onChange={(e) => setName(e.target.value)} />
+              <button type="button" onClick={() => setConfirmDelete(true)} className={`${secondaryButton} text-red-300`}>
+                Excluir
+              </button>
+              <button type="button" onClick={() => setEditing(false)} className={secondaryButton}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className={primaryButton}
+                onClick={async () => {
+                  try {
+                    await renameTeam(getDB(), LOCAL_TENANT_ID, team.id, name);
+                    toast.success("Dupla salva.");
+                    setEditing(false);
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : String(e));
+                  }
+                }}
+              >
+                Salvar
+              </button>
         </>
       ) : (
         <>
-          <span className="flex-1">
-            <HardLink href={teamHref(team.pair_key)} className="block text-lg font-semibold underline-offset-4 hover:underline">
-              {team.name}
-            </HardLink>
-            {team.name !== members && <span className="text-sm text-zinc-400">{members}</span>}
-          </span>
-          <span className="text-xs uppercase text-zinc-500">{team.modality === "beach" ? "Beach" : "Indoor"}</span>
-          <button type="button" onClick={() => setEditing(true)} className={secondaryButton}>
-            Editar
-          </button>
+              <span className="flex-1">
+                <HardLink href={teamHref(team.pair_key)} className="block text-lg font-semibold underline-offset-4 hover:underline">
+                  {team.name}
+                </HardLink>
+                {team.name !== members && <span className="text-sm text-zinc-400">{members}</span>}
+              </span>
+              <span className="text-xs uppercase text-zinc-500">{team.modality === "beach" ? "Beach" : "Indoor"}</span>
+              <button type="button" onClick={() => setEditing(true)} className={secondaryButton}>
+                Editar
+              </button>
         </>
       )}
       {confirmDelete && (
@@ -176,7 +191,10 @@ function TeamRow({ team, roster }: { team: RosterData["teams"][number]; roster: 
           title={`Excluir a dupla ${team.name}?`}
           confirmLabel="Excluir dupla"
           danger
-          onConfirm={() => deleteTeam(getDB(), LOCAL_TENANT_ID, team.id)}
+          onConfirm={async () => {
+            await deleteTeam(getDB(), LOCAL_TENANT_ID, team.id);
+            toast.success(`Dupla ${team.name} excluída.`);
+          }}
           onClose={() => setConfirmDelete(false)}
         >
           <p>Some só do cadastro (atalho para novas partidas). As partidas já jogadas continuam com o nome e as atletas gravados.</p>
@@ -194,6 +212,7 @@ export function RosterScreen() {
   const [principal, setPrincipal] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [onlyMissing, setOnlyMissing] = useState(false);
+  const [creating, setCreating] = useState<"athlete" | "team" | null>(null);
 
   if (!roster) return <p className="p-4 text-center text-zinc-400">Carregando cadastro…</p>;
 
@@ -208,6 +227,7 @@ export function RosterScreen() {
     setError(null);
     try {
       await mergeAthletes(getDB(), LOCAL_TENANT_ID, { canonical_id: target, alias_ids: selected.filter((id) => id !== target) });
+      toast.success(`${selected.length} cadastros unidos em ${roster!.athleteById.get(target)?.name ?? "uma atleta"}.`);
       setSelected([]);
       setPrincipal(null);
     } catch (e) {
@@ -217,64 +237,108 @@ export function RosterScreen() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4">
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-bold">Atletas</h2>
-        <p className="text-sm text-zinc-400">
-          Jogos antigos criavam um cadastro por partida. Marque os cadastros da mesma pessoa e toque em “Unir” para juntar o
-          histórico. Os lances registrados não são alterados.
-        </p>
-        <input className={inputClass} placeholder="Buscar atleta" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Buscar atleta" />
-        {(missingGender > 0 || onlyMissing) && (
-          <button
-            type="button"
-            aria-pressed={onlyMissing}
-            onClick={() => setOnlyMissing(!onlyMissing)}
-            className={`min-h-12 rounded-xl px-4 text-left text-sm ${onlyMissing ? "bg-amber-400 font-semibold text-zinc-950" : "bg-amber-400/10 text-amber-200"}`}
-          >
-            {onlyMissing
-              ? "Mostrando só quem está sem gênero · toque para ver todas"
-              : `${plural(missingGender, "atleta sem gênero", "atletas sem gênero")} (necessário para os rankings M/F) · toque para filtrar`}
-          </button>
-        )}
-
-        {selected.length >= 2 && (
-          <div className="sticky top-2 z-10 flex flex-col gap-2 rounded-2xl border-2 border-amber-400 bg-zinc-950 p-3">
-            <span className="text-sm">Cadastro principal (o nome que fica):</span>
-            <div className="flex flex-wrap gap-2">
-              {selected.map((id) => (
-                <button key={id} type="button" onClick={() => setPrincipal(id)} className={id === target ? primaryButton : secondaryButton}>
-                  {roster.athleteById.get(id)?.name}
-                </button>
-              ))}
+      {roster.canonical.length === 0 && roster.teams.length === 0 ? (
+        <EmptyState
+          icon="👥"
+          title="Você ainda não tem atletas ou duplas cadastradas."
+          primary={{ label: "+ Cadastrar atleta", onClick: () => setCreating("athlete") }}
+          secondary={{ label: "+ Cadastrar dupla", onClick: () => setCreating("team") }}
+        >
+          Cadastre antes do jogo para começar a partida mais rápido na beira da quadra. Também dá para cadastrar na hora, em “+ Nova partida”.
+        </EmptyState>
+      ) : (
+        <>
+          <section className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-xl font-bold">Atletas</h2>
+              <button type="button" onClick={() => setCreating("athlete")} className={primaryButton}>
+                + Cadastrar atleta
+              </button>
             </div>
-            <button type="button" onClick={merge} className={primaryButton}>
-              Unir {selected.length} cadastros
-            </button>
-          </div>
-        )}
-        {error && (
-          <p role="alert" className="rounded-xl bg-red-800 px-4 py-3 text-white">
-            {error}
-          </p>
-        )}
+            {roster.canonical.length > 1 && (
+              <p className="text-sm text-zinc-400">
+                Mesma pessoa cadastrada duas vezes? Marque os cadastros e toque em “Unir” para juntar o histórico. Os lances registrados não são alterados.
+              </p>
+            )}
+            <input className={inputClass} placeholder="Buscar atleta" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Buscar atleta" />
+            {(missingGender > 0 || onlyMissing) && (
+              <button
+                type="button"
+                aria-pressed={onlyMissing}
+                onClick={() => setOnlyMissing(!onlyMissing)}
+                className={`min-h-12 rounded-xl px-4 text-left text-sm ${onlyMissing ? "bg-amber-400 font-semibold text-zinc-950" : "bg-amber-400/10 text-amber-200"}`}
+              >
+                {onlyMissing
+                  ? "Mostrando só quem está sem gênero · toque para ver todas"
+                  : `${plural(missingGender, "atleta sem gênero", "atletas sem gênero")} (necessário para os rankings M/F) · toque para filtrar`}
+              </button>
+            )}
 
-        <ul className="flex flex-col gap-2">
-          {athletes.map((a) => (
-            <AthleteRow key={a.id} athlete={a} roster={roster} selected={selected.includes(a.id)} onToggle={() => toggle(a.id)} onError={setError} />
-          ))}
-          {athletes.length === 0 && <li className="text-zinc-500">Nenhuma atleta.</li>}
-        </ul>
-      </section>
+            {selected.length >= 2 && (
+              <div className="sticky top-20 z-10 flex flex-col gap-2 rounded-2xl border-2 border-amber-400 bg-zinc-950 p-3">
+                <span className="text-sm">Cadastro principal (o nome que fica):</span>
+                <div className="flex flex-wrap gap-2">
+                  {selected.map((id) => (
+                    <button key={id} type="button" onClick={() => setPrincipal(id)} className={id === target ? primaryButton : secondaryButton}>
+                      {roster.athleteById.get(id)?.name}
+                    </button>
+                  ))}
+                </div>
+                <button type="button" onClick={merge} className={primaryButton}>
+                  Unir {selected.length} cadastros
+                </button>
+              </div>
+            )}
+            {error && (
+              <p role="alert" className="rounded-xl bg-red-800 px-4 py-3 text-white">
+                {error}
+              </p>
+            )}
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-bold">Duplas e times</h2>
-        <ul className="flex flex-col gap-2">
-          {roster.teams.map((t) => (
-            <TeamRow key={t.id} team={t} roster={roster} />
-          ))}
-          {roster.teams.length === 0 && <li className="text-zinc-500">As duplas aparecem aqui ao criar partidas.</li>}
-        </ul>
-      </section>
+            <ul className="flex flex-col gap-2">
+              {athletes.map((a) => (
+                <AthleteRow key={a.id} athlete={a} roster={roster} selected={selected.includes(a.id)} onToggle={() => toggle(a.id)} onError={setError} />
+              ))}
+              {athletes.length === 0 && roster.canonical.length > 0 && (
+                <li className="flex flex-wrap items-center gap-2 text-zinc-400">
+                  Nenhuma atleta com essa busca.
+                  <button type="button" onClick={() => setCreating("athlete")} className={secondaryButton}>
+                    + Cadastrar “{query.trim() || "nova atleta"}”
+                  </button>
+                </li>
+              )}
+              {roster.canonical.length === 0 && (
+                <li>
+                  <EmptyState icon="🧍" title="Nenhuma atleta cadastrada." primary={{ label: "+ Cadastrar atleta", onClick: () => setCreating("athlete") }} />
+                </li>
+              )}
+            </ul>
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-xl font-bold">Duplas e times</h2>
+              <button type="button" onClick={() => setCreating("team")} className={primaryButton}>
+                + Cadastrar dupla
+              </button>
+            </div>
+            {roster.teams.length === 0 ? (
+              <EmptyState icon="🤝" title="Nenhuma dupla ainda." primary={{ label: "+ Cadastrar dupla", onClick: () => setCreating("team") }}>
+                Monte a dupla com atletas do cadastro (ou cadastre as atletas na hora).
+              </EmptyState>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {roster.teams.map((t) => (
+                  <TeamRow key={t.id} team={t} roster={roster} />
+                ))}
+              </ul>
+            )}
+          </section>
+        </>
+      )}
+
+      {creating === "athlete" && <NewAthleteSheet athletes={roster.canonical} onClose={() => setCreating(null)} />}
+      {creating === "team" && <NewTeamSheet roster={roster} onClose={() => setCreating(null)} />}
     </div>
   );
 }

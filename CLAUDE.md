@@ -25,6 +25,7 @@
 - PWA: Serwist via `src/app/serwist/[path]/route.ts` + `src/app/sw.ts`. Não reative `cacheComponents` (incompatível com essa rota).
 - Toda página nova que precisa abrir offline entra em `additionalPrecacheEntries` (route.ts). Rotas recebem parâmetros por query string (`/match?id=`), nunca por segmento dinâmico, e o parâmetro precisa estar em `ignoreURLParametersMatching` (sw.ts).
 - Links entre páginas usam `HardLink` (`src/components/hard-link.tsx`), não `<Link>`: a navegação completa é servida pelo pré-cache mesmo offline.
+- Telas com navegação ficam em `src/app/(main)/` (o grupo não entra na URL): o layout dele dá o cabeçalho global (`AppHeader`) e a faixa de rede (`NetworkBanner`). Página nova vai para lá e **não** monta cabeçalho/"← Início" próprio. O scout (`/match`) fica fora (tela cheia; sai pelo "← Sair" do placar).
 
 ## UI de scout (`src/features/scout/`)
 - **Tela = f(ledger):** `use-match-data.ts` faz `useLiveQuery` → `replayMatch` → `nextAction`. Placar, rali, posse e sugestões nunca viram estado React.
@@ -93,6 +94,11 @@
 ## Ponto no modo detalhado (Fase 9)
 - `outcomesForTouches` / `buildRallyFromTouches` (`quick-rally.ts`) são o núcleo único do "Como foi o ponto?": o modo rápido chega lá por `inferSkills(taps)`, o detalhado pelos toques do rali aberto.
 - `resolveDetailedPoint` gera um plano append-only (anula um sufixo do rali e regrava, com `replaces_event_id`); `resolvePoint` aplica numa transação e marca os toques com `via_point`. `undoLastAction` desfaz esse ponto inteiro e regrava os originais. Nunca edite toques no lugar.
+
+## UX guiada (Fase 11)
+- **Lista vazia nunca é rua sem saída:** use `EmptyState` (`src/components/empty-state.tsx`) com o próximo passo como botão (ex.: "+ Cadastrar atleta", "+ Iniciar nova partida").
+- **Todo CRUD confirma com toast** (`toast.success` de `src/features/toast/toast.ts`), disparado na interface, não no serviço. Antes de navegar com `window.location`, use `{ afterNavigation: true }` (vai pelo sessionStorage). Exclusão reversível oferece `action: Desfazer`. Erro de formulário continua no formulário.
+- Rede: `useOnline()` (`src/features/network/use-network.ts`); a decisão da faixa é pura (`connection-banner.ts`, testada). Nada de rede/sync aparece no scout.
 
 ## Dados de teste (`/dev/seed`)
 - Gerador puro em `src/domain/dev/rally-generator.ts` (semente fixa, modo detalhado, fim do rali sempre por `impliedPoint`); serviço em `src/services/dev/seed-service.ts`, gravando pelos services reais (`appendRallies` = vários ralis numa transação).
