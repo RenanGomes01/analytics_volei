@@ -37,28 +37,57 @@ describe("Box Score em CSV", () => {
   const csv = boxScoreToCsv({ box, match, athletes, filter: { set: "all" }, timeZone: "UTC" });
   const lines = parse(csv);
 
-  it("começa com BOM UTF-8, usa ; e termina linhas com CRLF", () => {
-    expect(csv.startsWith("﻿")).toBe(true);
+  /** Linha de atleta como { cabeçalho completo: valor }: o teste lê como a comissão técnica lê a planilha. */
+  const athleteRow = (name: string) => {
+    const header = lines[7].split(";");
+    const cells = lines.find((l) => l.split(";")[2] === name)!.split(";");
+    return Object.fromEntries(header.map((h, i) => [h, cells[i]]));
+  };
+
+  it("começa com BOM UTF-8, usa ; e termina linhas com CRLF; explica as convenções", () => {
+    expect(csv.startsWith("\uFEFF")).toBe(true);
     expect(csv.endsWith("\r\n")).toBe(true);
     expect(lines[0]).toBe("Partida;Areia A × Areia B;Modalidade;Beach;Data;13/10/2026;Filtro;Jogo inteiro");
-    expect(lines[1]).toBe("");
+    expect(lines[1]).toMatch(/^Observação;"?\(%\) = porcentagem/);
+    expect(lines[2]).toBe("");
   });
 
-  it("seção de equipes com termos da areia e porcentagens com vírgula decimal", () => {
-    expect(lines[2]).toBe(
-      "Equipe;Pontos;PA;Ace;Blq;Err. adv;Virada de bola (%);Quebra de saque (%);TA;E;Efic. ataque (%);Rec;Passe na mão (%);Erros recepção;Sq;ES;ES-R (rede);ES-F (fora)",
+  it("seção de equipes com nomes completos e porcentagens com vírgula decimal", () => {
+    expect(lines[3]).toBe(
+      "Equipe;Pontos (total);Pontos de ataque;Pontos de saque (aces);Pontos de bloqueio;Pontos por erro do adversário;Virada de bola (%);Quebra de saque (%);Total de ataques;Erros de ataque;Eficiência de ataque (%);Total de recepções;Passe na mão (%);Erros de recepção (aces sofridos);Total de saques;Erros de saque (total);Erros de saque na rede;Erros de saque pra fora",
     );
     // A: ace (1) + erro de ataque de A1 dá ponto a B. A recebeu 1 vez (rali 3) e perdeu.
-    expect(lines[3]).toBe("Areia A;1;0;1;0;0;0;50;1;1;-100;1;0;0;2;0;0;0");
+    expect(lines[4]).toBe("Areia A;1;0;1;0;0;0;50;1;1;-100;1;0;0;2;0;0;0");
     // B: kill de B1 + ponto pelo erro de A. B sacou 1 vez e ganhou (100); recebeu 2 e ganhou 1 (50).
-    expect(lines[4]).toBe("Areia B;2;1;0;0;1;50;100;1;0;100;1;100;0;1;0;0;0");
+    expect(lines[5]).toBe("Areia B;2;1;0;0;1;50;100;1;0;100;1;100;0;1;0;0;0");
   });
 
-  it("seção de atletas, com proteção contra fórmula e aspas", () => {
-    expect(lines[6]).toBe("Equipe;Nº;Atleta;Pts;PA;E;TA;Efic. (%);Ace;ES;ES-R (rede);ES-F (fora);Sq;Rec;Na mão (%);Blq;Def;Erros;Bola de 2ª (TA);Bola de 2ª (PA)");
-    expect(lines[7]).toBe("Areia A;1;Ana;1;0;1;1;-100;1;0;0;0;2;1;0;0;0;1;0;0");
-    expect(lines[8]).toBe(`Areia A;2;"'=SOMA(1;2)";0;0;0;0;;0;0;0;0;0;0;;0;0;0;0;0`);
-    expect(lines[9]).toBe('Areia B;3;"Carla ""Cacá""; capitã";1;1;0;1;100;0;0;0;0;0;1;100;0;0;0;0;0');
+  it("seção de atletas: totais por fundamento antes de acertos e erros, sem siglas", () => {
+    const header = lines[7].split(";");
+    expect(header.slice(0, 3)).toEqual(["Equipe", "Número", "Atleta"]);
+    // Em cada fundamento o total vem primeiro.
+    expect(header.indexOf("Total de ataques")).toBeLessThan(header.indexOf("Pontos de ataque"));
+    expect(header.indexOf("Total de saques")).toBeLessThan(header.indexOf("Pontos de saque (aces)"));
+    expect(header.indexOf("Total de recepções")).toBeLessThan(header.indexOf("Erros de recepção (aces sofridos)"));
+    // Nenhum cabeçalho é sigla (PA, TA, ES-R, Sq, Rec…).
+    for (const h of [...header, ...lines[3].split(";")]) expect(h, h).not.toMatch(/^([A-Z]{1,4}(-[A-Z])?|Pts|Sq|Rec|Def|Blq|Efic\.( \(%\))?|Err\. adv|2ª.*)$/);
+
+    expect(athleteRow("Ana")).toMatchObject({
+      Número: "1",
+      "Pontos (ataque + ace + bloqueio)": "1",
+      "Total de ataques": "1",
+      "Pontos de ataque": "0",
+      "Erros de ataque": "1",
+      "Ataques em jogo (continuidade)": "0",
+      "Eficiência de ataque (%)": "-100",
+      "Total de saques": "2",
+      "Pontos de saque (aces)": "1",
+      "Saques em jogo (continuidade)": "1",
+      "Total de recepções": "1",
+      "Erros cometidos (total)": "1",
+    });
+    expect(lines[9]).toContain(`;"'=SOMA(1;2)";`); // fórmula neutralizada (e o ; obriga aspas)
+    expect(lines[10]).toContain('"Carla ""Cacá""; capitã"');
   });
 
   it("decimais com 1 casa e vírgula; sem base de cálculo fica vazio", () => {
@@ -69,8 +98,10 @@ describe("Box Score em CSV", () => {
       filter: { set: "all" },
       timeZone: "UTC",
     });
-    expect(parse(thirds)[3].split(";")[6]).toBe("33,3");
-    expect(lines[8].split(";")).toContain(""); // Bia sem ataques: eficiência vazia
+    expect(parse(thirds)[4].split(";")[6]).toBe("33,3");
+    const header = lines[7].split(";");
+    const bia = lines[9].replace(`"'=SOMA(1;2)"`, "Bia").split(";");
+    expect(bia[header.indexOf("Eficiência de ataque (%)")]).toBe(""); // Bia sem ataques: eficiência vazia
   });
 
   it("respeita o filtro de set e usa os termos do indoor", () => {
@@ -78,8 +109,8 @@ describe("Box Score em CSV", () => {
     const set1 = boxScoreToCsv({ box: scenario(indoor)(1), match: indoor, athletes, filter: { set: 1 }, timeZone: "UTC" });
     const l = parse(set1);
     expect(l[0]).toContain("Indoor;Data;13/10/2026;Filtro;Set 1");
-    expect(l[2]).toContain("Recepção #+ (%)");
-    expect(l[6]).toContain(";#+ (%);");
+    expect(l[3]).toContain("Recepção #+ (%)");
+    expect(l[7]).toContain(";Recepção perfeita ou positiva (%);");
   });
 
   it("nome do arquivo com times, filtro e data", () => {

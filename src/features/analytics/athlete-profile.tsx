@@ -8,6 +8,7 @@ import { resolveAthlete } from "@/domain/roster/identity";
 import type { PhaseFilter } from "@/domain/roster/types";
 import { rulesFor } from "@/domain/rules/modality";
 import {
+  athleteByCompetition,
   athletePartners,
   athleteSeries,
   availableYears,
@@ -25,6 +26,8 @@ import {
   teamHref,
 } from "./ui";
 import { EmptyState } from "@/components/empty-state";
+import { athleteColumns, tableColumns } from "@/domain/stats/stat-columns";
+import { StatTable } from "@/features/stats/stat-table";
 import { replaceQuery, useSeasonData } from "./use-season-data";
 
 const MIN_ATTACKS = 10;
@@ -67,6 +70,7 @@ export function AthleteProfile() {
       me: seasonStats(mine, season.aliases).athletes[id],
       series: athleteSeries(mine, id, season.aliases),
       partners: athletePartners(mine, id, season.aliases),
+      byCompetition: athleteByCompetition(mine, id, season.aliases),
     };
   }, [season, id, yearParam, phase]);
 
@@ -218,6 +222,24 @@ export function AthleteProfile() {
               </Card>
             )}
           </div>
+
+          <Card
+            title="Números por torneio"
+            note="O histórico segue a atleta: cada linha soma os jogos dela naquele torneio, com a dupla que for; a última é o total do recorte"
+          >
+            <StatTable
+              firstHeader="Torneio"
+              columns={tableColumns(athleteColumns({ modality: computed.mine[0]?.match.modality ?? "beach", aggregated: true, showReception }))}
+              rows={computed.byCompetition.map((c) => ({
+                key: c.key,
+                label: c.label,
+                sub: c.stats.team_keys.map((k) => season.teamName(k)).join(" · "),
+                line: c.stats,
+              }))}
+              total={{ key: "total", label: yearParam === "all" ? "Todas as temporadas" : `Temporada ${yearParam}`, line: me }}
+              minWidth={1000}
+            />
+          </Card>
 
           <Card
             title="Parceiros"

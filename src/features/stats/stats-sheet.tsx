@@ -125,7 +125,7 @@ export function StatsSheet({ match, rules, events, athletes, sides, onClose }: P
         </div>
 
         {view.kind !== "athlete" && (
-          <div className="mt-6 flex flex-col gap-6 overflow-x-auto">
+          <div className="mt-6 flex flex-col gap-6">
             {teamsShown.map((t) => (
               <AthleteTable
                 key={t}

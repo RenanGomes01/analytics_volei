@@ -39,9 +39,19 @@ describe("CSV do torneio", () => {
   });
 
   it("duplas ordenadas por vitórias, com V/D e sets", () => {
-    expect(lines[3].startsWith("Dupla;J;V;D;Sets +;Sets -;Pontos pró;Pontos contra")).toBe(true);
-    expect(lines[4].startsWith("Renan / Pedro;1;1;0;2;0;42;0")).toBe(true);
-    expect(lines[5].startsWith("Xande / Yuri;1;0;1;0;2;0;42")).toBe(true);
+    expect(lines[2]).toMatch(/^Observação;/);
+    expect(lines[4].startsWith("Dupla;Jogos;Vitórias;Derrotas;Sets vencidos;Sets perdidos;Pontos a favor;Pontos contra")).toBe(true);
+    expect(lines[5].startsWith("Renan / Pedro;1;1;0;2;0;42;0")).toBe(true);
+    expect(lines[6].startsWith("Xande / Yuri;1;0;1;0;2;0;42")).toBe(true);
+  });
+
+  it("atletas com nomes completos e o total de cada fundamento antes do detalhe", () => {
+    const header = lines[8].split(";");
+    expect(header.slice(0, 4)).toEqual(["Atleta", "Número", "Jogos", "Pontos (ataque + ace + bloqueio)"]);
+    expect(header.indexOf("Total de ataques")).toBeLessThan(header.indexOf("Pontos de ataque"));
+    expect(header).toContain("Ataques em jogo (continuidade)");
+    expect(header).toContain("Saques em jogo (continuidade)");
+    for (const h of [...header, ...lines[4].split(";")]) expect(h, h).not.toMatch(/^([A-Z]{1,4}(-[A-Z])?|Pts|Sq|Rec|Def|Blq|Efic\.( \(%\))?|J)$/);
   });
 
   it("nome do arquivo", () => {

@@ -109,3 +109,11 @@ Bola mandada para o outro lado **sem intenção de ataque**, só para mantê-la 
 - **Torneio:** excluir mantém as partidas (com todos os lances) como **amistosos**.
 - **Partida:** torneio e fase mudam a qualquer momento; as duplas, só antes do primeiro lance. Excluir manda para a **lixeira** (some de listas, rankings e estatísticas; os lances ficam guardados) e dá para restaurar.
 - **Sincronização:** a tela Conta mostra o que está guardado no aparelho para subir (partidas, lances, atletas, duplas, torneios), onde o envio parou e por quê, e o que a nuvem recusou — com "Enviar a versão deste aparelho", "Usar a versão da nuvem" ou "Ignorar". Lance nunca é substituído pela versão da nuvem.
+
+## Siglas das tabelas (Fase 12)
+Em cada fundamento: **total → acertos → erros → continuidade → índice**. Toque na sigla (ou passe o mouse) para ver o nome; "📖 Legenda" lista todas. O CSV usa sempre os nomes completos.
+- **Ataque:** TA total de ataques · PA pontos de ataque · EA erros de ataque (inclui bloqueado) · AJ ataques em jogo · Efic. (PA − EA) ÷ TA · 2ª bola de segunda (pontos/tentativas).
+- **Saque:** TS total de saques · Ace · ES erros de saque (ES-R rede, ES-F fora) · SJ saques em jogo = TS − Ace − ES.
+- **Recepção:** TR total de recepções · Na mão (beach) / #+ (indoor) sobre as avaliadas · ER erros de recepção (aces sofridos).
+- **Outros:** Pts (ataque + ace + bloqueio) · Blq pontos de bloqueio · Def total de defesas · J jogos. Duplas: V, D, Sets, Saldo, K1 virada de bola, K2 quebra de saque, EAdv pontos por erro do adversário.
+- O histórico individual segue a atleta em qualquer dupla; o perfil mostra os números por torneio com a dupla de cada um.

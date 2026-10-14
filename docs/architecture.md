@@ -53,3 +53,8 @@
 - **Nuvem:** `0002_editable_matches.sql` libera `upsert`/`delete` em `matches` (policy de UPDATE do dono); `rally_events` continua só `insert` + trigger append-only.
 - **Pull:** partida segue a regra do cadastro (servidor vence, salvo mudança local pendente **ou recusada**); lápide de partida vira `deleted_at` local.
 - **Fila e falhas:** recusa do servidor (`conflict`) não para a fila; falha de envio (rede, login, 5xx) para a fila FIFO de propósito e aparece como "Envio parado em: …". Recuperação (`recovery-service.ts`): reenviar o estado atual (mutações antigas da entidade viram `dismissed`), usar a versão da nuvem (descarta a local e refaz o pull do zero), ignorar, e pular a cabeça da fila após 5 erros que não são de rede. `dismissed` fica só para auditoria.
+
+## Agregação por atleta e dicionário de estatísticas (Fase 12)
+- **Nenhuma estatística é persistida.** O IndexedDB e o Supabase guardam só o ledger (cada lance com o `athlete_id` de quem tocou) e o cadastro. Tela, ranking, perfil e CSV recalculam a partir dos lances.
+- **A atleta é a entidade da agregação individual:** `aggregateCompetition` soma contadores brutos por id canônico (aliases unem cadastros duplicados) e registra por quais duplas ela passou (`team_keys`). A dupla é uma agregação paralela, por `pair_key`. Trocar de parceiro não divide nem perde o histórico (`athleteByCompetition` mostra por torneio; a soma é a temporada).
+- **Dicionário único** (`stat-columns.ts`): sigla, nome completo, explicação, fundamento e se a coluna é de volume. `StatTable` (cabeçalho por fundamento, dica no mouse/toque, legenda) e os CSVs (`statCell`, cabeçalhos completos) leem dele.

@@ -1,6 +1,7 @@
 import type { AthleteStats, BoxScore, StatsFilter, TeamStats } from "../stats/types";
 import type { Athlete, Match, TeamSide } from "../types";
-import { document, pct, row } from "./csv";
+import { athleteColumns, csvColumns } from "../stats/stat-columns";
+import { NOTE_ROW, document, pct, row, statCell } from "./csv";
 import { slug } from "./match-export";
 
 /** Box Score de uma partida em CSV (formato Excel pt-BR, ver csv.ts). Sem assinatura: é relatório, não backup. */
@@ -42,45 +43,25 @@ export function boxScoreToCsv({ box, match, athletes, filter, timeZone }: BoxSco
     s.serve.errors_out,
   ];
 
+  const columns = csvColumns(athleteColumns({ modality: match.modality }));
   const athleteRow = (t: TeamSide, s: AthleteStats) => {
     const a = athletes.get(s.athlete_id);
-    return [
-      teamName(t),
-      a?.jersey_number ?? null,
-      a?.name ?? s.athlete_id.slice(0, 8),
-      s.points,
-      s.attack.kills,
-      s.attack.errors,
-      s.attack.attempts,
-      pct(s.attack.efficiency),
-      s.serve.aces,
-      s.serve.errors,
-      s.serve.errors_net,
-      s.serve.errors_out,
-      s.serve.attempts,
-      s.reception.attempts,
-      pct(s.reception.positive),
-      s.blocks,
-      s.digs,
-      s.errors,
-      s.attack.second_ball.attempts,
-      s.attack.second_ball.kills,
-    ];
+    return [teamName(t), a?.jersey_number ?? null, a?.name ?? s.athlete_id.slice(0, 8), ...columns.map((c) => statCell(c, s))];
   };
 
   const lines: string[] = [
     row(["Partida", `${match.team_a.name} × ${match.team_b.name}`, "Modalidade", beach ? "Beach" : "Indoor", "Data", date, "Filtro", filterLabel]),
+    row(NOTE_ROW),
     "",
     row([
-      "Equipe", "Pontos", "PA", "Ace", "Blq", "Err. adv", "Virada de bola (%)", "Quebra de saque (%)",
-      "TA", "E", "Efic. ataque (%)", "Rec", receptionLabel, "Erros recepção", "Sq", "ES", "ES-R (rede)", "ES-F (fora)",
+      "Equipe", "Pontos (total)", "Pontos de ataque", "Pontos de saque (aces)", "Pontos de bloqueio", "Pontos por erro do adversário",
+      "Virada de bola (%)", "Quebra de saque (%)", "Total de ataques", "Erros de ataque", "Eficiência de ataque (%)",
+      "Total de recepções", receptionLabel, "Erros de recepção (aces sofridos)", "Total de saques", "Erros de saque (total)",
+      "Erros de saque na rede", "Erros de saque pra fora",
     ]),
     ...(["A", "B"] as const).map((t) => row(teamRow(t, box.teams[t]))),
     "",
-    row([
-      "Equipe", "Nº", "Atleta", "Pts", "PA", "E", "TA", "Efic. (%)", "Ace", "ES", "ES-R (rede)", "ES-F (fora)", "Sq", "Rec",
-      beach ? "Na mão (%)" : "#+ (%)", "Blq", "Def", "Erros", "Bola de 2ª (TA)", "Bola de 2ª (PA)",
-    ]),
+    row(["Equipe", "Número", "Atleta", ...columns.map((c) => c.full)]),
   ];
 
   for (const t of ["A", "B"] as const) {

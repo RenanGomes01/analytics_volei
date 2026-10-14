@@ -261,3 +261,32 @@ export function pointKinds(matches: readonly SeasonMatch[], aliases: AliasMap, f
   }
   return rallyPointKinds(rallies());
 }
+
+export interface AthleteCompetitionLine {
+  /** Id do torneio, ou "friendly" para os amistosos. */
+  key: string;
+  label: string;
+  stats: AthleteAggregate;
+}
+
+/**
+ * Números da atleta por torneio (Fase 12): cada torneio somado pelo MESMO motor dos rankings
+ * (contadores brutos por atleta canônica), com as duplas por onde ela jogou em `team_keys`. Trocar
+ * de parceiro não muda nada: a soma das linhas é a temporada dela.
+ */
+export function athleteByCompetition(matches: readonly SeasonMatch[], athleteId: string, aliases: AliasMap): AthleteCompetitionLine[] {
+  const groups = new Map<string, { label: string; first: number; matches: SeasonMatch[] }>();
+  for (const m of matches) {
+    const key = m.tournament?.id ?? "friendly";
+    const g = groups.get(key) ?? { label: m.tournament?.name ?? "Amistosos", first: m.match.created_at, matches: [] };
+    g.first = Math.min(g.first, m.match.created_at);
+    g.matches.push(m);
+    groups.set(key, g);
+  }
+  return [...groups.entries()]
+    .sort((a, b) => a[1].first - b[1].first)
+    .flatMap(([key, g]) => {
+      const stats = seasonStats(g.matches, aliases).athletes[athleteId];
+      return stats ? [{ key, label: g.label, stats }] : [];
+    });
+}

@@ -1,3 +1,4 @@
+import type { StatColumn } from "../stats/stat-columns";
 import type { Rate } from "../stats/types";
 
 /**
@@ -32,3 +33,17 @@ export const pct = (value: Rate | number | null): number | null => {
 export const row = (cells: Cell[]) => cells.map(cell).join(SEP);
 
 export const document = (lines: string[]) => BOM + lines.join(EOL) + EOL;
+
+/** Valor de uma coluna do dicionário (stat-columns.ts) numa célula: % com 1 casa, contagem como número. */
+export function statCell<L>(col: StatColumn<L>, line: L): Cell {
+  const v = col.value(line);
+  if (v === null || v === undefined) return null;
+  if (col.format === "pct") return pct(v as Rate | number);
+  return v as number | string;
+}
+
+/** Linha de observação no topo dos relatórios: a planilha se explica sem o sistema. */
+export const NOTE_ROW = [
+  "Observação",
+  "(%) = porcentagem; Passe na mão = passes # sobre as recepções avaliadas; Eficiência = (pontos − erros) ÷ total; Em jogo = nem ponto nem erro.",
+];

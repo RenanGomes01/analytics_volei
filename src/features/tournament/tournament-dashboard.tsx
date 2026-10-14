@@ -4,6 +4,8 @@ import { athleteHref, EntityLink, teamHref } from "@/features/analytics/ui";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { TournamentEditSheet } from "./tournament-edit";
+import { athleteColumns, tableColumns, teamColumns, type PlayerLine } from "@/domain/stats/stat-columns";
+import { StatTable, type StatRow } from "@/features/stats/stat-table";
 import { EmptyState } from "@/components/empty-state";
 import { toast } from "@/features/toast/toast";
 import { HardLink } from "@/components/hard-link";
@@ -92,97 +94,39 @@ function TeamsTable({ data, roster }: { data: CompetitionData; roster: RosterDat
   const teams = Object.values(data.stats.teams).sort(
     (a, b) => b.wins - a.wins || a.losses - b.losses || b.points_for - b.points_against - (a.points_for - a.points_against),
   );
-  const cols: [string, string, (t: TeamAggregate) => string | number][] = [
-    ["J", "Jogos", (t) => t.matches],
-    ["V-D", "Vitórias e derrotas", (t) => `${t.wins}-${t.losses}`],
-    ["Sets", "Sets vencidos e perdidos", (t) => `${t.sets_won}-${t.sets_lost}`],
-    ["Pts ±", "Saldo de pontos", (t) => t.points_for - t.points_against],
-    ["Virada", "Virada de bola (K1)", (t) => pct(t.side_out)],
-    ["Quebra", "Quebra de saque (K2)", (t) => pct(t.break_point)],
-    ["Efic.", "Eficiência de ataque", (t) => pct(t.attack.efficiency)],
-  ];
+  const showReception = teams.some((t) => t.reception.positive.den > 0);
+  const rows: StatRow<TeamAggregate>[] = teams.map((t) => ({
+    key: t.pair_key,
+    line: t,
+    label: <EntityLink href={teamHref(t.pair_key)}>{teamName(t.pair_key)}</EntityLink>,
+  }));
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[560px] text-right tabular-nums">
-        <thead>
-          <tr className="text-xs uppercase text-zinc-400">
-            <th className="py-2 text-left">{data.tournament.modality === "beach" ? "Dupla" : "Time"}</th>
-            {cols.map(([label, title]) => (
-              <th key={label} title={title} className="px-2 py-2">
-                {label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {teams.map((t) => (
-            <tr key={t.pair_key} className="odd:bg-zinc-900/60">
-              <th scope="row" className="py-2.5 text-left font-medium">
-                <EntityLink href={teamHref(t.pair_key)}>{teamName(t.pair_key)}</EntityLink>
-              </th>
-              {cols.map(([label, , value]) => (
-                <td key={label} className="px-2 py-2.5">
-                  {value(t)}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <StatTable
+      firstHeader={data.tournament.modality === "beach" ? "Dupla" : "Time"}
+      columns={tableColumns(teamColumns({ modality: data.tournament.modality, showReception }))}
+      rows={rows}
+      minWidth={1000}
+    />
   );
 }
 
 function AthletesTable({ data, roster }: { data: CompetitionData; roster: RosterData }) {
   const { athleteName } = useNames(roster, data.stats);
-  const beach = data.tournament.modality === "beach";
   const athletes = Object.values(data.stats.athletes).sort((a, b) => b.points - a.points || athleteName(a.athlete_id).localeCompare(athleteName(b.athlete_id)));
-  type Col = [string, string, (a: AthleteAggregate) => string | number];
-  const reception: Col = [beach ? "Na mão" : "#+", beach ? "Passes na mão" : "Recepções # e +", (a) => pct(a.reception.positive)];
-  const cols: Col[] = [
-    ["J", "Jogos", (a) => a.matches],
-    ["Pts", "Pontos (ataques + aces + bloqueios)", (a) => a.points],
-    ["PA", "Pontos de ataque", (a) => a.attack.kills],
-    ["E", "Erros de ataque", (a) => a.attack.errors],
-    ["TA", "Total de ataques", (a) => a.attack.attempts],
-    ["Efic.", "Eficiência de ataque: (PA − E) / TA, somando todos os jogos", (a) => pct(a.attack.efficiency)],
-    ["Ace", "Aces", (a) => a.serve.aces],
-    ["ES", "Erros de saque", (a) => a.serve.errors],
-    ["Rec", "Recepções", (a) => a.reception.attempts],
-    // Passe na mão só com recepções avaliadas (o modo rápido não avalia o passe).
-    ...(athletes.some((a) => a.reception.positive.den > 0) ? [reception] : []),
-    ["Blq", "Pontos de bloqueio", (a) => a.blocks],
-    ["Def", "Defesas", (a) => a.digs],
-  ];
+  // Passe na mão só com recepções avaliadas (o modo rápido não avalia o passe).
+  const showReception = athletes.some((a) => a.reception.positive.den > 0);
+  const rows: StatRow<PlayerLine>[] = athletes.map((a) => ({
+    key: a.athlete_id,
+    line: a,
+    label: <EntityLink href={athleteHref(a.athlete_id)}>{athleteName(a.athlete_id)}</EntityLink>,
+  }));
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[720px] text-right tabular-nums">
-        <thead>
-          <tr className="text-xs uppercase text-zinc-400">
-            <th className="sticky left-0 bg-zinc-950 py-2 text-left">Atleta</th>
-            {cols.map(([label, title]) => (
-              <th key={label} title={title} className="px-2 py-2">
-                {label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {athletes.map((a) => (
-            <tr key={a.athlete_id} className="odd:bg-zinc-900/60">
-              <th scope="row" className="sticky left-0 bg-inherit py-2.5 text-left font-medium">
-                <EntityLink href={athleteHref(a.athlete_id)}>{athleteName(a.athlete_id)}</EntityLink>
-              </th>
-              {cols.map(([label, , value]) => (
-                <td key={label} className="px-2 py-2.5">
-                  {value(a)}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <StatTable
+      firstHeader="Atleta"
+      columns={tableColumns(athleteColumns({ modality: data.tournament.modality, aggregated: true, showReception }))}
+      rows={rows}
+      minWidth={1000}
+    />
   );
 }
 

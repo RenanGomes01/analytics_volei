@@ -41,6 +41,8 @@
 - As estatísticas partem de `replayMatch(...).rallies`, nunca do ledger cru. Assim usam as mesmas anulações, sets, sacador e resultado de rali do placar.
 - Invariante testada: os pontos da equipe (kills + aces + bloqueios + erros do adversário) são sempre iguais ao placar. Os testes de invariantes usam ledgers aleatórios com semente fixa.
 - Toda divisão passa por `rate()` / `efficiency()` (`rate.ts`): denominador 0 vira `null` e aparece como "–".
+- **Siglas, nomes completos e ordem das colunas** vêm só de `src/domain/stats/stat-columns.ts` (tabelas via `StatTable`, legenda e CSVs). Sigla nova entra lá, com `full` e `hint`; em cada fundamento o total vem primeiro. CSV usa sempre o nome completo.
+- O histórico individual é da **atleta** (id canônico), nunca da dupla: estatística não é persistida (nem no Dexie nem no Supabase); tudo é recalculado do ledger por `aggregateCompetition`. Ver `athlete-independence.test.ts`.
 - Definições: ataque bloqueado (próximo toque é bloqueio `#` do adversário) é erro do atacante; ponto de ataque e de bloqueio exigem `#` **e** o rali ganho; ace = rali com motivo `ace` (saque `#` ou recepção `=` logo após o saque) creditado à sacadora; "erros do adversário" = `error` + `four_touches` + `manual`.
 - A UI (`StatsSheet`) usa os `events` do mesmo `useLiveQuery` da tela de scout: não abra outra consulta ao banco.
 
