@@ -3,6 +3,7 @@
 import { athleteHref, EntityLink, teamHref } from "@/features/analytics/ui";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { TournamentEditSheet } from "./tournament-edit";
 import { HardLink } from "@/components/hard-link";
 import { getDB } from "@/db/client";
 import { competitionCsvFilename, competitionToCsv } from "@/domain/export/competition-csv";
@@ -266,8 +267,18 @@ function Dashboard({ tournamentId }: { tournamentId: string }) {
   const [phase, setPhase] = useState<PhaseFilter>("all");
   const data = useCompetitionData(tournamentId, roster?.aliases, phase);
   const [tab, setTab] = useState<Tab>("ranking");
+  const [editing, setEditing] = useState(false);
 
-  if (data === null) return <p className="p-8 text-center">Torneio não encontrado neste aparelho.</p>;
+  if (data === null) {
+    return (
+      <div className="flex flex-col items-center gap-4 p-8 text-center">
+        <p>Torneio não encontrado neste aparelho (foi excluído?).</p>
+        <HardLink href="/" className="min-h-12 rounded-xl bg-zinc-800 px-5 py-3 font-semibold">
+          Voltar ao início
+        </HardLink>
+      </div>
+    );
+  }
   if (!data || !roster) return <p className="p-8 text-center text-zinc-400">Carregando torneio…</p>;
 
   const { tournament, stats } = data;
@@ -297,6 +308,9 @@ function Dashboard({ tournamentId }: { tournamentId: string }) {
           </p>
         </div>
         <div className="flex gap-2">
+          <button type="button" onClick={() => setEditing(true)} className="min-h-12 rounded-xl bg-zinc-800 px-4 font-semibold">
+            Editar
+          </button>
           <button type="button" onClick={exportCsv} className="min-h-12 rounded-xl bg-emerald-200 px-4 font-semibold text-emerald-950">
             ⇩ CSV
           </button>
@@ -305,6 +319,7 @@ function Dashboard({ tournamentId }: { tournamentId: string }) {
           </HardLink>
         </div>
       </header>
+      {editing && <TournamentEditSheet tournament={tournament} matches={data.matches.length} onClose={() => setEditing(false)} />}
 
       <nav role="tablist" className="flex gap-1 rounded-2xl bg-zinc-900 p-1">
         {TABS.map(([id, label]) => (

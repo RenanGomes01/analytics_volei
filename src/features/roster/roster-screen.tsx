@@ -6,9 +6,10 @@ import { matchesSearch } from "@/domain/roster/identity";
 import type { Athlete, Gender } from "@/domain/types";
 import { athleteHref, teamHref } from "@/features/analytics/ui";
 import { inputClass, primaryButton, secondaryButton, segmentedClass } from "@/features/setup/form-styles";
+import { ConfirmSheet } from "@/components/confirm-sheet";
 import { HardLink } from "@/components/hard-link";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
-import { mergeAthletes, renameTeam, unmergeAthlete, updateAthlete } from "@/services/roster-service";
+import { deleteAthlete, deleteTeam, mergeAthletes, renameTeam, unmergeAthlete, updateAthlete } from "@/services/roster-service";
 import { useRosterData, type RosterData } from "./use-roster-data";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -30,7 +31,9 @@ function AthleteRow({
   const [name, setName] = useState(athlete.name);
   const [number, setNumber] = useState(athlete.jersey_number?.toString() ?? "");
   const [gender, setGender] = useState<Gender | null>(athlete.gender ?? null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const aliases = roster.aliasesOf.get(athlete.id) ?? [];
+  const games = roster.matchCount.get(athlete.id) ?? 0;
 
   async function run(action: () => Promise<unknown>) {
     onError(null);
@@ -77,6 +80,9 @@ function AthleteRow({
               {g}
             </button>
           ))}
+          <button type="button" onClick={() => setConfirmDelete(true)} className={`${secondaryButton} text-red-300`}>
+            Excluir
+          </button>
           <button type="button" onClick={() => setEditing(false)} className={secondaryButton}>
             Cancelar
           </button>
@@ -88,6 +94,25 @@ function AthleteRow({
             Salvar
           </button>
         </div>
+      )}
+      {confirmDelete && (
+        <ConfirmSheet
+          title={`Excluir ${athlete.name}?`}
+          confirmLabel="Excluir atleta"
+          danger
+          canConfirm={games === 0}
+          onConfirm={() => deleteAthlete(getDB(), LOCAL_TENANT_ID, athlete.id)}
+          onClose={() => setConfirmDelete(false)}
+        >
+          {games > 0 ? (
+            <p>
+              {athlete.name} joga em {plural(games, "partida", "partidas")}: os lances guardam o cadastro dela, então não dá para excluir. Se é um
+              cadastro duplicado, marque os dois e use “Unir”.
+            </p>
+          ) : (
+            <p>Para cadastros feitos por engano. As duplas do cadastro com ela também saem. A exclusão vai para a nuvem na próxima sincronização.</p>
+          )}
+        </ConfirmSheet>
       )}
       {aliases.length > 0 && (
         <ul className="flex flex-wrap gap-2 pl-14 text-sm text-zinc-400">
@@ -108,12 +133,19 @@ function AthleteRow({
 function TeamRow({ team, roster }: { team: RosterData["teams"][number]; roster: RosterData }) {
   const [name, setName] = useState(team.name);
   const [editing, setEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const members = team.athlete_ids.map((id) => roster.athleteById.get(id)?.name ?? "?").join(" / ");
   return (
     <li className="flex flex-wrap items-center gap-2 rounded-2xl bg-zinc-900 p-3">
       {editing ? (
         <>
           <input className={`${inputClass} min-w-0 flex-1`} value={name} aria-label="Nome da dupla" onChange={(e) => setName(e.target.value)} />
+          <button type="button" onClick={() => setConfirmDelete(true)} className={`${secondaryButton} text-red-300`}>
+            Excluir
+          </button>
+          <button type="button" onClick={() => setEditing(false)} className={secondaryButton}>
+            Cancelar
+          </button>
           <button
             type="button"
             className={primaryButton}
@@ -135,9 +167,20 @@ function TeamRow({ team, roster }: { team: RosterData["teams"][number]; roster: 
           </span>
           <span className="text-xs uppercase text-zinc-500">{team.modality === "beach" ? "Beach" : "Indoor"}</span>
           <button type="button" onClick={() => setEditing(true)} className={secondaryButton}>
-            Renomear
+            Editar
           </button>
         </>
+      )}
+      {confirmDelete && (
+        <ConfirmSheet
+          title={`Excluir a dupla ${team.name}?`}
+          confirmLabel="Excluir dupla"
+          danger
+          onConfirm={() => deleteTeam(getDB(), LOCAL_TENANT_ID, team.id)}
+          onClose={() => setConfirmDelete(false)}
+        >
+          <p>Some só do cadastro (atalho para novas partidas). As partidas já jogadas continuam com o nome e as atletas gravados.</p>
+        </ConfirmSheet>
       )}
     </li>
   );

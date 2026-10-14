@@ -102,3 +102,10 @@ Bola mandada para o outro lado **sem intenção de ataque**, só para mantê-la 
 - **"Ponto A/B" com o rali aberto** abre "Como foi o ponto?" (mesmas opções e mesma saída "Não vi como foi" do modo rápido, calculadas sobre os fundamentos que o analista já escolheu). Ex.: saque → passe → levantamento e "Ponto" da mesma equipe → **"Bola de segunda (ponto)"**: o levantamento vira **ataque `#` da levantadora** (conta em PA e na coluna "2ª").
 - **Ledger:** nada é alterado. O trecho final do rali que muda é anulado (`void`) e regravado na mesma ordem; as cópias levam `replaces_event_id`, e tudo o que o "Como foi o ponto?" grava leva `via_point`. **Desfazer** esse ponto anula o fim e esses toques e regrava os toques originais: volta exatamente ao rali de antes do "Ponto".
 - **`/dev/seed` em produção:** 404 (`next build`/Vercel). Só volta num servidor local com `ENABLE_DEV_SEED=true` no `.env.local`.
+
+## Correções e exclusões (Fase 10)
+- **Atleta:** só é excluída se nunca jogou (nem em partida da lixeira) e não está unida a outra. Duplicada? "Unir atletas". As duplas do cadastro com ela saem junto.
+- **Dupla:** pode ser excluída sempre; as partidas já jogadas guardam nome e atletas.
+- **Torneio:** excluir mantém as partidas (com todos os lances) como **amistosos**.
+- **Partida:** torneio e fase mudam a qualquer momento; as duplas, só antes do primeiro lance. Excluir manda para a **lixeira** (some de listas, rankings e estatísticas; os lances ficam guardados) e dá para restaurar.
+- **Sincronização:** a tela Conta mostra o que está guardado no aparelho para subir (partidas, lances, atletas, duplas, torneios), onde o envio parou e por quê, e o que a nuvem recusou — com "Enviar a versão deste aparelho", "Usar a versão da nuvem" ou "Ignorar". Lance nunca é substituído pela versão da nuvem.

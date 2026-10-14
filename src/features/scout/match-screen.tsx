@@ -64,6 +64,7 @@ function ScoutBoard({ matchId }: { matchId: string }) {
   useWakeLock(!!match && !derived?.state.winner);
 
   if (match === null) return <Notice text="Partida não encontrada neste aparelho." />;
+  if (match?.deleted_at) return <Notice text="Esta partida está na lixeira. Para voltar a usá-la, restaure pela lista de partidas." />;
   if (!match || !athletes || !derived) return <Notice text="Carregando partida…" />;
 
   const { events, state, next, rules, lastActive } = derived;

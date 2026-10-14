@@ -136,8 +136,27 @@ export async function listTournamentMatches(db: ScoutDB, tenant_id: string, tour
   const entries = await db.tournament_entries.where("tournament_id").equals(tournament_id).toArray();
   const matches = await db.matches.bulkGet(entries.map((e) => e.match_id));
   return matches
-    .filter((m): m is Match => !!m && m.tenant_id === tenant_id)
+    .filter((m): m is Match => !!m && m.tenant_id === tenant_id && !m.deleted_at)
     .sort((a, b) => a.created_at - b.created_at);
+}
+
+/**
+ * Exclui o torneio. As partidas ficam (viram amistosos): cada vínculo e o torneio ganham lápide no
+ * outbox, tudo numa transação. Nenhum lance é tocado.
+ */
+export async function deleteTournament(db: ScoutDB, tenant_id: string, id: string): Promise<{ unlinked: number }> {
+  return db.transaction("rw", db.tournaments, db.tournament_entries, db.outbox, async () => {
+    const tournament = await db.tournaments.get(id);
+    if (!tournament || tournament.tenant_id !== tenant_id) throw new Error("Torneio não encontrado.");
+    const entries = await db.tournament_entries.where("tournament_id").equals(id).filter((e) => e.tenant_id === tenant_id).toArray();
+    for (const entry of entries) {
+      await db.tournament_entries.delete(entry.id);
+      await enqueue(db, "tournament_entry", entry, "delete");
+    }
+    await db.tournaments.delete(id);
+    await enqueue(db, "tournament", tournament, "delete");
+    return { unlinked: entries.length };
+  });
 }
 
 export interface CreateMatchFromTeamsInput {

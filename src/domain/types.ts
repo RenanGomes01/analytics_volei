@@ -30,6 +30,13 @@ export interface Match extends TenantScoped {
   team_b: { name: string; athlete_ids: string[] };
   first_server: TeamSide;
   created_at: number;
+  /** Última edição de metadados (dupla trocada antes do scout, exclusão, restauração). */
+  updated_at?: number;
+  /**
+   * Exclusão lógica (lixeira). A partida some das listas e estatísticas, mas a linha e os lances
+   * ficam (o ledger é imutável, aqui e na nuvem). Restaurar remove o campo.
+   */
+  deleted_at?: number;
 }
 
 export type Gender = "M" | "F";
@@ -149,7 +156,11 @@ export type OutboxEntity =
 /** insert: ledger e entidades novas. upsert/delete: cadastro editável (atletas, duplas, torneios, aliases). */
 export type OutboxOp = "insert" | "upsert" | "delete";
 /** local_only: nunca sai do aparelho (dados de teste do /dev/seed). */
-export type OutboxStatus = "pending" | "sent" | "acked" | "conflict" | "local_only";
+/**
+ * `local_only`: dados de teste, nunca enviados. `dismissed`: recusado pelo servidor e descartado pelo
+ * analista (ou superado por um reenvio mais novo); fica só para auditoria.
+ */
+export type OutboxStatus = "pending" | "sent" | "acked" | "conflict" | "local_only" | "dismissed";
 
 export interface OutboxEntry extends TenantScoped {
   /** Chave de idempotência no servidor. */

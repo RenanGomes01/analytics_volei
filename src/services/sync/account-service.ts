@@ -58,9 +58,3 @@ export async function retryPendingNow(db: ScoutDB, tenant_id: string, now = Date
     .filter((e) => e.tenant_id === tenant_id && e.next_attempt_at > now)
     .modify({ next_attempt_at: now });
 }
-
-/** Mutações recusadas pelo servidor (para a tela Conta explicar o motivo). */
-export async function listOutboxConflicts(db: ScoutDB, tenant_id: string, limit = 20) {
-  const rows = await db.outbox.where("status").equals("conflict").filter((e) => e.tenant_id === tenant_id).limit(limit).toArray();
-  return rows.map((e) => ({ entity: e.entity, entity_id: e.entity_id, reason: e.last_error ?? "" }));
-}

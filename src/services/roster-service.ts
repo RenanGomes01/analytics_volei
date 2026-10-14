@@ -153,3 +153,56 @@ export async function listTeams(db: ScoutDB, tenant_id: string, modality?: Modal
     .filter((t) => !modality || t.modality === modality)
     .sort((a, b) => normalizeName(a.name).localeCompare(normalizeName(b.name), "pt-BR"));
 }
+
+/**
+ * Exclui uma dupla do cadastro. A dupla é só um atalho: as partidas guardam o retrato (nome +
+ * atletas), então nada se perde. Lápide no outbox.
+ */
+export async function deleteTeam(db: ScoutDB, tenant_id: string, id: string): Promise<void> {
+  await db.transaction("rw", db.teams, db.outbox, async () => {
+    const team = await db.teams.get(id);
+    if (!team || team.tenant_id !== tenant_id) throw new Error("Dupla não encontrada.");
+    await db.teams.delete(id);
+    await enqueue(db, "team", team, "delete");
+  });
+}
+
+/** Onde a atleta é usada: partidas (inclusive na lixeira), uniões e duplas do cadastro. */
+export async function athleteUsage(db: ScoutDB, tenant_id: string, id: string) {
+  const [matches, aliases, teams] = await Promise.all([
+    db.matches.where("tenant_id").equals(tenant_id).toArray(),
+    db.athlete_aliases.where("tenant_id").equals(tenant_id).toArray(),
+    db.teams.where("tenant_id").equals(tenant_id).toArray(),
+  ]);
+  return {
+    matches: matches.filter((m) => m.team_a.athlete_ids.includes(id) || m.team_b.athlete_ids.includes(id)).length,
+    merged: aliases.some((a) => a.alias_id === id || a.canonical_id === id),
+    teams: teams.filter((t) => t.athlete_ids.includes(id)),
+  };
+}
+
+/**
+ * Exclui uma atleta cadastrada por engano. Recusa se ela jogou alguma partida (os lances guardam o
+ * id dela — para duplicados, use "Unir atletas") ou se está numa união. As duplas do cadastro que a
+ * incluem (sem partidas, portanto) vão junto. Lápides no outbox, numa transação.
+ */
+export async function deleteAthlete(db: ScoutDB, tenant_id: string, id: string): Promise<{ teams: number }> {
+  return db.transaction("rw", [db.athletes, db.matches, db.athlete_aliases, db.teams, db.outbox], async () => {
+    const athlete = await db.athletes.get(id);
+    if (!athlete || athlete.tenant_id !== tenant_id) throw new Error("Atleta não encontrada.");
+    const usage = await athleteUsage(db, tenant_id, id);
+    if (usage.matches > 0) {
+      throw new Error(
+        `${athlete.name} joga em ${usage.matches} ${usage.matches === 1 ? "partida" : "partidas"} (contando a lixeira). Para corrigir um cadastro duplicado, use "Unir atletas".`,
+      );
+    }
+    if (usage.merged) throw new Error(`${athlete.name} está unida a outro cadastro: desfaça a união antes de excluir.`);
+    for (const team of usage.teams) {
+      await db.teams.delete(team.id);
+      await enqueue(db, "team", team, "delete");
+    }
+    await db.athletes.delete(id);
+    await enqueue(db, "athlete", athlete, "delete");
+    return { teams: usage.teams.length };
+  });
+}

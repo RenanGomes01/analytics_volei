@@ -5,22 +5,10 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useEffect, useState, type FormEvent } from "react";
 import { getDB } from "@/db/client";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
-import { countSyncable, getLinkedAccount, linkAccount, listOutboxConflicts } from "@/services/sync/account-service";
-import { listPullConflicts } from "@/services/sync/pull-service";
+import { countSyncable, getLinkedAccount, linkAccount } from "@/services/sync/account-service";
 import { getSupabase } from "@/services/sync/supabase-client";
 import { requestSyncNow, SUPABASE_CONFIG, SYNC_MODE } from "@/features/sync/sync-config";
-import { useSyncStatus } from "@/features/sync/use-sync-status";
-
-const time = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" });
-const ENTITY_LABEL: Record<string, string> = {
-  match: "Partida",
-  athlete: "Atleta",
-  rally_event: "Lance",
-  team: "Dupla",
-  tournament: "Torneio",
-  tournament_entry: "Vínculo com torneio",
-  athlete_alias: "União de atletas",
-};
+import { SyncCenter } from "./sync-center";
 
 const card = "flex flex-col gap-3 rounded-2xl bg-zinc-900 p-4";
 const primary = "min-h-12 rounded-xl bg-amber-400 px-5 font-bold text-zinc-950 disabled:opacity-50";
@@ -59,7 +47,10 @@ export function AccountScreen() {
         </p>
       )}
       {SYNC_MODE === "supabase" && SUPABASE_CONFIG ? (
-        <CloudAccount />
+        <>
+          <CloudAccount />
+          <SyncCenter />
+        </>
       ) : (
         <section className={card}>
           <h2 className="text-lg font-bold">Sincronização com a nuvem desligada</h2>
@@ -210,59 +201,8 @@ function SignedIn({ client, session }: { client: SupabaseClient; session: Sessio
           </button>
         </section>
       ) : (
-        <SyncDetails />
+        <p className="px-1 text-sm text-zinc-400">Aparelho vinculado a esta conta: o que for scouteado aqui sobe sozinho.</p>
       )}
     </>
-  );
-}
-
-function SyncDetails() {
-  const db = getDB();
-  const status = useSyncStatus();
-  const outboxConflicts = useLiveQuery(() => listOutboxConflicts(db, LOCAL_TENANT_ID), []);
-  const pullConflicts = useLiveQuery(() => listPullConflicts(db), []);
-  if (!status) return null;
-
-  const conflicts = [
-    ...(outboxConflicts ?? []).map((c) => ({ ...c, where: "Recusado pela nuvem" })),
-    ...(pullConflicts ?? []).map((c) => ({ ...c, where: "Ao baixar" })),
-  ];
-  const errors = [status.blocked, status.last_error, status.pull_error].filter(Boolean);
-
-  return (
-    <section className={card}>
-      <h2 className="text-lg font-bold">Sincronização</h2>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="text-zinc-400">Na fila para enviar</dt>
-        <dd className="tabular-nums">{status.pending}</dd>
-        <dt className="text-zinc-400">Último envio</dt>
-        <dd>{status.last_success_at ? time.format(status.last_success_at) : "nunca"}</dd>
-        <dt className="text-zinc-400">Último recebimento</dt>
-        <dd>{status.last_pull_at ? time.format(status.last_pull_at) : "nunca"}</dd>
-      </dl>
-      {errors.map((e) => (
-        <p key={e} className="text-amber-200">
-          ⚠ {e}
-        </p>
-      ))}
-      <button type="button" onClick={requestSyncNow} className={`${primary} self-start`}>
-        Sincronizar agora
-      </button>
-      {conflicts.length > 0 && (
-        <div className="flex flex-col gap-1">
-          <h3 className="font-semibold text-red-300">
-            {conflicts.length} {conflicts.length === 1 ? "divergência" : "divergências"}
-          </h3>
-          <p className="text-xs text-zinc-400">Nada foi apagado: a versão deste aparelho foi mantida. Uma partida deve ser scouteada em um aparelho só.</p>
-          <ul className="flex flex-col gap-1 text-sm">
-            {conflicts.slice(0, 10).map((c) => (
-              <li key={`${c.where}:${c.entity}:${c.entity_id}`} className="rounded-lg bg-zinc-800 px-3 py-2">
-                <span className="font-semibold">{ENTITY_LABEL[c.entity] ?? c.entity}</span> · {c.where}: {c.reason}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </section>
   );
 }

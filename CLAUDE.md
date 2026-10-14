@@ -79,8 +79,16 @@
 - SQL em `supabase/migrations/` (aplicado à mão no SQL Editor). Mudou o SQL? Crie `0002_….sql` (idempotente) e cubra em `tests/sql/` (PGlite).
 - Tabelas da nuvem guardam a linha inteira em `data jsonb`; colunas tipadas são geradas. Campo opcional novo no app não exige SQL novo. Entidade nova no outbox exige: tabela + `sync_table()` + `pull_changes()` + `tableOf()` em `pull-service.ts`.
 - `SupabaseTransport` implementa `SyncTransport`/`PullSource`; o SDK só por `import()` (`supabase-client.ts`), nunca no carregamento inicial.
-- Pull grava sem outbox, numa transação por página junto com o cursor. Ledger e partidas: só acrescenta. Cadastro: servidor vence, salvo mudança local não enviada.
-- O sync só roda com conta conectada **e** vínculo confirmado (`linkAccount`). Outbox do seed é `local_only`.
+- Pull grava sem outbox, numa transação por página junto com o cursor. Ledger: só acrescenta. Cadastro e partidas: servidor vence, salvo mudança local não enviada ou recusada (`conflict` espera a decisão do analista).
+- O sync só roda com conta conectada **e** vínculo confirmado (`linkAccount`). Outbox do seed é `local_only` — e toda mutação posterior de uma entidade `local_only` herda o status (`enqueue`).
+
+## CRUD e central de sincronização (Fase 10)
+- Exclusão = mudança local + outbox `delete` na mesma transação (lápide `deleted_at` na nuvem). Sem FKs na nuvem: a integridade é checada no serviço **antes** (`deleteAthlete` recusa atleta com partidas; `deleteTournament` deixa as partidas como amistosos; `updateMatchTeams` só sem lances).
+- Partida excluída é **lógica** (`Match.deleted_at`, lixeira com `restoreMatch`); os lances ficam no ledger. Toda leitura de partidas para tela/estatística filtra `deleted_at` (`listMatches`, `loadSeason`, `listTournamentMatches`). Nova consulta a `db.matches`? Filtre também.
+- Partida editável na nuvem exige `supabase/migrations/0002_editable_matches.sql`. Sem ele, edição/exclusão de partida volta `conflict` com a instrução.
+- Central (`src/features/account/sync-center.tsx`): `getSyncSummary` (o que está retido, item parado, recusados, com nomes legíveis) + `recovery-service.ts` (`retryEntry`, `acceptRemote`, `dismissEntry`, `skipHead`). Reenvio de cadastro/partida manda o **estado atual** e marca as mutações antigas como `dismissed` — nunca reenvie um payload velho.
+- Falha de rede/login nunca é "pulada" (`isTransientError`); só erro do servidor repetido (≥ 5 tentativas) pode ir para revisão.
+- Diálogos de confirmação: `ConfirmSheet` (`src/components/`), nunca `confirm()` do navegador.
 
 ## Ponto no modo detalhado (Fase 9)
 - `outcomesForTouches` / `buildRallyFromTouches` (`quick-rally.ts`) são o núcleo único do "Como foi o ponto?": o modo rápido chega lá por `inferSkills(taps)`, o detalhado pelos toques do rali aberto.

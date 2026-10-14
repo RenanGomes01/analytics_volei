@@ -10,11 +10,11 @@ import { LAST_PULL_KEY, PULL_CONFLICTS_KEY, PULL_CURSOR_KEY } from "./sync-keys"
  * (o dado já está no servidor).
  *
  * Mesclagem:
- *  - partida e lances (imutáveis): só acrescenta. Mesmo id com conteúdo diferente → mantém o local e
- *    registra a divergência. Nunca sobrescreve o ledger.
- *  - cadastro (atletas, duplas, torneios, vínculos, uniões): vale a versão do servidor (maior
- *    server_seq), exceto se há mudança local ainda não enviada — essa ganha e vai subir depois.
- *    Lápide remove.
+ *  - lances (imutáveis): só acrescenta. Mesmo id com conteúdo diferente → mantém o local e registra
+ *    a divergência. Nunca sobrescreve o ledger.
+ *  - cadastro e partidas (Fase 10: partida editável): vale a versão do servidor (maior server_seq),
+ *    exceto se há mudança local ainda não enviada — essa ganha e vai subir depois. Lápide remove;
+ *    a de partida vira exclusão lógica (`deleted_at`), porque os lances dela continuam no ledger.
  */
 
 export interface PulledChange {
@@ -93,11 +93,12 @@ export async function applyPulledPage(
   const tables = [db.athletes, db.teams, db.tournaments, db.tournament_entries, db.athlete_aliases, db.matches, db.rally_events, db.outbox, db.meta];
   return db.transaction("rw", tables, async () => {
     const report = { applied: 0, skipped: 0, conflicts: 0, cursor: await getPullCursor(db) };
-    // Mudanças locais ainda não confirmadas pelo servidor: ganham do eco remoto.
+    // Mudanças locais ainda não confirmadas pelo servidor ganham do eco remoto — inclusive as
+    // recusadas (`conflict`), que esperam a decisão do analista na central de sincronização.
     const ids = [...new Set(changes.map((c) => c.entity_id))];
     const unsent = new Set(
       (await db.outbox.where("entity_id").anyOf(ids).toArray())
-        .filter((e) => e.tenant_id === tenant_id && (e.status === "pending" || e.status === "sent"))
+        .filter((e) => e.tenant_id === tenant_id && (e.status === "pending" || e.status === "sent" || e.status === "conflict"))
         .map((e) => `${e.entity}:${e.entity_id}`),
     );
     const found: PullConflict[] = [];
@@ -108,7 +109,7 @@ export async function applyPulledPage(
       const row = toLocalRow(change, tenant_id);
       const local = await table.get(change.entity_id);
 
-      if (change.entity === "match" || change.entity === "rally_event") {
+      if (change.entity === "rally_event") {
         if (change.deleted || (local && same(local, row))) {
           report.skipped += 1;
           continue;
@@ -117,12 +118,10 @@ export async function applyPulledPage(
           found.push({ entity: change.entity, entity_id: change.entity_id, reason: "Mesmo id com conteúdo diferente: mantida a versão deste aparelho." });
           continue;
         }
-        if (change.entity === "rally_event") {
-          // Outro aparelho já usou esta posição do ledger: a partida foi scouteada em dois aparelhos.
-          const event = row as unknown as RallyEvent;
-          const clash = await db.rally_events.where("[match_id+local_seq]").equals([event.match_id, event.local_seq]).first();
-          if (clash) found.push({ entity: "rally_event", entity_id: event.id, match_id: event.match_id, reason: "Partida scouteada em mais de um aparelho." });
-        }
+        // Outro aparelho já usou esta posição do ledger: a partida foi scouteada em dois aparelhos.
+        const event = row as unknown as RallyEvent;
+        const clash = await db.rally_events.where("[match_id+local_seq]").equals([event.match_id, event.local_seq]).first();
+        if (clash) found.push({ entity: "rally_event", entity_id: event.id, match_id: event.match_id, reason: "Partida scouteada em mais de um aparelho." });
         await table.add(row);
         report.applied += 1;
         continue;
@@ -130,6 +129,16 @@ export async function applyPulledPage(
 
       if (unsent.has(`${change.entity}:${change.entity_id}`)) {
         report.skipped += 1;
+        continue;
+      }
+      if (change.deleted && change.entity === "match") {
+        // Partida na lixeira: a linha fica (os lances continuam no ledger), só some das listas.
+        const tombstone = { ...row, deleted_at: typeof row.deleted_at === "number" ? row.deleted_at : now };
+        if (local && same(local, tombstone)) report.skipped += 1;
+        else {
+          await table.put(tombstone);
+          report.applied += 1;
+        }
         continue;
       }
       if (change.deleted) {

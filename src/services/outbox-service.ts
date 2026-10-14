@@ -39,6 +39,15 @@ export async function enqueue(
   op: OutboxOp = "insert",
 ): Promise<OutboxEntry> {
   const now = monotonicNow();
+  // Registro que nasceu como dado de teste continua só local: editar ou excluir uma partida do
+  // /dev/seed não pode mandar para a nuvem uma partida que nunca subiu (nem os lances dela).
+  const localOnly =
+    localOnlyDepth > 0 ||
+    (await db.outbox
+      .where("entity_id")
+      .equals(row.id)
+      .filter((e) => e.entity === entity && e.status === "local_only")
+      .count()) > 0;
   const entry: OutboxEntry = {
     mutation_id: newId(),
     tenant_id: row.tenant_id,
@@ -46,7 +55,7 @@ export async function enqueue(
     entity_id: row.id,
     op,
     payload: structuredClone(row),
-    status: localOnlyDepth > 0 ? "local_only" : "pending",
+    status: localOnly ? "local_only" : "pending",
     created_at: now,
     attempts: 0,
     last_attempt_at: null,

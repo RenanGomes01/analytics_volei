@@ -46,3 +46,10 @@
 - **Dados de teste:** o outbox do `/dev/seed` nasce `local_only` (`withLocalOnlyOutbox`) e nunca é enviado.
 - **Service worker:** origens `*.supabase.co`/`*.supabase.in` são `NetworkOnly` (o `defaultCache` guardaria GETs de outra origem, inclusive de autenticação).
 - **Testes:** o SQL roda em Postgres em memória (`@electric-sql/pglite`, `tests/sql/`) com `auth.uid()` simulado; o app usa um servidor falso com a mesma semântica (`tests/services/cloud-sync.test.ts`).
+
+## CRUD e central de sincronização (Fase 10)
+- **Exclusões com lápide.** Atleta, dupla, torneio e vínculo: apagados localmente + outbox `delete` na mesma transação; o servidor marca `deleted_at` (com `server_seq` novo) e o pull apaga nos outros aparelhos. **Partida:** exclusão lógica (`Match.deleted_at`) — a linha e os lances ficam, aqui e na nuvem (ledger imutável); a lixeira restaura com `upsert`.
+- **Integridade sem FKs:** checada no serviço antes de gravar. Atleta com partidas (inclusive na lixeira) ou em união não é excluída (o caminho é "Unir atletas"); dupla é só atalho de cadastro; torneio excluído leva os vínculos (partidas viram amistosos); dupla da partida só muda antes do scout.
+- **Nuvem:** `0002_editable_matches.sql` libera `upsert`/`delete` em `matches` (policy de UPDATE do dono); `rally_events` continua só `insert` + trigger append-only.
+- **Pull:** partida segue a regra do cadastro (servidor vence, salvo mudança local pendente **ou recusada**); lápide de partida vira `deleted_at` local.
+- **Fila e falhas:** recusa do servidor (`conflict`) não para a fila; falha de envio (rede, login, 5xx) para a fila FIFO de propósito e aparece como "Envio parado em: …". Recuperação (`recovery-service.ts`): reenviar o estado atual (mutações antigas da entidade viram `dismissed`), usar a versão da nuvem (descarta a local e refaz o pull do zero), ignorar, e pular a cabeça da fila após 5 erros que não são de rede. `dismissed` fica só para auditoria.

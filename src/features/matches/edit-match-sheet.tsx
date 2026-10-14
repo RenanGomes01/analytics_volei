@@ -1,0 +1,161 @@
+"use client";
+
+import { useLiveQuery } from "dexie-react-hooks";
+import { useState } from "react";
+import { ConfirmSheet } from "@/components/confirm-sheet";
+import { getDB } from "@/db/client";
+import { PHASE_LABEL, TOURNAMENT_PHASES, type TournamentPhase } from "@/domain/roster/types";
+import type { Match } from "@/domain/types";
+import type { RosterData } from "@/features/roster/use-roster-data";
+import { inputClass, primaryButton, secondaryButton, segmentedClass } from "@/features/setup/form-styles";
+import { LOCAL_TENANT_ID } from "@/lib/tenant";
+import { countScoutedEvents, deleteMatch, updateMatchTeams } from "@/services/match-service";
+import { addMatchToTournament, removeMatchFromTournament, setMatchPhase } from "@/services/tournament-service";
+
+interface Props {
+  match: Match;
+  roster: RosterData;
+  onClose: () => void;
+}
+
+const sameTeam = (a: Match["team_a"], b: Match["team_a"]) => a.name === b.name && a.athlete_ids.join() === b.athlete_ids.join();
+
+/**
+ * Corrigir a partida marcada errado: torneio e fase a qualquer momento; as duplas só antes do scout
+ * (os lances guardam o id de cada atleta). "Excluir" manda para a lixeira, de onde dá para restaurar.
+ */
+export function EditMatchSheet({ match, roster, onClose }: Props) {
+  const scouted = useLiveQuery(() => countScoutedEvents(getDB(), LOCAL_TENANT_ID, match.id), [match.id]);
+  const entry = roster.entries.find((e) => e.match_id === match.id) ?? null;
+  const teams = roster.teams.filter((t) => t.modality === match.modality);
+  const tournaments = roster.tournaments.filter((t) => t.modality === match.modality);
+  const teamIdOf = (side: Match["team_a"]) => teams.find((t) => t.athlete_ids.join() === side.athlete_ids.join())?.id ?? "";
+
+  const [teamA, setTeamA] = useState(teamIdOf(match.team_a));
+  const [teamB, setTeamB] = useState(teamIdOf(match.team_b));
+  const [tournamentId, setTournamentId] = useState(entry?.tournament_id ?? "");
+  const [phase, setPhase] = useState<TournamentPhase | null>(entry?.phase ?? null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const locked = (scouted ?? 0) > 0;
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    try {
+      const snapshot = (id: string, fallback: Match["team_a"]) => {
+        const t = teams.find((x) => x.id === id);
+        return t ? { name: t.name, athlete_ids: [...t.athlete_ids] } : fallback;
+      };
+      const team_a = snapshot(teamA, match.team_a);
+      const team_b = snapshot(teamB, match.team_b);
+      if (!locked && (!sameTeam(team_a, match.team_a) || !sameTeam(team_b, match.team_b))) {
+        await updateMatchTeams(getDB(), LOCAL_TENANT_ID, match.id, { team_a, team_b });
+      }
+      let entryId = entry?.id ?? null;
+      if ((entry?.tournament_id ?? "") !== tournamentId) {
+        if (entry) await removeMatchFromTournament(getDB(), LOCAL_TENANT_ID, entry.id);
+        entryId = tournamentId ? (await addMatchToTournament(getDB(), LOCAL_TENANT_ID, { tournament_id: tournamentId, match_id: match.id })).id : null;
+      }
+      const currentPhase = entryId === entry?.id ? (entry?.phase ?? null) : null;
+      if (entryId && phase !== currentPhase) await setMatchPhase(getDB(), LOCAL_TENANT_ID, entryId, phase);
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (confirmDelete) {
+    return (
+      <ConfirmSheet
+        title={`Excluir ${match.team_a.name} × ${match.team_b.name}?`}
+        confirmLabel="Mandar para a lixeira"
+        danger
+        onConfirm={() => deleteMatch(getDB(), LOCAL_TENANT_ID, match.id)}
+        onClose={() => {
+          setConfirmDelete(false);
+          onClose();
+        }}
+      >
+        <p>A partida sai das listas, rankings e estatísticas. Os lances continuam guardados: dá para restaurar pela lixeira, no fim da lista.</p>
+        <p className="text-sm text-zinc-400">Com a nuvem ligada, a exclusão chega aos outros aparelhos na próxima sincronização.</p>
+      </ConfirmSheet>
+    );
+  }
+
+  const teamSelect = (label: string, value: string, onChange: (v: string) => void) => (
+    <label className="flex flex-col gap-1 text-sm text-zinc-400">
+      {label}
+      <select className={inputClass} value={value} disabled={locked} onChange={(e) => onChange(e.target.value)}>
+        {!value && <option value="">(dupla fora do cadastro)</option>}
+        {teams.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Editar partida" className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="flex max-h-full w-full max-w-lg flex-col gap-3 overflow-y-auto rounded-3xl bg-zinc-900 p-5 text-zinc-100">
+        <h2 className="text-xl font-bold">Editar partida</h2>
+        {teamSelect("Dupla A", teamA, setTeamA)}
+        {teamSelect("Dupla B", teamB, setTeamB)}
+        {locked && (
+          <p className="rounded-xl bg-zinc-800 px-3 py-2 text-sm text-zinc-300">
+            Já tem lances: as duplas não mudam. Nome errado? Corrija no cadastro (Atletas e duplas) ou use “Unir atletas”.
+          </p>
+        )}
+        <label className="flex flex-col gap-1 text-sm text-zinc-400">
+          Torneio
+          <select
+            className={inputClass}
+            value={tournamentId}
+            onChange={(e) => {
+              setTournamentId(e.target.value);
+              setPhase(e.target.value ? (phase ?? "group") : null);
+            }}
+          >
+            <option value="">Amistoso (sem torneio)</option>
+            {tournaments.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {tournamentId && (
+          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Fase">
+            {TOURNAMENT_PHASES.map((p) => (
+              <button key={p} type="button" role="radio" aria-checked={phase === p} onClick={() => setPhase(p)} className={segmentedClass(phase === p)}>
+                {PHASE_LABEL[p]}
+              </button>
+            ))}
+          </div>
+        )}
+        {error && (
+          <p role="alert" className="rounded-xl bg-red-900/70 px-4 py-3 text-red-100">
+            {error}
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setConfirmDelete(true)} className={`${secondaryButton} text-red-300`}>
+            Excluir partida
+          </button>
+          <span className="flex-1" />
+          <button type="button" onClick={onClose} className={secondaryButton}>
+            Cancelar
+          </button>
+          <button type="button" disabled={saving || scouted === undefined} onClick={save} className={primaryButton}>
+            Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

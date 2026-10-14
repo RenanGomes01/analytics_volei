@@ -168,7 +168,7 @@ export async function getSyncStatus(db: ScoutDB, tenant_id: string): Promise<Syn
   const entries = await db.outbox.where("tenant_id").equals(tenant_id).toArray();
   const status: SyncStatus = { pending: 0, conflicts: 0, acked: 0, last_success_at: null, last_error: null, last_pull_at: null, pull_conflicts: 0, blocked: null, pull_error: null };
   for (const e of entries) {
-    if (e.status === "local_only") continue;
+    if (e.status === "local_only" || e.status === "dismissed") continue;
     if (e.status === "acked") status.acked += 1;
     else if (e.status === "conflict") status.conflicts += 1;
     else {

@@ -24,7 +24,7 @@ export async function loadSeason(db: ScoutDB, tenant_id: string): Promise<Season
     [db.matches, db.rally_events, db.tournaments, db.tournament_entries, db.athletes, db.teams, db.athlete_aliases],
     async () => {
       const [matches, events, tournaments, entries, athletes, teams, aliases] = await Promise.all([
-        db.matches.where("tenant_id").equals(tenant_id).toArray(),
+        db.matches.where("tenant_id").equals(tenant_id).filter((m) => !m.deleted_at).toArray(),
         db.rally_events.where("tenant_id").equals(tenant_id).toArray(),
         listTournaments(db, tenant_id),
         db.tournament_entries.where("tenant_id").equals(tenant_id).toArray(),
