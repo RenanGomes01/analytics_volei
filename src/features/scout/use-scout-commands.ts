@@ -4,9 +4,11 @@ import { useCallback, useEffect, useReducer } from "react";
 import { getDB } from "@/db/client";
 import type { NextAction } from "@/domain/rally/next-action";
 import type { PointDetail, Quality, Skill, TeamSide } from "@/domain/types";
+import type { DetailedPointPlan } from "@/domain/rally/resolve-detailed-point";
 import {
   appendRallyEnd,
   appendTouch,
+  resolvePoint,
   undoLastAction,
   type MatchScope,
 } from "@/services/rally-ledger-service";
@@ -60,6 +62,8 @@ export function useScoutCommands(scope: MatchScope, next: NextAction | null, led
     commitQuality: (quality: Quality, detail?: PointDetail) =>
       selection && run(() => appendTouch(getDB(), scope, { ...selection, quality, ...(detail ? { detail } : {}) })),
     pointTo: (point_to: TeamSide) => run(() => appendRallyEnd(getDB(), scope, { point_to, reason: "manual" })),
+    /** "Como foi o ponto?" com o rali aberto (ex.: levantamento que virou bola de segunda). */
+    resolvePoint: (plan: DetailedPointPlan) => run(() => resolvePoint(getDB(), scope, plan)),
     undo: () => run(() => undoLastAction(getDB(), scope)),
   };
 }

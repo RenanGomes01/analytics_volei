@@ -1,5 +1,6 @@
 import { newId } from "@/lib/id";
 import { phaseForTouch } from "@/domain/rally/phase";
+import type { DetailedPointPlan } from "@/domain/rally/resolve-detailed-point";
 import { activeEvents, replayMatch, type MatchState } from "@/domain/rally/replay";
 import { rulesFor } from "@/domain/rules/modality";
 import type {
@@ -30,7 +31,7 @@ export interface MatchScope {
   match_id: string;
 }
 
-export type TouchInput = Pick<TouchEvent, "team" | "athlete_id" | "skill" | "quality" | "detail">;
+export type TouchInput = Pick<TouchEvent, "team" | "athlete_id" | "skill" | "quality" | "detail" | "replaces_event_id" | "via_point">;
 
 export interface RallyEndInput {
   point_to: TeamSide;
@@ -141,11 +142,30 @@ export function voidEvent(db: ScoutDB, scope: MatchScope, event_id: string): Pro
   });
 }
 
-/** Desfaz a última ação válida da partida (toque ou fim de rali). Retorna null se não há o que desfazer. */
+/**
+ * Desfaz a última ação válida da partida (toque ou fim de rali). Retorna null se não há o que desfazer.
+ * Ponto resolvido por "Como foi o ponto?" no modo detalhado (resolvePoint) volta inteiro: anula o fim
+ * e as cópias corrigidas e regrava os toques originais, como estavam antes do "Ponto".
+ */
 export function undoLastAction(db: ScoutDB, scope: MatchScope): Promise<VoidEvent | null> {
   return ledgerTransaction(db, async () => {
-    const last = activeEvents(await listMatchEvents(db, scope)).at(-1);
-    return last ? voidEvent(db, scope, last.id) : null;
+    const all = await listMatchEvents(db, scope);
+    const active = activeEvents(all);
+    const last = active.at(-1);
+    if (!last) return null;
+    if (last.kind !== "rally_end") return voidEvent(db, scope, last.id);
+
+    const written = active.filter((e): e is TouchEvent => e.kind === "touch" && e.rally_id === last.rally_id && !!e.via_point);
+    const undone = await voidEvent(db, scope, last.id);
+    for (const e of [...written].reverse()) await voidEvent(db, scope, e.id);
+    const byId = new Map(all.map((e) => [e.id, e]));
+    for (const copy of written) {
+      const original = copy.replaces_event_id ? byId.get(copy.replaces_event_id) : undefined;
+      if (original?.kind !== "touch") continue;
+      const { team, athlete_id, skill, quality, detail } = original;
+      await appendTouch(db, scope, { team, athlete_id, skill, quality, ...(detail ? { detail } : {}) });
+    }
+    return undone;
   });
 }
 
@@ -180,6 +200,22 @@ export function appendRally(
     }
     const endEvent = await append(db, { ...next(), ...end, kind: "rally_end" } satisfies RallyEndEvent);
     return { touches: written, end: endEvent };
+  });
+}
+
+/**
+ * Modo detalhado, "Como foi o ponto?": aplica o plano de resolveDetailedPoint numa transação —
+ * anula o trecho final do rali aberto, regrava as cópias corrigidas e os toques novos (marcados com
+ * `via_point`) e fecha o rali. Nada é alterado nem apagado.
+ */
+export function resolvePoint(db: ScoutDB, scope: MatchScope, plan: DetailedPointPlan): Promise<RallyEndEvent> {
+  return ledgerTransaction(db, async () => {
+    const { state } = await loadMatchContext(db, scope);
+    const open = new Set((state.open_rally?.touches ?? []).map((t) => t.id));
+    if (plan.void_ids.some((id) => !open.has(id))) throw new Error("O rali mudou: confira os toques e marque o ponto de novo.");
+    for (const id of [...plan.void_ids].reverse()) await voidEvent(db, scope, id);
+    const { end } = await appendRally(db, scope, plan.touches.map((t) => ({ ...t, via_point: true as const })), plan.end);
+    return end;
   });
 }
 

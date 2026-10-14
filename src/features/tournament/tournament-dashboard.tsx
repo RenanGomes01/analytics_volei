@@ -50,9 +50,11 @@ function formatRanking(spec: RankingSpec, a: AthleteAggregate, value: number): {
 function RankingCards({ data, roster }: { data: CompetitionData; roster: RosterData }) {
   const { athleteName } = useNames(roster, data.stats);
   const athletes = Object.values(data.stats.athletes);
+  // Passe na mão só com recepções avaliadas no recorte (o modo rápido não avalia o passe).
+  const rated = athletes.some((a) => a.reception.positive.den > 0);
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {rankingSpecs(data.tournament.modality).map((spec) => {
+      {rankingSpecs(data.tournament.modality).filter((spec) => spec.metric !== "reception" || rated).map((spec) => {
         const rows = rankAthletes(athletes, spec, { nameOf: athleteName });
         return (
           <section key={spec.metric} className="rounded-2xl bg-zinc-900 p-4">
@@ -132,7 +134,9 @@ function AthletesTable({ data, roster }: { data: CompetitionData; roster: Roster
   const { athleteName } = useNames(roster, data.stats);
   const beach = data.tournament.modality === "beach";
   const athletes = Object.values(data.stats.athletes).sort((a, b) => b.points - a.points || athleteName(a.athlete_id).localeCompare(athleteName(b.athlete_id)));
-  const cols: [string, string, (a: AthleteAggregate) => string | number][] = [
+  type Col = [string, string, (a: AthleteAggregate) => string | number];
+  const reception: Col = [beach ? "Na mão" : "#+", beach ? "Passes na mão" : "Recepções # e +", (a) => pct(a.reception.positive)];
+  const cols: Col[] = [
     ["J", "Jogos", (a) => a.matches],
     ["Pts", "Pontos (ataques + aces + bloqueios)", (a) => a.points],
     ["PA", "Pontos de ataque", (a) => a.attack.kills],
@@ -142,7 +146,8 @@ function AthletesTable({ data, roster }: { data: CompetitionData; roster: Roster
     ["Ace", "Aces", (a) => a.serve.aces],
     ["ES", "Erros de saque", (a) => a.serve.errors],
     ["Rec", "Recepções", (a) => a.reception.attempts],
-    [beach ? "Na mão" : "#+", beach ? "Passes na mão" : "Recepções # e +", (a) => pct(a.reception.positive)],
+    // Passe na mão só com recepções avaliadas (o modo rápido não avalia o passe).
+    ...(athletes.some((a) => a.reception.positive.den > 0) ? [reception] : []),
     ["Blq", "Pontos de bloqueio", (a) => a.blocks],
     ["Def", "Defesas", (a) => a.digs],
   ];

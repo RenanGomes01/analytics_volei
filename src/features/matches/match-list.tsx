@@ -3,6 +3,7 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { HardLink } from "@/components/hard-link";
 import { getDB } from "@/db/client";
+import { PHASE_LABEL } from "@/domain/roster/types";
 import { ExportButton } from "@/features/export/export-button";
 import { useRosterData } from "@/features/roster/use-roster-data";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
@@ -19,6 +20,15 @@ export function MatchList() {
     return <p className="text-center text-zinc-400">Nenhuma partida neste aparelho ainda.</p>;
   }
 
+  // "Torneio · Semifinal"; sem torneio é amistoso.
+  const phaseOf = new Map((roster?.entries ?? []).map((e) => [e.match_id, e.phase]));
+  const competitionLabel = (id: string) => {
+    const tournament = roster?.tournamentOfMatch.get(id);
+    if (!tournament) return roster ? "Amistoso" : "";
+    const phase = phaseOf.get(id);
+    return phase ? `${tournament.name} · ${PHASE_LABEL[phase]}` : tournament.name;
+  };
+
   return (
     <ul className="flex flex-col gap-2">
       {matches.map((m) => (
@@ -32,7 +42,7 @@ export function MatchList() {
             </span>
             <span className="shrink-0 text-right text-sm text-zinc-400">
               {m.modality === "beach" ? "Beach" : "Indoor"} · {dateFormat.format(m.created_at)}
-              <span className="block text-xs text-zinc-500">{roster?.tournamentOfMatch.get(m.id)?.name ?? "Sem torneio"}</span>
+              <span className="block text-xs text-zinc-500">{competitionLabel(m.id)}</span>
             </span>
           </HardLink>
           <ExportButton matchId={m.id} compact />

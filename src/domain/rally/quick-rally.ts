@@ -136,11 +136,15 @@ export const POINT_DETAIL_LABEL: Record<PointDetail, string> = {
  * "Falta…" (BEACH_FAULTS) fica sempre disponível à parte, na tela.
  */
 export function pointOutcomes(taps: readonly QuickTap[], winner: TeamSide): QuickOutcome[] {
-  return [...lanceOutcomes(taps, winner), { id: "unseen", label: "Não vi como foi" }];
+  return outcomesForTouches(inferSkills(taps), winner);
 }
 
-function lanceOutcomes(taps: readonly QuickTap[], winner: TeamSide): QuickOutcome[] {
-  const touches = inferSkills(taps);
+/** O mesmo, sobre toques já classificados (modo detalhado: fundamentos escolhidos pelo analista). */
+export function outcomesForTouches(touches: readonly Pick<QuickTouch, "team" | "skill">[], winner: TeamSide): QuickOutcome[] {
+  return [...lanceOutcomes(touches, winner), { id: "unseen", label: "Não vi como foi" }];
+}
+
+function lanceOutcomes(touches: readonly Pick<QuickTouch, "team" | "skill">[], winner: TeamSide): QuickOutcome[] {
   const last = touches.at(-1);
   if (!last) return [];
   // Posição do último toque dentro da posse da equipe (1º, 2º…), para reconhecer bola de primeira/segunda.
@@ -225,7 +229,12 @@ const other = (t: TeamSide): TeamSide => (t === "A" ? "B" : "A");
 
 /** Eventos do rali: o lance final ganha a qualidade (e o detalhe) que o ponto revela; o fim é explícito. */
 export function buildQuickRally(taps: readonly QuickTap[], winner: TeamSide, choice: QuickChoice): QuickRally {
-  const touches = inferSkills(taps);
+  return buildRallyFromTouches(inferSkills(taps), winner, choice);
+}
+
+/** O mesmo, sobre toques já classificados. Não altera a lista recebida. */
+export function buildRallyFromTouches(classified: readonly QuickTouch[], winner: TeamSide, choice: QuickChoice): QuickRally {
+  const touches = classified.map((t) => ({ ...t }));
   const last = touches.at(-1);
   const { detail } = choice;
   if (choice.as_attack && last && last.skill !== "serve") last.skill = "attack"; // bola de primeira/segunda

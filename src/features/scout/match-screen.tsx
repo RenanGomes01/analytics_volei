@@ -20,6 +20,8 @@ import { useMatchData } from "./use-match-data";
 import { useScoutCommands } from "./use-scout-commands";
 import { ServeChooser } from "./components/serve-chooser";
 import { QuickBoard } from "./quick/quick-board";
+import { PointSheet } from "./quick/point-sheet";
+import { detailedPointOutcomes, resolveDetailedPoint } from "@/domain/rally/resolve-detailed-point";
 import { useScoutMode } from "./use-scout-mode";
 import { useSideSwap } from "./use-side-swap";
 import { useWakeLock } from "./use-wake-lock";
@@ -44,6 +46,8 @@ function ScoutBoard({ matchId }: { matchId: string }) {
   const [finishOpen, setFinishOpen] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState<string | null>(null);
+  /** Modo detalhado: "Ponto X" com o rali aberto pergunta como foi (nunca vira falta sem lance às cegas). */
+  const [pointFor, setPointFor] = useState<TeamSide | null>(null);
 
   async function finish(input: FinishMatchInput) {
     setFinishing(true);
@@ -65,6 +69,8 @@ function ScoutBoard({ matchId }: { matchId: string }) {
   const { events, state, next, rules, lastActive } = derived;
   const sides: [TeamSide, TeamSide] = swapped ? ["B", "A"] : ["A", "B"];
   const { selection } = commands;
+  const openTouches = state.open_rally?.touches ?? [];
+  const teamName = (t: TeamSide) => (t === "A" ? match.team_a.name : match.team_b.name);
 
   const panel = (team: TeamSide) => (
     <TeamPanel
@@ -128,7 +134,7 @@ function ScoutBoard({ matchId }: { matchId: string }) {
             saving={commands.saving}
             canScore={!state.winner}
             onUndo={commands.undo}
-            onPoint={commands.pointTo}
+            onPoint={(team) => (openTouches.length > 0 ? setPointFor(team) : commands.pointTo(team))}
             onSwapSides={toggleSides}
             onOpenStats={() => setStatsOpen(true)}
             onQuickMode={() => setMode("quick")}
@@ -138,6 +144,22 @@ function ScoutBoard({ matchId }: { matchId: string }) {
 
       {statsOpen && (
         <StatsSheet match={match} rules={rules} events={events} athletes={athletes} sides={sides} onClose={closeStats} />
+      )}
+
+      {pointFor && mode === "detailed" && openTouches.length > 0 && !state.winner && (
+        <PointSheet
+          winner={pointFor}
+          options={detailedPointOutcomes(openTouches, pointFor)}
+          teamName={teamName}
+          roster={(t) => (t === "A" ? match.team_a.athlete_ids : match.team_b.athlete_ids)}
+          athletes={athletes}
+          saving={commands.saving}
+          onChoose={(choice) => {
+            setPointFor(null);
+            commands.resolvePoint(resolveDetailedPoint(openTouches, pointFor, choice));
+          }}
+          onCancel={() => setPointFor(null)}
+        />
       )}
 
       {finishOpen && !state.winner && (

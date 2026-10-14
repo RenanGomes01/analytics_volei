@@ -13,7 +13,8 @@ interface Props {
   saving: boolean;
   onChoose: (choice: QuickChoice) => void;
   onCancel: () => void;
-  onReplay: () => void;
+  /** Só no modo rápido (os toques ainda não estão no ledger). */
+  onReplay?: () => void;
 }
 
 type Step = { kind: "main" } | { kind: "blocker"; option: QuickOutcome } | { kind: "faults" } | { kind: "fault_who"; detail: PointDetail; label: string };
@@ -111,7 +112,7 @@ export function PointSheet({ winner, options, teamName, roster, athletes, saving
             Cancelar (o rali continua)
           </button>
         </div>
-        {step.kind === "main" && (
+        {step.kind === "main" && onReplay && (
           <button type="button" onClick={onReplay} className="min-h-12 rounded-2xl text-sm text-zinc-400 underline">
             Rali anulado — repetir o ponto (sem ponto para ninguém)
           </button>

@@ -60,7 +60,7 @@ export function ScoutFooter({
           onClick={() => onPoint(team)}
           disabled={!canScore || saving}
           className={`${button} truncate border-2 border-zinc-700 bg-zinc-900`}
-          title="Falta sem lance registrado: rede, invasão, decisão da arbitragem"
+          title="Com o rali em andamento, pergunta como foi o ponto; sem toques, registra falta/arbitragem"
         >
           Ponto {teamName(team)}
         </button>

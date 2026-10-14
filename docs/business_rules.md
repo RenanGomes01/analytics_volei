@@ -38,7 +38,7 @@ Na recepção do beach, a estatística "Passe na mão" = recepções `#` ÷ tota
 - A sugestão só destaca: os dois lados continuam tocáveis (exceto o time que sacou, logo após o próprio saque).
 
 ### O que encerra o rali (por prioridade)
-1. **Ponto A / Ponto B** (rede, invasão, condução, arbitragem).
+1. **Ponto A / Ponto B**. Sem toques no rali: falta/arbitragem direto (rede, invasão, condução). Com o rali em andamento (modo detalhado): pergunta **"Como foi o ponto?"**, com as mesmas opções do modo rápido (ver Fase 9).
 2. **4 toques**: a equipe que passar de 3 toques cede o ponto (no beach o bloqueio conta como toque; no indoor, não).
 3. **Qualidade do último lance**:
    - `=` em qualquer fundamento → ponto do adversário (erro).
@@ -87,7 +87,7 @@ Bola mandada para o outro lado **sem intenção de ataque**, só para mantê-la 
 - **Erro de saque:** no modo detalhado o `=` do saque são dois botões, **"Erro: na rede"** e **"Erro: fora"** (detalhe gravado no lance). Box Score: **ES-R** (rede), **ES-F** (fora) e **ES** (total, inclui lances antigos sem detalhe).
 - **Passe na mão:** aparece só quando há recepções **avaliadas** no recorte. Como o modo rápido não avalia o passe, a coluna, o card de ranking e o gráfico somem sozinhos.
 - **Finalizar partida:** evento `match_end` (vencedor + motivo: placar atual, desistência/lesão, W.O., chuva, outro, com observação). O rali aberto não conta; o set em andamento fica **interrompido** (marcado com `*`, sem vencedor). V/D entram normalmente nas competições. **Desfazer reabre a partida.** Pelo placar atual, a sugestão é quem tem mais sets ou, empatado, mais pontos no set (serve para set único de 25).
-- **Fase da competição:** Fase de grupos, Oitavas, Quartas, Semifinal, Final, Disputa de 3º. Fica no vínculo partida → torneio; partida sem torneio é **amistoso**. **Mata-mata** = tudo que não é fase de grupos. Partidas sem fase registrada só entram no filtro "Todas".
+- **Fase da competição:** aparece também nos cards da lista de partidas ("Torneio · Semifinal"; sem torneio, "Amistoso"). Fase de grupos, Oitavas, Quartas, Semifinal, Final, Disputa de 3º. Fica no vínculo partida → torneio; partida sem torneio é **amistoso**. **Mata-mata** = tudo que não é fase de grupos. Partidas sem fase registrada só entram no filtro "Todas".
 
 ## Sincronização com a nuvem (Fase 8)
 - **O scout nunca depende da internet.** Sem rede, sem conta ou com sessão vencida, tudo funciona igual; a fila cresce e sobe quando der.
@@ -97,3 +97,8 @@ Bola mandada para o outro lado **sem intenção de ataque**, só para mantê-la 
 - **Uma partida é scouteada em um aparelho só.** Se a mesma partida receber lances de dois aparelhos, nada é apagado e a tela Conta mostra a divergência.
 - **Cadastro editado em dois aparelhos:** vale a última alteração enviada.
 - **Dados de teste** (`/dev/seed`) nunca vão para a nuvem.
+
+## Ponto no modo detalhado e produção (Fase 9)
+- **"Ponto A/B" com o rali aberto** abre "Como foi o ponto?" (mesmas opções e mesma saída "Não vi como foi" do modo rápido, calculadas sobre os fundamentos que o analista já escolheu). Ex.: saque → passe → levantamento e "Ponto" da mesma equipe → **"Bola de segunda (ponto)"**: o levantamento vira **ataque `#` da levantadora** (conta em PA e na coluna "2ª").
+- **Ledger:** nada é alterado. O trecho final do rali que muda é anulado (`void`) e regravado na mesma ordem; as cópias levam `replaces_event_id`, e tudo o que o "Como foi o ponto?" grava leva `via_point`. **Desfazer** esse ponto anula o fim e esses toques e regrava os toques originais: volta exatamente ao rali de antes do "Ponto".
+- **`/dev/seed` em produção:** 404 (`next build`/Vercel). Só volta num servidor local com `ENABLE_DEV_SEED=true` no `.env.local`.

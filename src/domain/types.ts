@@ -87,6 +87,13 @@ export interface TouchEvent extends RallyEventBase {
   skill: Skill;
   quality: Quality;
   detail?: PointDetail;
+  /**
+   * Cópia corrigida de um toque anulado no mesmo "Como foi o ponto?" do modo detalhado (ex.: o
+   * levantamento que foi bola de segunda). O Desfazer usa isto para regravar o toque original.
+   */
+  replaces_event_id?: string;
+  /** Gravado pelo "Como foi o ponto?" do modo detalhado: o Desfazer do ponto também o anula. */
+  via_point?: true;
 }
 
 export type RallyEndReason = "kill" | "ace" | "error" | "four_touches" | "manual";

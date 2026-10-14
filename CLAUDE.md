@@ -29,7 +29,7 @@
 ## UI de scout (`src/features/scout/`)
 - **Tela = f(ledger):** `use-match-data.ts` faz `useLiveQuery` → `replayMatch` → `nextAction`. Placar, rali, posse e sugestões nunca viram estado React.
 - O único estado de UI é a seleção efêmera (`scout-ui-reducer.ts`: idle → armed → saving). Ele volta para idle sempre que o tamanho do ledger muda.
-- O ponto sai da qualidade do lance (`domain/rally/implied-point.ts`): `#` em saque, ataque ou bloqueio e `=` em qualquer fundamento. Os botões Ponto A/B são só para faltas sem lance.
+- O ponto sai da qualidade do lance (`domain/rally/implied-point.ts`): `#` em saque, ataque ou bloqueio e `=` em qualquer fundamento. Os botões Ponto A/B: sem toques no rali, falta sem lance; com o rali aberto, abrem "Como foi o ponto?" (`resolve-detailed-point.ts` + `resolvePoint`), nunca um ponto "manual" às cegas.
 - A inferência destaca a equipe esperada, mas só bloqueia o que é fisicamente impossível. O analista precisa conseguir registrar o que viu, inclusive um 4º toque.
 - Tela de scout: `h-dvh overflow-hidden`, sem scroll; alvos de toque com no mínimo 48px (botões principais com 64px).
 - **Toda interface em PT-BR**, inclusive siglas e motivos de ponto (ex.: "Virada de bola", "Quebra de saque", "Bola de graça", "PA"). Identificadores no código continuam em inglês.
@@ -82,10 +82,14 @@
 - Pull grava sem outbox, numa transação por página junto com o cursor. Ledger e partidas: só acrescenta. Cadastro: servidor vence, salvo mudança local não enviada.
 - O sync só roda com conta conectada **e** vínculo confirmado (`linkAccount`). Outbox do seed é `local_only`.
 
+## Ponto no modo detalhado (Fase 9)
+- `outcomesForTouches` / `buildRallyFromTouches` (`quick-rally.ts`) são o núcleo único do "Como foi o ponto?": o modo rápido chega lá por `inferSkills(taps)`, o detalhado pelos toques do rali aberto.
+- `resolveDetailedPoint` gera um plano append-only (anula um sufixo do rali e regrava, com `replaces_event_id`); `resolvePoint` aplica numa transação e marca os toques com `via_point`. `undoLastAction` desfaz esse ponto inteiro e regrava os originais. Nunca edite toques no lugar.
+
 ## Dados de teste (`/dev/seed`)
 - Gerador puro em `src/domain/dev/rally-generator.ts` (semente fixa, modo detalhado, fim do rali sempre por `impliedPoint`); serviço em `src/services/dev/seed-service.ts`, gravando pelos services reais (`appendRallies` = vários ralis numa transação).
 - Os ids criados ficam em `meta["dev_seed"]`. `removeDemoData` apaga **só** esses ids (exceção deliberada ao append-only, restrita a dados sintéticos).
-- A rota não tem link na home e não entra no pré-cache. Remover (ou esconder atrás de variável de ambiente) antes de um deploy público.
+- A rota não tem link na home e não entra no pré-cache. Em produção dá 404 (`src/lib/dev-flags.ts`), salvo `ENABLE_DEV_SEED=true` (só em `.env.local` de homologação, nunca na Vercel).
 - No `fake-indexeddb`, apagar milhares de linhas é muito lento: nos testes use `maxMatches`.
 
 ## Regras do Next.js (geradas pelo create-next-app)

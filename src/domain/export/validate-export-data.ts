@@ -71,6 +71,8 @@ export function validateExportData(data: unknown): string[] {
       if (!SKILLS.includes(e.skill as Skill)) errors.push(`${at}: fundamento desconhecido.`);
       if (!QUALITIES.includes(e.quality as Quality)) errors.push(`${at}: qualidade fora da escala.`);
       if (e.detail !== undefined && !DETAILS.includes(e.detail as PointDetail)) errors.push(`${at}: detalhe do ponto desconhecido.`);
+      if (e.replaces_event_id !== undefined && !isStr(e.replaces_event_id)) errors.push(`${at}: substituição inválida.`);
+      if (e.via_point !== undefined && e.via_point !== true) errors.push(`${at}: marca de ponto inválida.`);
     } else if (e.kind === "rally_end") {
       if (!isTeam(e.point_to) || !REASONS.includes(e.reason as RallyEndReason)) errors.push(`${at}: fim de rali inválido.`);
       if (e.detail !== undefined && !DETAILS.includes(e.detail as PointDetail)) errors.push(`${at}: detalhe do ponto desconhecido.`);
