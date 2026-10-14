@@ -1,6 +1,7 @@
 import type { OutboxEntry } from "@/domain/types";
 import type { ScoutDB } from "@/db/schema";
 import { nextAttemptAt } from "./backoff";
+import { BLOCKED_KEY, LAST_PULL_KEY, LAST_SUCCESS_KEY, PULL_CONFLICTS_KEY, PULL_ERROR_KEY } from "./sync-keys";
 import type { PushResult, SyncTransport } from "./transport";
 
 /**
@@ -11,7 +12,6 @@ import type { PushResult, SyncTransport } from "./transport";
 export const CLAIM_LEASE_MS = 2 * 60_000;
 export const DEFAULT_BATCH_SIZE = 50;
 const MAX_BATCHES_PER_CYCLE = 20;
-const LAST_SUCCESS_KEY = "sync:last_success_at";
 
 export interface SyncCycleOptions {
   tenant_id: string;
@@ -155,12 +155,20 @@ export interface SyncStatus {
   acked: number;
   last_success_at: number | null;
   last_error: string | null;
+  /** Último pull concluído (modo supabase). */
+  last_pull_at: number | null;
+  /** Divergências vistas ao baixar (ver pull-service). */
+  pull_conflicts: number;
+  /** Por que o sync com a nuvem está parado (ex.: "Entre na conta para sincronizar."). */
+  blocked: string | null;
+  pull_error: string | null;
 }
 
 export async function getSyncStatus(db: ScoutDB, tenant_id: string): Promise<SyncStatus> {
   const entries = await db.outbox.where("tenant_id").equals(tenant_id).toArray();
-  const status: SyncStatus = { pending: 0, conflicts: 0, acked: 0, last_success_at: null, last_error: null };
+  const status: SyncStatus = { pending: 0, conflicts: 0, acked: 0, last_success_at: null, last_error: null, last_pull_at: null, pull_conflicts: 0, blocked: null, pull_error: null };
   for (const e of entries) {
+    if (e.status === "local_only") continue;
     if (e.status === "acked") status.acked += 1;
     else if (e.status === "conflict") status.conflicts += 1;
     else {
@@ -170,6 +178,16 @@ export async function getSyncStatus(db: ScoutDB, tenant_id: string): Promise<Syn
   }
   const last = (await db.meta.get(LAST_SUCCESS_KEY))?.value;
   status.last_success_at = typeof last === "number" ? last : null;
+  const pulled = (await db.meta.get(LAST_PULL_KEY))?.value;
+  status.last_pull_at = typeof pulled === "number" ? pulled : null;
+  const pullConflicts = (await db.meta.get(PULL_CONFLICTS_KEY))?.value;
+  status.pull_conflicts = Array.isArray(pullConflicts) ? pullConflicts.length : 0;
+  const text = async (key: string) => {
+    const value = (await db.meta.get(key))?.value;
+    return typeof value === "string" ? value : null;
+  };
+  status.blocked = await text(BLOCKED_KEY);
+  status.pull_error = await text(PULL_ERROR_KEY);
   return status;
 }
 

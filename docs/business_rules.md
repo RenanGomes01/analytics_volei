@@ -88,3 +88,12 @@ Bola mandada para o outro lado **sem intenção de ataque**, só para mantê-la 
 - **Passe na mão:** aparece só quando há recepções **avaliadas** no recorte. Como o modo rápido não avalia o passe, a coluna, o card de ranking e o gráfico somem sozinhos.
 - **Finalizar partida:** evento `match_end` (vencedor + motivo: placar atual, desistência/lesão, W.O., chuva, outro, com observação). O rali aberto não conta; o set em andamento fica **interrompido** (marcado com `*`, sem vencedor). V/D entram normalmente nas competições. **Desfazer reabre a partida.** Pelo placar atual, a sugestão é quem tem mais sets ou, empatado, mais pontos no set (serve para set único de 25).
 - **Fase da competição:** Fase de grupos, Oitavas, Quartas, Semifinal, Final, Disputa de 3º. Fica no vínculo partida → torneio; partida sem torneio é **amistoso**. **Mata-mata** = tudo que não é fase de grupos. Partidas sem fase registrada só entram no filtro "Todas".
+
+## Sincronização com a nuvem (Fase 8)
+- **O scout nunca depende da internet.** Sem rede, sem conta ou com sessão vencida, tudo funciona igual; a fila cresce e sobe quando der.
+- **Conta:** e-mail e senha criados no painel do Supabase (sem cadastro público). Uma conta = um analista; tablet e computador entram na mesma conta.
+- **Vínculo:** ao entrar pela primeira vez num aparelho, a tela **Conta** pergunta se o histórico deste aparelho deve ir para a conta. Só depois disso algo é enviado. Trocar de conta pede a confirmação de novo. **Sair não apaga nada.**
+- **No computador:** basta entrar na mesma conta; os campeonatos, partidas e estatísticas scouteados no tablet aparecem sozinhos e ficam disponíveis offline.
+- **Uma partida é scouteada em um aparelho só.** Se a mesma partida receber lances de dois aparelhos, nada é apagado e a tela Conta mostra a divergência.
+- **Cadastro editado em dois aparelhos:** vale a última alteração enviada.
+- **Dados de teste** (`/dev/seed`) nunca vão para a nuvem.

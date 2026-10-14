@@ -71,7 +71,7 @@ describe("fase da competição", () => {
     const updated = await setMatchPhase(db, T, `${t.id}:${semi.id}`, "semifinal");
     expect(updated.phase).toBe("semifinal");
     const outbox = await db.outbox.where("entity_id").equals(updated.id).toArray();
-    expect(outbox.map((o) => o.op)).toEqual(["insert", "upsert"]);
+    expect(outbox.sort((a, b) => a.created_at - b.created_at).map((o) => o.op)).toEqual(["insert", "upsert"]);
 
     const season = await loadSeason(db, T);
     const ids = (phase: "all" | "group" | "knockout" | "semifinal" | "final") =>

@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 import { defaultCache } from "@serwist/turbopack/worker";
-import { type PrecacheEntry, Serwist, type SerwistGlobalConfig } from "serwist";
+import { NetworkOnly, type PrecacheEntry, Serwist, type SerwistGlobalConfig } from "serwist";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -19,7 +19,8 @@ const serwist = new Serwist({
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
-  runtimeCaching: defaultCache,
+  // API e login do Supabase nunca passam pelo cache (o defaultCache guardaria GETs de outra origem).
+  runtimeCaching: [{ matcher: ({ url }) => /\.supabase\.(co|in)$/.test(url.hostname), handler: new NetworkOnly() }, ...defaultCache],
   fallbacks: {
     entries: [{ url: "/~offline", matcher: ({ request }) => request.destination === "document" }],
   },

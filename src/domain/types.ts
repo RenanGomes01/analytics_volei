@@ -141,7 +141,8 @@ export type OutboxEntity =
   | "athlete_alias";
 /** insert: ledger e entidades novas. upsert/delete: cadastro editável (atletas, duplas, torneios, aliases). */
 export type OutboxOp = "insert" | "upsert" | "delete";
-export type OutboxStatus = "pending" | "sent" | "acked" | "conflict";
+/** local_only: nunca sai do aparelho (dados de teste do /dev/seed). */
+export type OutboxStatus = "pending" | "sent" | "acked" | "conflict" | "local_only";
 
 export interface OutboxEntry extends TenantScoped {
   /** Chave de idempotência no servidor. */

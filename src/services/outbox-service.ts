@@ -3,6 +3,7 @@ import type { OutboxEntity, OutboxEntry, OutboxOp } from "@/domain/types";
 import type { ScoutDB } from "@/db/schema";
 
 let lastStamp = 0;
+let localOnlyDepth = 0;
 
 /**
  * Relógio estritamente crescente nesta sessão. Várias mutações na mesma transação (ex.: atletas e
@@ -12,6 +13,19 @@ let lastStamp = 0;
 function monotonicNow(): number {
   lastStamp = Math.max(Date.now(), lastStamp + 1);
   return lastStamp;
+}
+
+/**
+ * Durante `fn`, as mutações enfileiradas nascem `local_only`: ficam registradas mas nunca são
+ * enviadas à nuvem. Uso exclusivo dos dados de teste (/dev/seed).
+ */
+export async function withLocalOnlyOutbox<T>(fn: () => Promise<T>): Promise<T> {
+  localOnlyDepth += 1;
+  try {
+    return await fn();
+  } finally {
+    localOnlyDepth -= 1;
+  }
 }
 
 /**
@@ -32,7 +46,7 @@ export async function enqueue(
     entity_id: row.id,
     op,
     payload: structuredClone(row),
-    status: "pending",
+    status: localOnlyDepth > 0 ? "local_only" : "pending",
     created_at: now,
     attempts: 0,
     last_attempt_at: null,

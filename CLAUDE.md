@@ -46,9 +46,9 @@
 ## Exportação e sync (Fase 4)
 - **Exportação:** `exportMatch()` (`src/services/export/`) gera o envelope `volei-scout/match-export` v1 com o ledger completo (inclusive VoidEvents), um hash SHA-256 do JSON canônico de `data` e uma assinatura ECDSA P-256 da chave **não-extraível** do aparelho (fica na `meta`). Mudou o formato de forma incompatível? Suba `EXPORT_SCHEMA_VERSION` e mantenha `verifyMatchExport` lendo as versões antigas.
 - **Outbox:** o sync só altera a tabela `outbox`, nunca `rally_events`. Envio FIFO por `created_at` (monotônico no `enqueue`), parando no primeiro retry; backoff em `src/services/sync/backoff.ts`; lease de 2 min para entradas presas em `sent`.
-- **Transporte:** a interface é `SyncTransport` (`src/services/sync/transport.ts`); hoje só existe o `MockTransport`. Um back-end real entra como outro transporte, sem mexer no motor. É obrigatório ser idempotente por `mutation_id`.
+- **Transporte:** a interface é `SyncTransport` (`src/services/sync/transport.ts`); `MockTransport` (teste) e `SupabaseTransport` (Fase 8), sem mexer no motor. É obrigatório ser idempotente por `mutation_id`.
 - **Versão nova do PWA:** o SW usa skipWaiting + clientsClaim, então abas abertas passam a ter código antigo sob um SW novo. `src/features/update/` detecta isso (`controllerchange`), mostra o banner "Nova versão disponível" e **pausa o SyncAgent** naquela aba até recarregar. Nunca recarregue automaticamente: `reloadOnOnline` fica desligado no `SerwistProvider`.
-- `NEXT_PUBLIC_SYNC_MODE` = `off` (padrão) ou `mock` (ver `.env.example`). O `SyncAgent` (no layout) nunca bloqueia a UI, e o status aparece só no `SyncBadge`, nunca na tela de scout.
+- `NEXT_PUBLIC_SYNC_MODE` = `off` (padrão), `mock` ou `supabase` (ver `.env.example`). O `SyncAgent` (no layout) nunca bloqueia a UI, e o status aparece só no `SyncBadge`, nunca na tela de scout.
 - **Importação** (`src/services/export/import-service.ts`): sempre `inspectMatchExport` (só lê) antes de `importMatchExport` (transação única). Nunca sobrescreva: as situações são new / up_to_date / append / diverged / conflict (ver `docs/architecture.md`). Toda validação nova de arquivo entra em `validateExportData` (estrutura) — hash e assinatura não bastam.
 - **CSV** (`src/domain/export/box-score-csv.ts`): formato Excel pt-BR (`;`, vírgula decimal, BOM). Todo texto vindo do usuário passa por `text()` (neutraliza fórmulas).
 - **Persistência:** `src/services/storage/persistence.ts`; nunca prometa na interface que os dados estão garantidos só porque `persist()` foi pedido.
@@ -73,6 +73,14 @@
 - Encerramento manual = evento `match_end` (`finishMatch`); nunca altere a partida nem apague eventos para encerrar. Desfazer reabre.
 - Fase da partida mora em `TournamentEntry.phase` (`setMatchPhase`); amistoso = sem torneio.
 - Passe na mão só aparece com recepções avaliadas no recorte (`reception.positive.den > 0`).
+
+## Cloud sync com Supabase (Fase 8)
+- Telas leem **só o Dexie**; o Supabase é espelho (push do outbox + pull). Nunca leia do Supabase numa tela nem faça o scout esperar pela rede.
+- SQL em `supabase/migrations/` (aplicado à mão no SQL Editor). Mudou o SQL? Crie `0002_….sql` (idempotente) e cubra em `tests/sql/` (PGlite).
+- Tabelas da nuvem guardam a linha inteira em `data jsonb`; colunas tipadas são geradas. Campo opcional novo no app não exige SQL novo. Entidade nova no outbox exige: tabela + `sync_table()` + `pull_changes()` + `tableOf()` em `pull-service.ts`.
+- `SupabaseTransport` implementa `SyncTransport`/`PullSource`; o SDK só por `import()` (`supabase-client.ts`), nunca no carregamento inicial.
+- Pull grava sem outbox, numa transação por página junto com o cursor. Ledger e partidas: só acrescenta. Cadastro: servidor vence, salvo mudança local não enviada.
+- O sync só roda com conta conectada **e** vínculo confirmado (`linkAccount`). Outbox do seed é `local_only`.
 
 ## Dados de teste (`/dev/seed`)
 - Gerador puro em `src/domain/dev/rally-generator.ts` (semente fixa, modo detalhado, fim do rali sempre por `impliedPoint`); serviço em `src/services/dev/seed-service.ts`, gravando pelos services reais (`appendRallies` = vários ralis numa transação).

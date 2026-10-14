@@ -5,6 +5,7 @@ import type { Gender, TeamSide } from "@/domain/types";
 import { appendRallies, finishMatch } from "@/services/rally-ledger-service";
 import { createAthlete, findOrCreateTeam } from "@/services/roster-service";
 import { createMatchFromTeams, createTournament } from "@/services/tournament-service";
+import { withLocalOnlyOutbox } from "@/services/outbox-service";
 
 /**
  * Ferramenta de homologação: popula o aparelho com ~1 ano de jogos sintéticos (modo detalhado),
@@ -104,7 +105,12 @@ export interface SeedOptions {
   maxMatches?: number;
 }
 
-export async function seedDemoData(db: ScoutDB, tenant_id: string, { seed = DEFAULT_SEED, onProgress, maxMatches = Infinity }: SeedOptions = {}): Promise<DevSeedRecord> {
+/** Injeta os dados de teste. O outbox gerado fica `local_only`: o seed nunca vai para a nuvem. */
+export function seedDemoData(db: ScoutDB, tenant_id: string, options: SeedOptions = {}): Promise<DevSeedRecord> {
+  return withLocalOnlyOutbox(() => injectDemoData(db, tenant_id, options));
+}
+
+async function injectDemoData(db: ScoutDB, tenant_id: string, { seed = DEFAULT_SEED, onProgress, maxMatches = Infinity }: SeedOptions): Promise<DevSeedRecord> {
   if (await getDevSeed(db)) throw new Error("Os dados de teste já foram injetados neste aparelho.");
   const rng = createRng(seed);
   const record: DevSeedRecord = { created_at: Date.now(), athlete_ids: [], team_ids: [], tournament_ids: [], match_ids: [], showcase: { athlete_id: "", pair_key: "" } };
