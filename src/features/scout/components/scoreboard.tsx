@@ -10,6 +10,8 @@ interface Props {
   next: NextAction;
   rules: ModalityRules;
   sides: [TeamSide, TeamSide];
+  /** Abre o encerramento manual (só com a partida em andamento). */
+  onFinish?: () => void;
 }
 
 /** Beach: troca de lado a cada 7 pontos somados (5 no set decisivo). */
@@ -43,7 +45,7 @@ function TeamHeader({ match, state, team, align }: TeamHeaderProps) {
   );
 }
 
-export function Scoreboard({ match, state, next, rules, sides }: Props) {
+export function Scoreboard({ match, state, next, rules, sides, onFinish }: Props) {
   const score = state.sets.at(-1)!.score;
 
   return (
@@ -60,6 +62,11 @@ export function Scoreboard({ match, state, next, rules, sides }: Props) {
           {next.phase && <span>· {PHASE_LABEL[next.phase]}</span>}
           {sideSwitchDue(state, rules) && <span className="font-bold text-amber-400">· trocar de lado</span>}
         </div>
+        {onFinish && !state.winner && (
+          <button type="button" onClick={onFinish} className="mt-1 min-h-10 rounded-lg px-3 text-xs font-semibold uppercase tracking-wide text-zinc-400 underline-offset-4 hover:underline">
+            Finalizar partida
+          </button>
+        )}
       </div>
       <TeamHeader match={match} state={state} team={sides[1]} align="right" />
     </header>

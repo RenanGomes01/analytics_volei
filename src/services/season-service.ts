@@ -41,11 +41,15 @@ export async function loadSeason(db: ScoutDB, tenant_id: string): Promise<Season
       }
       const tournamentById = new Map(tournaments.map((t) => [t.id, t]));
       const tournamentOfMatch = new Map(entries.map((e) => [e.match_id, tournamentById.get(e.tournament_id) ?? null]));
+      const phaseOfMatch = new Map(entries.flatMap((e) => (e.phase ? [[e.match_id, e.phase] as const] : [])));
 
       return {
         matches: matches
           .sort((a, b) => a.created_at - b.created_at)
-          .map((match) => ({ match, events: eventsByMatch.get(match.id) ?? [], tournament: tournamentOfMatch.get(match.id) ?? null })),
+          .map((match) => {
+            const phase = phaseOfMatch.get(match.id);
+            return { match, events: eventsByMatch.get(match.id) ?? [], tournament: tournamentOfMatch.get(match.id) ?? null, ...(phase ? { phase } : {}) };
+          }),
         tournaments,
         athletes: new Map(athletes.map((a) => [a.id, a])),
         teams,

@@ -1,8 +1,8 @@
 import type { ScoutDB } from "@/db/schema";
 import { createRng, generateRally, type PlayerProfile } from "@/domain/dev/rally-generator";
-import type { TournamentCategory } from "@/domain/roster/types";
+import type { TournamentCategory, TournamentPhase } from "@/domain/roster/types";
 import type { Gender, TeamSide } from "@/domain/types";
-import { appendRallies } from "@/services/rally-ledger-service";
+import { appendRallies, finishMatch } from "@/services/rally-ledger-service";
 import { createAthlete, findOrCreateTeam } from "@/services/roster-service";
 import { createMatchFromTeams, createTournament } from "@/services/tournament-service";
 
@@ -134,11 +134,17 @@ export async function seedDemoData(db: ScoutDB, tenant_id: string, { seed = DEFA
 
   let done = 0;
   /** Cria a partida e joga rali a rali até haver vencedor. Devolve o lado vencedor. */
-  async function play(a: PairNames, b: PairNames, when: number, tournament_id?: string): Promise<TeamSide> {
+  async function play(
+    a: PairNames,
+    b: PairNames,
+    when: number,
+    tournament_id?: string,
+    { phase, retireAfter }: { phase?: TournamentPhase; retireAfter?: number } = {},
+  ): Promise<TeamSide> {
     if (record.match_ids.length >= maxMatches) return "A";
     const [ta, tb] = [await team(a), await team(b)];
     const first_server: TeamSide = rng() < 0.5 ? "A" : "B";
-    const match = await createMatchFromTeams(db, { tenant_id, team_a_id: ta.id, team_b_id: tb.id, first_server, tournament_id }, when);
+    const match = await createMatchFromTeams(db, { tenant_id, team_a_id: ta.id, team_b_id: tb.id, first_server, tournament_id, phase }, when);
     record.match_ids.push(match.id);
     await save();
 
@@ -148,16 +154,21 @@ export async function seedDemoData(db: ScoutDB, tenant_id: string, { seed = DEFA
     let previousServing: TeamSide | null = null;
     let rallies = 0;
     const final = await appendRallies(db, { tenant_id, match_id: match.id }, (state) => {
-      if (rallies++ >= 400) return null;
+      if (rallies++ >= (retireAfter ?? 400)) return null;
       const serving = state.serving_team;
       if (previousServing !== null && serving !== previousServing) nextServer[serving] ^= 1;
       previousServing = serving;
       return generateRally({ serving_team: serving, server_id: athletes[serving][nextServer[serving]], athletes, profiles }, rng);
     });
-    if (!final.winner) throw new Error("Partida sintética não terminou.");
+    let winner = final.winner;
+    if (!winner && retireAfter !== undefined) {
+      // Desistência por lesão: vence quem estava em quadra até o fim (a dupla A, por convenção do seed).
+      winner = (await finishMatch(db, { tenant_id, match_id: match.id }, { winner: "A", reason: "retirement", note: "Lesão (dado de teste)" })).winner;
+    }
+    if (!winner) throw new Error("Partida sintética não terminou.");
     done += 1;
     onProgress?.(done, DEV_SEED_TOTAL_MATCHES);
-    return final.winner;
+    return winner;
   }
 
   const day = (iso: string, offsetHours = 0) => new Date(`${iso}T09:00:00`).getTime() + offsetHours * 3_600_000;
@@ -171,11 +182,13 @@ export async function seedDemoData(db: ScoutDB, tenant_id: string, { seed = DEFA
       const wins = [0, 0, 0];
       const games: [number, number][] = [[0, 1], [0, 2], [1, 2]];
       for (const [g, [x, y]] of games.entries()) {
-        const winner = await play(pairs[x], pairs[y], day(t.start_date, g), tournament.id);
+        // No Open masculino, o 1º jogo termina por desistência no meio do 2º set.
+        const retireAfter = t.category === "Open" && gender === "M" && g === 0 ? 55 : undefined;
+        const winner = await play(pairs[x], pairs[y], day(t.start_date, g), tournament.id, { phase: "group", retireAfter });
         wins[winner === "A" ? x : y] += 1;
       }
       const [f1, f2] = [0, 1, 2].sort((i, j) => wins[j] - wins[i] || i - j);
-      await play(pairs[f1], pairs[f2], day(t.start_date, 30), tournament.id); // final no dia seguinte
+      await play(pairs[f1], pairs[f2], day(t.start_date, 30), tournament.id, { phase: "final" }); // final no dia seguinte
     }
   }
   for (const f of FRIENDLIES) {

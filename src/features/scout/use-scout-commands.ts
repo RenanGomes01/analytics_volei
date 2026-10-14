@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useReducer } from "react";
 import { getDB } from "@/db/client";
 import type { NextAction } from "@/domain/rally/next-action";
-import type { Quality, Skill, TeamSide } from "@/domain/types";
+import type { PointDetail, Quality, Skill, TeamSide } from "@/domain/types";
 import {
   appendRallyEnd,
   appendTouch,
@@ -57,8 +57,8 @@ export function useScoutCommands(scope: MatchScope, next: NextAction | null, led
     pickSkill: (skill: Skill) => next && dispatch({ type: "pickSkill", skill, next }),
     cancel: () => dispatch({ type: "cancel" }),
     dismissError: () => dispatch({ type: "dismissError" }),
-    commitQuality: (quality: Quality) =>
-      selection && run(() => appendTouch(getDB(), scope, { ...selection, quality })),
+    commitQuality: (quality: Quality, detail?: PointDetail) =>
+      selection && run(() => appendTouch(getDB(), scope, { ...selection, quality, ...(detail ? { detail } : {}) })),
     pointTo: (point_to: TeamSide) => run(() => appendRallyEnd(getDB(), scope, { point_to, reason: "manual" })),
     undo: () => run(() => undoLastAction(getDB(), scope)),
   };

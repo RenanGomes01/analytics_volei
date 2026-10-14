@@ -54,3 +54,38 @@ describe("loadSeason", () => {
     expect(stats.athletes[renan.id]).toMatchObject({ matches: 1, serve: { aces: 1 } });
   });
 });
+
+describe("fase da competição", () => {
+  it("grava a fase no vínculo, deixa reclassificar (upsert no outbox) e filtra grupos × mata-mata", async () => {
+    const { setMatchPhase } = await import("@/services/tournament-service");
+    const { matchesPhase } = await import("@/domain/roster/types");
+    const [r, p, x, y] = await Promise.all(["R", "P", "X", "Y"].map((name) => createAthlete(db, { tenant_id: T, name, gender: "M" })));
+    const rp = await findOrCreateTeam(db, T, { athlete_ids: [r.id, p.id], modality: "beach" });
+    const xy = await findOrCreateTeam(db, T, { athlete_ids: [x.id, y.id], modality: "beach" });
+    const t = await createTournament(db, T, { name: "Etapa", start_date: "2026-03-01", modality: "beach" });
+    const group = await createMatchFromTeams(db, { tenant_id: T, team_a_id: rp.id, team_b_id: xy.id, first_server: "A", tournament_id: t.id, phase: "group" });
+    const semi = await createMatchFromTeams(db, { tenant_id: T, team_a_id: rp.id, team_b_id: xy.id, first_server: "A", tournament_id: t.id });
+    await createMatchFromTeams(db, { tenant_id: T, team_a_id: rp.id, team_b_id: xy.id, first_server: "A", phase: "final" }); // amistoso: fase ignorada
+
+    expect((await db.tournament_entries.get(`${t.id}:${group.id}`))?.phase).toBe("group");
+    const updated = await setMatchPhase(db, T, `${t.id}:${semi.id}`, "semifinal");
+    expect(updated.phase).toBe("semifinal");
+    const outbox = await db.outbox.where("entity_id").equals(updated.id).toArray();
+    expect(outbox.map((o) => o.op)).toEqual(["insert", "upsert"]);
+
+    const season = await loadSeason(db, T);
+    const ids = (phase: "all" | "group" | "knockout" | "semifinal" | "final") =>
+      filterSeason(season.matches, { includeFriendlies: true, phase }).map((m) => m.match.id);
+    expect(ids("group")).toEqual([group.id]);
+    expect(ids("knockout")).toEqual([semi.id]);
+    expect(ids("semifinal")).toEqual([semi.id]);
+    expect(ids("final")).toEqual([]); // amistoso não tem fase
+    expect(ids("all")).toHaveLength(3);
+
+    await setMatchPhase(db, T, `${t.id}:${semi.id}`, null);
+    expect((await db.tournament_entries.get(`${t.id}:${semi.id}`))?.phase).toBeUndefined();
+    expect(matchesPhase(undefined, "all")).toBe(true);
+    expect(matchesPhase(undefined, "knockout")).toBe(false);
+    expect(matchesPhase("third_place", "knockout")).toBe(true);
+  });
+});

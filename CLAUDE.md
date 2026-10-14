@@ -62,10 +62,17 @@
 
 ## Dashboards e temporada (Fase 6)
 - `src/domain/stats/season.ts` + `src/services/season-service.ts`; telas em `src/features/analytics/` (`/rankings`, `/athlete?id=`, `/team?key=`).
-- **Recharts só em `src/features/charts/`** e só importado por telas de análise — nunca no scout (`/match`).
+- **Recharts só em `src/features/charts/`** e só importado por telas de análise. No scout (`/match`), só via `next/dynamic` (`src/features/stats/match-charts.tsx`), nunca no carregamento inicial.
 - Gênero no atleta (`gender`), categoria no torneio (`category`), gênero da dupla deduzido por `teamGender`. Campos opcionais: não exigem migração.
 - Gráficos: um eixo por gráfico, % sempre com volume, pouco volume esmaecido (nunca escondido).
 - Rota nova com query string → adicionar em `additionalPrecacheEntries` e o parâmetro em `ignoreURLParametersMatching` (`src/app/sw.ts`).
+
+## Fluxo in-game (Fase 7)
+- "Como foi o ponto?" (`quick-rally.ts`) **sempre** termina com "Não vi como foi" (`unseen`): nenhuma sequência de toques pode deixar o analista sem saída (há teste exaustivo).
+- Bola de primeira/segunda: `as_attack` converte o último toque em ataque. A estatística "2ª" é deduzida pela ordem dos toques (`touch-lines.ts`), sem campo novo.
+- Encerramento manual = evento `match_end` (`finishMatch`); nunca altere a partida nem apague eventos para encerrar. Desfazer reabre.
+- Fase da partida mora em `TournamentEntry.phase` (`setMatchPhase`); amistoso = sem torneio.
+- Passe na mão só aparece com recepções avaliadas no recorte (`reception.positive.den > 0`).
 
 ## Dados de teste (`/dev/seed`)
 - Gerador puro em `src/domain/dev/rally-generator.ts` (semente fixa, modo detalhado, fim do rali sempre por `impliedPoint`); serviço em `src/services/dev/seed-service.ts`, gravando pelos services reais (`appendRallies` = vários ralis numa transação).

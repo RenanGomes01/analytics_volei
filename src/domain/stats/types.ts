@@ -19,12 +19,17 @@ export interface AttackLine {
   in_play: number;
   /** (kills − errors) / attempts; null sem ataques. */
   efficiency: number | null;
+  /** Bola de segunda (ataque no 2º toque da posse). */
+  second_ball: { attempts: number; kills: number };
 }
 
 export interface ServeLine {
   attempts: number;
   aces: number;
+  /** Todos os erros de saque; `errors_net + errors_out` ≤ `errors` (lances antigos podem não ter detalhe). */
   errors: number;
+  errors_net: number;
+  errors_out: number;
 }
 
 export interface ReceptionLine {

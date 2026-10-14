@@ -10,29 +10,43 @@ interface Props {
   athletes: Map<string, Athlete>;
   stats: Record<string, AthleteStats>;
   team: TeamStats;
+  /** Mostra a % de passe só quando há recepções avaliadas (o modo rápido não avalia o passe). */
+  showReception: boolean;
 }
 
 type Line = Pick<AthleteStats, "attack" | "serve" | "reception" | "blocks" | "digs"> & { points: number };
 
-const columns = (modality: Modality): { label: string; title: string; value: (s: Line) => string | number }[] => [
+type Column = { label: string; title: string; value: (s: Line) => string | number };
+
+/** "PA/TA" da bola de segunda; "–" sem nenhuma. */
+const secondBall = (s: Line) => (s.attack.second_ball.attempts ? `${s.attack.second_ball.kills}/${s.attack.second_ball.attempts}` : "–");
+
+const columns = (modality: Modality, showReception: boolean): Column[] => [
   { label: "Pts", title: "Pontos (ataques + aces + bloqueios)", value: (s) => s.points },
   { label: "PA", title: "Pontos de ataque (ataques #)", value: (s) => s.attack.kills },
   { label: "E", title: "Erros de ataque (= ou bloqueado)", value: (s) => s.attack.errors },
   { label: "TA", title: "Total de ataques", value: (s) => s.attack.attempts },
   { label: "Efic.", title: "Eficiência de ataque: (PA − E) / TA", value: (s) => pct(s.attack.efficiency) },
+  { label: "2ª", title: "Bola de segunda: pontos / tentativas (ataque no 2º toque)", value: secondBall },
   { label: "Ace", title: "Aces", value: (s) => s.serve.aces },
-  { label: "ES", title: "Erros de saque", value: (s) => s.serve.errors },
+  { label: "ES-R", title: "Erros de saque na rede", value: (s) => s.serve.errors_net },
+  { label: "ES-F", title: "Erros de saque pra fora", value: (s) => s.serve.errors_out },
+  { label: "ES", title: "Erros de saque (total, inclusive sem detalhe)", value: (s) => s.serve.errors },
   { label: "Sq", title: "Total de saques", value: (s) => s.serve.attempts },
   { label: "Rec", title: "Total de recepções", value: (s) => s.reception.attempts },
-  modality === "beach"
-    ? { label: "Na mão", title: "Passes na mão (#)", value: (s) => pct(s.reception.positive) }
-    : { label: "#+", title: "Recepções perfeitas ou positivas", value: (s) => pct(s.reception.positive) },
+  ...(showReception
+    ? [
+        modality === "beach"
+          ? { label: "Na mão", title: "Passes na mão (#)", value: (s: Line) => pct(s.reception.positive) }
+          : { label: "#+", title: "Recepções perfeitas ou positivas", value: (s: Line) => pct(s.reception.positive) },
+      ]
+    : []),
   { label: "Blq", title: "Pontos de bloqueio", value: (s) => s.blocks },
   { label: "Def", title: "Defesas", value: (s) => s.digs },
 ];
 
-export function AthleteTable({ modality, side, teamName, athleteIds, athletes, stats, team }: Props) {
-  const tableColumns = columns(modality);
+export function AthleteTable({ modality, side, teamName, athleteIds, athletes, stats, team, showReception }: Props) {
+  const tableColumns = columns(modality, showReception);
   // Elenco na ordem do cadastro; depois, quem tem lances mas não está no elenco.
   const outsiders = Object.values(stats).filter((s) => s.team === side && !athleteIds.includes(s.athlete_id));
   const rows = [...athleteIds.flatMap((id) => (stats[id] ? [stats[id]] : [])), ...outsiders];
@@ -40,7 +54,7 @@ export function AthleteTable({ modality, side, teamName, athleteIds, athletes, s
   const totals: Line = { ...team, points: team.attack.kills + team.serve.aces + team.blocks };
 
   return (
-    <table className="w-full min-w-[640px] border-separate border-spacing-0 text-right tabular-nums">
+    <table className="w-full min-w-[760px] border-separate border-spacing-0 text-right tabular-nums">
       <caption className="pb-2 text-left text-sm font-semibold uppercase tracking-wide text-zinc-400">{teamName}</caption>
       <thead>
         <tr className="text-xs uppercase text-zinc-400">

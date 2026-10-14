@@ -51,7 +51,7 @@ export function SeedScreen() {
           <li>12 atletas (6 masculinos, 6 femininos), com gênero preenchido.</li>
           <li>5 torneios de 2026: Circuito MT Etapas 1 e 2 (masc. e fem.) e Open Nacional.</li>
           <li>Troca de duplas: Renan joga com Pedro na Etapa 1 e com George na Etapa 2.</li>
-          <li>{DEV_SEED_TOTAL_MATCHES} partidas completas no modo detalhado (cerca de 3.000 ralis), incluindo amistosos desde nov/2025.</li>
+          <li>{DEV_SEED_TOTAL_MATCHES} partidas no modo detalhado (cerca de 3.000 ralis), com fases (grupos e final), amistosos desde nov/2025 e um jogo encerrado por desistência.</li>
         </ul>
         <p className="rounded-xl bg-amber-400/10 px-3 py-2 text-amber-200">
           Os dados de teste aparecem junto com os seus jogos reais até você removê-los. A remoção apaga só o que foi criado aqui.

@@ -1,10 +1,10 @@
-import { POINT_DETAIL_LABEL } from "../rally/quick-rally";
 import { replayMatch } from "../rally/replay";
 import { pairKey, resolveAthlete, teamGender, type AliasMap } from "../roster/identity";
-import type { Tournament, TournamentCategory } from "../roster/types";
+import { matchesPhase, type PhaseFilter, type Tournament, type TournamentCategory, type TournamentPhase } from "../roster/types";
 import { rulesFor } from "../rules/modality";
 import type { Athlete, Gender, Match, RallyEvent, TeamSide } from "../types";
 import { aggregateCompetition, type AthleteAggregate, type CompetitionStats, type TeamAggregate } from "./aggregate";
+import { rallyPointKinds, type PointKind } from "./match-insights";
 import type { AttackLine, Rate, ReceptionLine } from "./types";
 
 /**
@@ -18,12 +18,16 @@ export interface SeasonMatch {
   events: readonly RallyEvent[];
   /** null = amistoso/treino (partida sem torneio). */
   tournament: Tournament | null;
+  /** Fase no torneio, quando registrada. */
+  phase?: TournamentPhase;
 }
 
 export interface SeasonFilter {
   year?: number;
   category?: TournamentCategory | "all";
   includeFriendlies?: boolean;
+  /** Fase: amistosos e partidas sem fase só entram em "all". */
+  phase?: PhaseFilter;
 }
 
 export type GenderFilter = Gender | "all";
@@ -38,10 +42,14 @@ export function availableYears(matches: readonly SeasonMatch[]): number[] {
 }
 
 /** Recorte da temporada por ano, categoria da etapa e amistosos. */
-export function filterSeason(matches: readonly SeasonMatch[], { year, category = "all", includeFriendlies = false }: SeasonFilter): SeasonMatch[] {
+export function filterSeason(
+  matches: readonly SeasonMatch[],
+  { year, category = "all", includeFriendlies = false, phase = "all" }: SeasonFilter,
+): SeasonMatch[] {
   return matches.filter((m) => {
     if (year !== undefined && seasonYear(m) !== year) return false;
-    if (!m.tournament) return includeFriendlies && category === "all";
+    if (!m.tournament) return includeFriendlies && category === "all" && phase === "all";
+    if (!matchesPhase(m.phase, phase)) return false;
     return category === "all" || m.tournament.category === category;
   });
 }
@@ -235,60 +243,21 @@ export function teamSeries(matches: readonly SeasonMatch[], key: string, aliases
 
 // ---------- como os pontos aconteceram ----------
 
-export interface PointKind {
-  label: string;
-  /** Agrupamento para colorir: ponto conquistado × erro do adversário. */
-  group: "won" | "error";
-  count: number;
-}
+export type { PointKind };
 
 /**
  * Contagem dos pontos por "como aconteceram" (motivo + detalhe do modo rápido + último toque).
  * `forTeam` (pair_key) limita aos pontos ganhos por essa dupla.
  */
 export function pointKinds(matches: readonly SeasonMatch[], aliases: AliasMap, forTeam?: string): PointKind[] {
-  const counts = new Map<string, PointKind>();
-  const add = (label: string, group: PointKind["group"]) => {
-    const k = counts.get(label) ?? { label, group, count: 0 };
-    k.count += 1;
-    counts.set(label, k);
-  };
-  for (const { match, events } of matches) {
-    const state = replayMatch(events, { rules: rulesFor(match.modality), first_server: match.first_server });
-    for (const r of state.rallies) {
-      if (!r.point_to) continue;
-      if (forTeam && pairKey(r.point_to === "A" ? match.team_a.athlete_ids : match.team_b.athlete_ids, aliases) !== forTeam) continue;
-      const last = r.touches.at(-1);
-      const detail = r.detail ? ` (${POINT_DETAIL_LABEL[r.detail]})` : "";
-      switch (r.reason) {
-        case "ace":
-          add("Ace", "won");
-          break;
-        case "kill":
-          if (r.detail === "shot") add("Largada / shot", "won");
-          else if (r.detail === "block_out") add("Explorou o bloqueio", "won");
-          else add(last?.skill === "block" ? "Ponto de bloqueio" : "Ponto de ataque", "won");
-          break;
-        case "four_touches":
-          add("4 toques", "error");
-          break;
-        case "error": {
-          const skill = last?.skill;
-          const base =
-            skill === "serve" ? "Erro de saque"
-            : skill === "attack" ? "Erro de ataque"
-            : skill === "block" ? "Erro de bloqueio"
-            : skill === "dig" ? "Erro de defesa"
-            : skill === "set" ? "Erro de levantamento"
-            : skill === "fault" ? "Falta"
-            : "Erro";
-          add(`${base}${skill === "fault" || skill === "set" ? detail : ""}`, "error");
-          break;
-        }
-        default:
-          add(r.detail ? `Falta${detail}` : "Ponto marcado (sem detalhe)", "error");
+  function* rallies() {
+    for (const { match, events } of matches) {
+      const state = replayMatch(events, { rules: rulesFor(match.modality), first_server: match.first_server });
+      for (const r of state.rallies) {
+        if (forTeam && r.point_to && pairKey(r.point_to === "A" ? match.team_a.athlete_ids : match.team_b.athlete_ids, aliases) !== forTeam) continue;
+        yield r;
       }
     }
   }
-  return [...counts.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "pt-BR"));
+  return rallyPointKinds(rallies());
 }

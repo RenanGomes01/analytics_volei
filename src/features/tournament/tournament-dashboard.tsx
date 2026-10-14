@@ -7,6 +7,7 @@ import { HardLink } from "@/components/hard-link";
 import { getDB } from "@/db/client";
 import { competitionCsvFilename, competitionToCsv } from "@/domain/export/competition-csv";
 import { pairKey } from "@/domain/roster/identity";
+import { PHASE_LABEL, TOURNAMENT_PHASES, type PhaseFilter, type TournamentPhase } from "@/domain/roster/types";
 import type { AthleteAggregate, TeamAggregate } from "@/domain/stats/aggregate";
 import { rankAthletes, rankingSpecs, type RankingSpec } from "@/domain/stats/rankings";
 import { deliverFile } from "@/features/export/deliver-file";
@@ -14,7 +15,7 @@ import { useRosterData, type RosterData } from "@/features/roster/use-roster-dat
 import { secondaryButton } from "@/features/setup/form-styles";
 import { pct } from "@/features/stats/format";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
-import { addMatchToTournament, removeMatchFromTournament } from "@/services/tournament-service";
+import { addMatchToTournament, removeMatchFromTournament, setMatchPhase } from "@/services/tournament-service";
 import { useCompetitionData, type CompetitionData } from "./use-competition-data";
 
 type Tab = "ranking" | "teams" | "athletes" | "matches";
@@ -196,7 +197,7 @@ function MatchesTab({ data, roster }: { data: CompetitionData; roster: RosterDat
   return (
     <div className="flex flex-col gap-3">
       <ul className="flex flex-col gap-2">
-        {data.matches.map(({ match, state, entry_id }) => {
+        {data.matches.map(({ match, state, entry_id, phase }) => {
           const names = [match.team_a, match.team_b].map((t) => teamName(pairKey(t.athlete_ids, roster.aliases)));
           const score = state.sets.filter((s) => s.score.A + s.score.B > 0).map((s) => `${s.score.A}×${s.score.B}`).join(" · ");
           return (
@@ -209,6 +210,19 @@ function MatchesTab({ data, roster }: { data: CompetitionData; roster: RosterDat
                   {score || "sem pontos"} · {state.winner ? `vitória ${names[state.winner === "A" ? 0 : 1]}` : "em andamento"}
                 </span>
               </HardLink>
+              <select
+                value={phase ?? ""}
+                onChange={(e) => run(() => setMatchPhase(getDB(), LOCAL_TENANT_ID, entry_id, (e.target.value || null) as TournamentPhase | null))}
+                aria-label="Fase da partida"
+                className="min-h-12 max-w-40 rounded-xl border-2 border-zinc-700 bg-zinc-950 px-2 text-sm"
+              >
+                <option value="">Fase não informada</option>
+                {TOURNAMENT_PHASES.map((p) => (
+                  <option key={p} value={p}>
+                    {PHASE_LABEL[p]}
+                  </option>
+                ))}
+              </select>
               <button type="button" onClick={() => run(() => removeMatchFromTournament(getDB(), LOCAL_TENANT_ID, entry_id))} className="min-h-12 rounded-xl px-3 text-sm text-zinc-400" title="Tirar a partida deste torneio (a partida não é apagada)">
                 Remover
               </button>
@@ -244,7 +258,8 @@ function MatchesTab({ data, roster }: { data: CompetitionData; roster: RosterDat
 
 function Dashboard({ tournamentId }: { tournamentId: string }) {
   const roster = useRosterData();
-  const data = useCompetitionData(tournamentId, roster?.aliases);
+  const [phase, setPhase] = useState<PhaseFilter>("all");
+  const data = useCompetitionData(tournamentId, roster?.aliases, phase);
   const [tab, setTab] = useState<Tab>("ranking");
 
   if (data === null) return <p className="p-8 text-center">Torneio não encontrado neste aparelho.</p>;
@@ -300,6 +315,32 @@ function Dashboard({ tournamentId }: { tournamentId: string }) {
           </button>
         ))}
       </nav>
+
+      {tab !== "matches" && (
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor="phase-filter" className="text-sm text-zinc-400">
+            Fase:
+          </label>
+          <select
+            id="phase-filter"
+            value={phase}
+            onChange={(e) => setPhase(e.target.value as PhaseFilter)}
+            className="min-h-12 rounded-xl border-2 border-zinc-700 bg-zinc-900 px-3"
+          >
+            <option value="all">Todas as partidas</option>
+            <option value="group">Fase de grupos</option>
+            <option value="knockout">Mata-mata (oitavas → final)</option>
+            {TOURNAMENT_PHASES.filter((p) => p !== "group").map((p) => (
+              <option key={p} value={p}>
+                Só {PHASE_LABEL[p].toLowerCase()}
+              </option>
+            ))}
+          </select>
+          {phase !== "all" && data.matches.some((m) => !m.phase) && (
+            <span className="text-sm text-amber-300">Partidas sem fase ficam fora: classifique na aba Partidas.</span>
+          )}
+        </div>
+      )}
 
       {tab === "ranking" && <RankingCards data={data} roster={roster} />}
       {tab === "teams" && <TeamsTable data={data} roster={roster} />}

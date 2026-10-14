@@ -38,6 +38,8 @@ export function boxScoreToCsv({ box, match, athletes, filter, timeZone }: BoxSco
     s.reception.errors,
     s.serve.attempts,
     s.serve.errors,
+    s.serve.errors_net,
+    s.serve.errors_out,
   ];
 
   const athleteRow = (t: TeamSide, s: AthleteStats) => {
@@ -53,12 +55,16 @@ export function boxScoreToCsv({ box, match, athletes, filter, timeZone }: BoxSco
       pct(s.attack.efficiency),
       s.serve.aces,
       s.serve.errors,
+      s.serve.errors_net,
+      s.serve.errors_out,
       s.serve.attempts,
       s.reception.attempts,
       pct(s.reception.positive),
       s.blocks,
       s.digs,
       s.errors,
+      s.attack.second_ball.attempts,
+      s.attack.second_ball.kills,
     ];
   };
 
@@ -67,13 +73,13 @@ export function boxScoreToCsv({ box, match, athletes, filter, timeZone }: BoxSco
     "",
     row([
       "Equipe", "Pontos", "PA", "Ace", "Blq", "Err. adv", "Virada de bola (%)", "Quebra de saque (%)",
-      "TA", "E", "Efic. ataque (%)", "Rec", receptionLabel, "Erros recepção", "Sq", "ES",
+      "TA", "E", "Efic. ataque (%)", "Rec", receptionLabel, "Erros recepção", "Sq", "ES", "ES-R (rede)", "ES-F (fora)",
     ]),
     ...(["A", "B"] as const).map((t) => row(teamRow(t, box.teams[t]))),
     "",
     row([
-      "Equipe", "Nº", "Atleta", "Pts", "PA", "E", "TA", "Efic. (%)", "Ace", "ES", "Sq", "Rec",
-      beach ? "Na mão (%)" : "#+ (%)", "Blq", "Def", "Erros",
+      "Equipe", "Nº", "Atleta", "Pts", "PA", "E", "TA", "Efic. (%)", "Ace", "ES", "ES-R (rede)", "ES-F (fora)", "Sq", "Rec",
+      beach ? "Na mão (%)" : "#+ (%)", "Blq", "Def", "Erros", "Bola de 2ª (TA)", "Bola de 2ª (PA)",
     ]),
   ];
 

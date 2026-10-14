@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { HardLink } from "@/components/hard-link";
 import { replayMatch } from "@/domain/rally/replay";
 import { resolveAthlete } from "@/domain/roster/identity";
+import type { PhaseFilter } from "@/domain/roster/types";
 import { rulesFor } from "@/domain/rules/modality";
 import {
   athletePartners,
@@ -36,6 +37,9 @@ export function AthleteProfile() {
   const requested = params.get("id") ?? "";
   const id = season ? resolveAthlete(season.aliases, requested) : requested;
   const [yearParam, setYear] = useState<string>(params.get("year") ?? "all");
+  const [phase, setPhase] = useState<PhaseFilter>(
+    params.get("phase") === "group" || params.get("phase") === "knockout" ? (params.get("phase") as PhaseFilter) : "all",
+  );
 
   // Um cadastro antigo (alias) abre o perfil do atleta canônico.
   useEffect(() => {
@@ -51,6 +55,7 @@ export function AthleteProfile() {
     const scope = filterSeason(season.matches, {
       year: yearParam === "all" ? undefined : Number(yearParam),
       includeFriendlies: true,
+      phase,
     });
     const mine = scope.filter(({ match }) =>
       [...match.team_a.athlete_ids, ...match.team_b.athlete_ids].some(
@@ -63,7 +68,7 @@ export function AthleteProfile() {
       series: athleteSeries(mine, id, season.aliases),
       partners: athletePartners(mine, id, season.aliases),
     };
-  }, [season, id, yearParam]);
+  }, [season, id, yearParam, phase]);
 
   if (!season || !computed)
     return <p className="p-8 text-center text-zinc-400">Carregando atleta…</p>;
@@ -76,6 +81,8 @@ export function AthleteProfile() {
   const { me, series, partners, mine } = computed;
   const wins = partners.reduce((s, p) => s + p.wins, 0);
   const losses = partners.reduce((s, p) => s + p.losses, 0);
+  // Passe na mão só com recepções avaliadas (o modo rápido não avalia o passe).
+  const showReception = !!me && me.reception.positive.den > 0;
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
@@ -114,6 +121,19 @@ export function AthleteProfile() {
           replaceQuery({ year: v === "all" ? undefined : v });
         }}
       />
+      <Segmented
+        label="Fase"
+        value={phase}
+        options={[
+          ["all", "Todos os jogos"],
+          ["group", "Grupos"],
+          ["knockout", "Mata-mata"],
+        ]}
+        onChange={(v) => {
+          setPhase(v);
+          replaceQuery({ phase: v === "all" ? undefined : v });
+        }}
+      />
 
       {!me ? (
         <p className="text-zinc-400">Nenhuma partida neste recorte.</p>
@@ -135,14 +155,22 @@ export function AthleteProfile() {
               value={pct(me.attack.efficiency)}
               detail={`${me.attack.kills}-${me.attack.errors}/${me.attack.attempts}`}
             />
-            <Stat
-              label="Passe na mão"
-              value={pct(me.reception.positive.pct)}
-              detail={`${me.reception.positive.num}/${me.reception.positive.den} avaliados`}
-            />
+            {showReception ? (
+              <Stat
+                label="Passe na mão"
+                value={pct(me.reception.positive.pct)}
+                detail={`${me.reception.positive.num}/${me.reception.positive.den} avaliados`}
+              />
+            ) : (
+              <Stat
+                label="Bola de segunda"
+                value={`${me.attack.second_ball.kills}/${me.attack.second_ball.attempts}`}
+                detail="pontos / tentativas"
+              />
+            )}
           </div>
 
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div className={`grid gap-3 ${showReception ? "lg:grid-cols-2" : ""}`}>
             <Card
               title="Eficiência de ataque por torneio"
               note={`(PA − E) / TA somando cada torneio · pontos claros = menos de ${MIN_ATTACKS} ataques`}
@@ -157,16 +185,11 @@ export function AthleteProfile() {
                 }))}
               />
             </Card>
-            <Card
-              title="Passe na mão por torneio"
-              note={`Só recepções avaliadas (modo detalhado) · pontos claros = menos de ${MIN_RECEPTIONS}`}
-            >
-              {series.every((p) => p.reception.positive.den === 0) ? (
-                <p className="text-sm text-zinc-500">
-                  Nenhuma recepção avaliada. O modo rápido não avalia o passe;
-                  use o modo detalhado para ter este gráfico.
-                </p>
-              ) : (
+            {showReception && (
+              <Card
+                title="Passe na mão por torneio"
+                note={`Só recepções avaliadas (modo detalhado) · pontos claros = menos de ${MIN_RECEPTIONS}`}
+              >
                 <TrendChart
                   name="Passe na mão"
                   color="#d95926"
@@ -177,8 +200,8 @@ export function AthleteProfile() {
                     lowVolume: p.reception.positive.den < MIN_RECEPTIONS,
                   }))}
                 />
-              )}
-            </Card>
+              </Card>
+            )}
           </div>
 
           <Card

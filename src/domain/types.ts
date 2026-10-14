@@ -113,7 +113,21 @@ export interface SetStartEvent extends RallyEventBase {
   serving_team: TeamSide;
 }
 
-export type RallyEvent = TouchEvent | RallyEndEvent | VoidEvent | SetStartEvent;
+/** Por que a partida foi encerrada manualmente (sem chegar ao placar das regras). */
+export type MatchEndReason = "score" | "retirement" | "walkover" | "weather" | "other";
+
+/**
+ * Encerramento manual da partida (lesão, chuva, W.O., set único…). Tem rally_id próprio; o rali aberto
+ * é descartado no replay. Anular este evento (Desfazer) reabre a partida.
+ */
+export interface MatchEndEvent extends RallyEventBase {
+  kind: "match_end";
+  winner: TeamSide;
+  reason: MatchEndReason;
+  note?: string;
+}
+
+export type RallyEvent = TouchEvent | RallyEndEvent | VoidEvent | SetStartEvent | MatchEndEvent;
 
 // ---- Outbox ----
 

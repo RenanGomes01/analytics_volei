@@ -1,6 +1,6 @@
 import { newId } from "@/lib/id";
 import { rulesFor } from "@/domain/rules/modality";
-import type { Tournament, TournamentCategory, TournamentEntry } from "@/domain/roster/types";
+import type { Tournament, TournamentCategory, TournamentEntry, TournamentPhase } from "@/domain/roster/types";
 import type { Match, Modality, TeamSide } from "@/domain/types";
 import type { ScoutDB } from "@/db/schema";
 import { enqueue } from "./outbox-service";
@@ -109,6 +109,20 @@ export async function addMatchToTournament(
   });
 }
 
+/** Classifica (ou corrige) a fase de uma partida no torneio. `null` limpa. Upsert no outbox. */
+export async function setMatchPhase(db: ScoutDB, tenant_id: string, entry_id: string, phase: TournamentPhase | null): Promise<TournamentEntry> {
+  return db.transaction("rw", db.tournament_entries, db.outbox, async () => {
+    const entry = await db.tournament_entries.get(entry_id);
+    if (!entry || entry.tenant_id !== tenant_id) throw new Error("Vínculo não encontrado.");
+    const updated: TournamentEntry = { ...entry };
+    if (phase) updated.phase = phase;
+    else delete updated.phase;
+    await db.tournament_entries.put(updated);
+    await enqueue(db, "tournament_entry", updated, "upsert");
+    return updated;
+  });
+}
+
 export async function removeMatchFromTournament(db: ScoutDB, tenant_id: string, entry_id: string): Promise<void> {
   await db.transaction("rw", db.tournament_entries, db.outbox, async () => {
     const entry = await db.tournament_entries.get(entry_id);
@@ -133,6 +147,8 @@ export interface CreateMatchFromTeamsInput {
   first_server: TeamSide;
   /** Sem torneio: a modalidade vem das duplas. */
   tournament_id?: string;
+  /** Fase no torneio (ignorada sem torneio: amistoso). */
+  phase?: TournamentPhase;
 }
 
 /**
@@ -169,7 +185,14 @@ export async function createMatchFromTeams(db: ScoutDB, input: CreateMatchFromTe
     await db.matches.add(match);
     await enqueue(db, "match", match);
     if (tournament) {
-      const entry: TournamentEntry = { id: `${tournament.id}:${match.id}`, tenant_id, tournament_id: tournament.id, match_id: match.id, created_at: now };
+      const entry: TournamentEntry = {
+        id: `${tournament.id}:${match.id}`,
+        tenant_id,
+        tournament_id: tournament.id,
+        match_id: match.id,
+        created_at: now,
+        ...(input.phase ? { phase: input.phase } : {}),
+      };
       await db.tournament_entries.add(entry);
       await enqueue(db, "tournament_entry", entry);
     }

@@ -52,8 +52,10 @@ export function PointSheet({ winner, options, teamName, roster, athletes, saving
                 key={`${o.id}:${o.detail ?? ""}`}
                 type="button"
                 disabled={saving}
-                onClick={() => (o.pick === "blocker" ? setStep({ kind: "blocker", option: o }) : onChoose({ outcome: o.id, detail: o.detail }))}
-                className={`${big} min-h-20 px-4 text-xl ${i === 0 ? "bg-emerald-600 text-white" : "bg-zinc-200 text-zinc-950"}`}
+                onClick={() =>
+                  o.pick === "blocker" ? setStep({ kind: "blocker", option: o }) : onChoose({ outcome: o.id, detail: o.detail, as_attack: o.as_attack })
+                }
+                className={`${big} min-h-20 px-4 text-xl ${o.id === "unseen" ? "bg-zinc-700 text-zinc-100" : i === 0 ? "bg-emerald-600 text-white" : "bg-zinc-200 text-zinc-950"}`}
               >
                 {o.label}
               </button>
@@ -67,7 +69,7 @@ export function PointSheet({ winner, options, teamName, roster, athletes, saving
       break;
     case "blocker":
       title = "Quem bloqueou?";
-      body = <div className="grid grid-cols-2 gap-2">{athleteButtons(winner, (id) => onChoose({ outcome: "blocked", detail: "blocked", athlete_id: id }))}</div>;
+      body = <div className="grid grid-cols-2 gap-2">{athleteButtons(winner, (id) => onChoose({ outcome: "blocked", detail: "blocked", athlete_id: id, as_attack: step.option.as_attack }))}</div>;
       break;
     case "faults":
       title = `Qual falta de ${teamName(loser)}?`;

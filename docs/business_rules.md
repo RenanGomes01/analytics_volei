@@ -79,3 +79,12 @@ Bola mandada para o outro lado **sem intenção de ataque**, só para mantê-la 
 - **Rankings de duplas:** vitórias; % de vitórias (mín. 3 jogos decididos); virada de bola e quebra de saque (mín. 30 ralis); saldo de pontos.
 - **Gráficos:** toda porcentagem vem com o volume (ex.: 48% · 61-12/102); pontos de evolução com pouco volume (< 10 ataques ou < 10 recepções avaliadas) aparecem esmaecidos, nunca escondidos.
 - **Perfil do atleta** atravessa parcerias (aliases resolvidos: um cadastro antigo abre o perfil canônico); **perfil da dupla** só considera partidas daquele `pair_key`.
+
+## Fluxo in-game e granularidade (Fase 7)
+- **Nunca beco sem saída (modo rápido):** "Como foi o ponto?" sempre oferece **"Não vi como foi"** (ponto sem lance, motivo "marcado"), inclusive sem nenhum toque marcado.
+- **Bola de primeira/segunda:** se a equipe pontua com o 1º ou 2º toque da posse, o ponto é **ataque `#` de quem tocou por último** (quem levantaria). Se perde no 2º toque, há "Bola de segunda fora / na rede / bloqueada", que viram **ataque `=`** (ou ataque seguido de bloqueio `#` do adversário). Dois toques / condução / levantamento fora continuam sendo erro de levantamento.
+- **Bola de segunda na estatística:** é o ataque no 2º toque da posse, deduzido pela ordem dos toques (sem campo novo). Coluna **"2ª"** = pontos/tentativas; também conta em TA, PA e eficiência.
+- **Erro de saque:** no modo detalhado o `=` do saque são dois botões, **"Erro: na rede"** e **"Erro: fora"** (detalhe gravado no lance). Box Score: **ES-R** (rede), **ES-F** (fora) e **ES** (total, inclui lances antigos sem detalhe).
+- **Passe na mão:** aparece só quando há recepções **avaliadas** no recorte. Como o modo rápido não avalia o passe, a coluna, o card de ranking e o gráfico somem sozinhos.
+- **Finalizar partida:** evento `match_end` (vencedor + motivo: placar atual, desistência/lesão, W.O., chuva, outro, com observação). O rali aberto não conta; o set em andamento fica **interrompido** (marcado com `*`, sem vencedor). V/D entram normalmente nas competições. **Desfazer reabre a partida.** Pelo placar atual, a sugestão é quem tem mais sets ou, empatado, mais pontos no set (serve para set único de 25).
+- **Fase da competição:** Fase de grupos, Oitavas, Quartas, Semifinal, Final, Disputa de 3º. Fica no vínculo partida → torneio; partida sem torneio é **amistoso**. **Mata-mata** = tudo que não é fase de grupos. Partidas sem fase registrada só entram no filtro "Todas".

@@ -46,19 +46,19 @@ describe("Box Score em CSV", () => {
 
   it("seção de equipes com termos da areia e porcentagens com vírgula decimal", () => {
     expect(lines[2]).toBe(
-      "Equipe;Pontos;PA;Ace;Blq;Err. adv;Virada de bola (%);Quebra de saque (%);TA;E;Efic. ataque (%);Rec;Passe na mão (%);Erros recepção;Sq;ES",
+      "Equipe;Pontos;PA;Ace;Blq;Err. adv;Virada de bola (%);Quebra de saque (%);TA;E;Efic. ataque (%);Rec;Passe na mão (%);Erros recepção;Sq;ES;ES-R (rede);ES-F (fora)",
     );
     // A: ace (1) + erro de ataque de A1 dá ponto a B. A recebeu 1 vez (rali 3) e perdeu.
-    expect(lines[3]).toBe("Areia A;1;0;1;0;0;0;50;1;1;-100;1;0;0;2;0");
+    expect(lines[3]).toBe("Areia A;1;0;1;0;0;0;50;1;1;-100;1;0;0;2;0;0;0");
     // B: kill de B1 + ponto pelo erro de A. B sacou 1 vez e ganhou (100); recebeu 2 e ganhou 1 (50).
-    expect(lines[4]).toBe("Areia B;2;1;0;0;1;50;100;1;0;100;1;100;0;1;0");
+    expect(lines[4]).toBe("Areia B;2;1;0;0;1;50;100;1;0;100;1;100;0;1;0;0;0");
   });
 
   it("seção de atletas, com proteção contra fórmula e aspas", () => {
-    expect(lines[6]).toBe("Equipe;Nº;Atleta;Pts;PA;E;TA;Efic. (%);Ace;ES;Sq;Rec;Na mão (%);Blq;Def;Erros");
-    expect(lines[7]).toBe("Areia A;1;Ana;1;0;1;1;-100;1;0;2;1;0;0;0;1");
-    expect(lines[8]).toBe(`Areia A;2;"'=SOMA(1;2)";0;0;0;0;;0;0;0;0;;0;0;0`);
-    expect(lines[9]).toBe('Areia B;3;"Carla ""Cacá""; capitã";1;1;0;1;100;0;0;0;1;100;0;0;0');
+    expect(lines[6]).toBe("Equipe;Nº;Atleta;Pts;PA;E;TA;Efic. (%);Ace;ES;ES-R (rede);ES-F (fora);Sq;Rec;Na mão (%);Blq;Def;Erros;Bola de 2ª (TA);Bola de 2ª (PA)");
+    expect(lines[7]).toBe("Areia A;1;Ana;1;0;1;1;-100;1;0;0;0;2;1;0;0;0;1;0;0");
+    expect(lines[8]).toBe(`Areia A;2;"'=SOMA(1;2)";0;0;0;0;;0;0;0;0;0;0;;0;0;0;0;0`);
+    expect(lines[9]).toBe('Areia B;3;"Carla ""Cacá""; capitã";1;1;0;1;100;0;0;0;0;0;1;100;0;0;0;0;0');
   });
 
   it("decimais com 1 casa e vírgula; sem base de cálculo fica vazio", () => {

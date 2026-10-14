@@ -6,6 +6,8 @@ interface Props {
   modality: Modality;
   name: string;
   stats: TeamStats;
+  /** Mostra a % de passe só quando há recepções avaliadas (o modo rápido não avalia o passe). */
+  showReception: boolean;
 }
 
 function Row({ label, value, detail }: { label: string; value: string; detail: string }) {
@@ -20,7 +22,7 @@ function Row({ label, value, detail }: { label: string; value: string; detail: s
   );
 }
 
-export function TeamSummary({ modality, name, stats }: Props) {
+export function TeamSummary({ modality, name, stats, showReception }: Props) {
   const { points, attack, reception, serve } = stats;
   const chips: [string, number, string][] = [
     ["PA", points.kills, "Pontos de ataque (ataques #)"],
@@ -52,12 +54,18 @@ export function TeamSummary({ modality, name, stats }: Props) {
           value={pct(attack.efficiency)}
           detail={`${attack.kills} pts · ${attack.errors} erros · ${attack.in_play} em jogo / ${attack.attempts}`}
         />
+        {showReception && (
+          <Row
+            label={modality === "beach" ? "Passe na mão" : "Recepção #+"}
+            value={pct(reception.positive)}
+            detail={`${fraction(reception.positive)} · ${reception.errors} erro${reception.errors === 1 ? "" : "s"}`}
+          />
+        )}
         <Row
-          label={modality === "beach" ? "Passe na mão" : "Recepção #+"}
-          value={pct(reception.positive)}
-          detail={`${fraction(reception.positive)} · ${reception.errors} erro${reception.errors === 1 ? "" : "s"}`}
+          label="Saque"
+          value={`${serve.aces} ace${serve.aces === 1 ? "" : "s"}`}
+          detail={`erros: ${serve.errors_net} rede · ${serve.errors_out} fora${serve.errors > serve.errors_net + serve.errors_out ? ` · ${serve.errors - serve.errors_net - serve.errors_out} s/ detalhe` : ""} / ${serve.attempts}`}
         />
-        <Row label="Saque" value={`${serve.aces} ace${serve.aces === 1 ? "" : "s"}`} detail={`${serve.errors} erros / ${serve.attempts}`} />
       </dl>
     </section>
   );

@@ -220,3 +220,49 @@ describe("rally-ledger-service", () => {
     expect(await db.athletes.count()).toBe(athletesBefore);
   });
 });
+
+describe("finishMatch — encerramento manual (lesão, chuva, W.O., set único)", () => {
+  it("encerra com o vencedor escolhido, descarta o rali aberto e interrompe o set; Desfazer reabre", async () => {
+    const scope = await newMatch();
+    for (let i = 0; i < 3; i++) await appendRallyEnd(db, scope, { point_to: "B", reason: "manual" });
+    await appendTouch(db, scope, { team: "A", athlete_id: "a1", skill: "serve", quality: "+" }); // rali aberto
+
+    const { finishMatch } = await import("@/services/rally-ledger-service");
+    const end = await finishMatch(db, scope, { winner: "B", reason: "retirement", note: "  lesão no tornozelo " });
+    expect(end).toMatchObject({ kind: "match_end", winner: "B", reason: "retirement", note: "lesão no tornozelo" });
+
+    const state = await getMatchState(db, scope);
+    expect(state.winner).toBe("B");
+    expect(state.end).toEqual({ reason: "retirement", note: "lesão no tornozelo" });
+    expect(state.open_rally).toBeNull();
+    expect(state.rallies).toHaveLength(3);
+    expect(state.sets).toEqual([expect.objectContaining({ score: { A: 0, B: 3 }, winner: null, interrupted: true })]);
+    // Invariante: pontos do Box Score = placar, mesmo com o rali aberto descartado.
+    const { computeBoxScore } = await import("@/domain/stats/box-score");
+    const { BEACH_RULES } = await import("@/domain/rules/modality");
+    const box = computeBoxScore(await listMatchEvents(db, scope), { rules: BEACH_RULES, first_server: "A", roster: { A: ["a1", "a2"], B: ["b1", "b2"] } });
+    expect([box.teams.A.points.total, box.teams.B.points.total]).toEqual([0, 3]);
+
+    await expect(appendTouch(db, scope, { team: "A", athlete_id: "a1", skill: "serve", quality: "+" })).rejects.toThrow(/encerrada/);
+    await expect(finishMatch(db, scope, { winner: "A", reason: "other" })).rejects.toThrow(/já está encerrada/);
+
+    await undoLastAction(db, scope); // anula o match_end
+    const reopened = await getMatchState(db, scope);
+    expect(reopened.winner).toBeNull();
+    expect(reopened.end).toBeNull();
+    expect(reopened.open_rally?.touches).toHaveLength(1); // o rali aberto volta
+  });
+
+  it("vai para o outbox e entra no export (o validador aceita match_end)", async () => {
+    const scope = await newMatch();
+    const { finishMatch } = await import("@/services/rally-ledger-service");
+    const { validateExportData } = await import("@/domain/export/validate-export-data");
+    await appendRallyEnd(db, scope, { point_to: "A", reason: "manual" });
+    const end = await finishMatch(db, scope, { winner: "A", reason: "score" });
+    expect((await listPending(db, "t1")).some((e) => e.entity_id === end.id)).toBe(true);
+    const match = await db.matches.get(scope.match_id);
+    const athletes = ["a1", "a2", "b1", "b2"].map((id) => ({ id, tenant_id: "t1", name: id, created_at: 0 }));
+    expect(validateExportData({ match, athletes, events: await listMatchEvents(db, scope) })).toEqual([]);
+    expect(validateExportData({ match, athletes, events: [{ ...end, reason: "nope" }] })).toContain("Evento 1: encerramento de partida inválido.");
+  });
+});

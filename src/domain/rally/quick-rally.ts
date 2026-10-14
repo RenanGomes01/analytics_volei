@@ -70,7 +70,9 @@ export type QuickOutcomeId =
   | "dig_error"
   | "block_error"
   | "ball_error"
-  | "fault";
+  | "fault"
+  /** Saída de emergência: o analista não viu como foi. Ponto sem lance (motivo "marcado"). */
+  | "unseen";
 
 export interface QuickOutcome {
   id: QuickOutcomeId;
@@ -78,6 +80,8 @@ export interface QuickOutcome {
   detail?: PointDetail;
   /** Precisa de mais um toque: em quem bloqueou (equipe que pontuou). */
   pick?: "blocker";
+  /** O último toque (1º/2º da posse) foi na verdade um ataque: bola de primeira/segunda. */
+  as_attack?: boolean;
 }
 
 /** A escolha final do analista. */
@@ -86,6 +90,8 @@ export interface QuickChoice {
   detail?: PointDetail;
   /** Bloqueador ("Bloqueado") ou quem cometeu a falta ("Falta"); ausente = não sabe quem. */
   athlete_id?: string;
+  /** Converte o último toque em ataque (bola de primeira/segunda que errou ou foi bloqueada). */
+  as_attack?: boolean;
 }
 
 /** Faltas do vôlei de praia: cometidas pela equipe que PERDEU o ponto. */
@@ -130,19 +136,44 @@ export const POINT_DETAIL_LABEL: Record<PointDetail, string> = {
  * "Falta…" (BEACH_FAULTS) fica sempre disponível à parte, na tela.
  */
 export function pointOutcomes(taps: readonly QuickTap[], winner: TeamSide): QuickOutcome[] {
+  return [...lanceOutcomes(taps, winner), { id: "unseen", label: "Não vi como foi" }];
+}
+
+function lanceOutcomes(taps: readonly QuickTap[], winner: TeamSide): QuickOutcome[] {
   const touches = inferSkills(taps);
   const last = touches.at(-1);
   if (!last) return [];
+  // Posição do último toque dentro da posse da equipe (1º, 2º…), para reconhecer bola de primeira/segunda.
+  let nth = 0;
+  for (let i = touches.length - 1; i >= 1 && touches[i].team === last.team; i--) nth++;
+  const early = last.skill === "set" || ((last.skill === "reception" || last.skill === "dig") && nth === 1);
+  const earlyName = last.skill === "set" ? "segunda" : "primeira";
 
   if (last.team === winner) {
     if (last.skill === "serve") return [{ id: "ace", label: "Ace" }];
     if (last.skill === "block") return [{ id: "block_point", label: "Ponto de bloqueio" }];
+    if (early) {
+      return [
+        { id: "kill", label: `Bola de ${earlyName} (ponto)` },
+        { id: "kill", label: `Largada de ${earlyName}`, detail: "shot" },
+        { id: "kill", label: "Explorou o bloqueio", detail: "block_out" },
+      ];
+    }
     return [
       { id: "kill", label: "Ponto de ataque" },
       { id: "kill", label: "Largada / shot", detail: "shot" },
       { id: "kill", label: "Explorou o bloqueio", detail: "block_out" },
     ];
   }
+
+  const earlyAttack: QuickOutcome[] =
+    last.skill === "set"
+      ? [
+          { id: "attack_error", label: "Bola de segunda fora", detail: "out", as_attack: true },
+          { id: "attack_error", label: "Bola de segunda na rede", detail: "net", as_attack: true },
+          { id: "blocked", label: "Bola de segunda bloqueada →", detail: "blocked", pick: "blocker", as_attack: true },
+        ]
+      : [];
 
   switch (last.skill) {
     case "serve":
@@ -172,6 +203,7 @@ export function pointOutcomes(taps: readonly QuickTap[], winner: TeamSide): Quic
       ];
     case "set":
       return [
+        ...earlyAttack,
         { id: "ball_error", label: "Dois toques", detail: "double" },
         { id: "ball_error", label: "Condução", detail: "lift" },
         { id: "ball_error", label: "Levantamento fora", detail: "out" },
@@ -196,6 +228,7 @@ export function buildQuickRally(taps: readonly QuickTap[], winner: TeamSide, cho
   const touches = inferSkills(taps);
   const last = touches.at(-1);
   const { detail } = choice;
+  if (choice.as_attack && last && last.skill !== "serve") last.skill = "attack"; // bola de primeira/segunda
   const set = (t: QuickTouch | undefined, patch: Partial<QuickTouch>) => t && Object.assign(t, patch, detail ? { detail } : {});
   const end = (reason: RallyEndReason): QuickRally => ({ touches, end: { point_to: winner, reason, ...(detail ? { detail } : {}) } });
 
@@ -235,6 +268,8 @@ export function buildQuickRally(taps: readonly QuickTap[], winner: TeamSide, cho
         touches.push({ team: other(winner), athlete_id: choice.athlete_id, skill: "fault", quality: "=", ...(detail ? { detail } : {}) });
         return end("error");
       }
+      return end("manual");
+    case "unseen":
       return end("manual");
   }
 }

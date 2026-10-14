@@ -1,7 +1,7 @@
 "use client";
 
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import type { PointKind } from "@/domain/stats/season";
+import type { PointKind } from "@/domain/stats/match-insights";
 import { Legend, TooltipBox } from "./chart-tooltip";
 import { CHART, SERIES } from "./palette";
 

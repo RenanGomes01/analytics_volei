@@ -31,7 +31,7 @@ describe("seedDemoData", () => {
     for (const { match, events } of season.matches) {
       const state = replayMatch(events, { rules: rulesFor("beach"), first_server: match.first_server });
       expect(state.winner).not.toBeNull();
-      for (const set of state.sets) {
+      for (const set of state.sets.filter((x) => !x.interrupted)) {
         const target = set.set_number === 3 ? 15 : 21;
         const [hi, lo] = [Math.max(set.score.A, set.score.B), Math.min(set.score.A, set.score.B)];
         expect(hi >= target && hi - lo >= 2 && (hi === target || hi - lo === 2)).toBe(true);
@@ -54,6 +54,12 @@ describe("seedDemoData", () => {
     // Renan trocou de parceiro entre as etapas.
     const renan = record.showcase.athlete_id;
     expect(athletePartners(season.matches, renan, season.aliases).map((p) => season.athletes.get(p.partner_ids[0])?.name).sort()).toEqual(["George", "Pedro"]);
+    // Fases: todos contra todos = grupos, final = final; um jogo do Open termina por desistência.
+    expect(filterSeason(season.matches, { phase: "final" })).toHaveLength(6);
+    expect(filterSeason(season.matches, { phase: "group" })).toHaveLength(18);
+    const retired = season.matches.filter(({ match, events }) => replayMatch(events, { rules: rulesFor("beach"), first_server: match.first_server }).end);
+    expect(retired).toHaveLength(1);
+    expect(replayMatch(retired[0].events, { rules: rulesFor("beach"), first_server: retired[0].match.first_server }).end?.reason).toBe("retirement");
     // Amistoso de 2025 deixa dois anos no filtro.
     expect(filterSeason(season.matches, { year: 2025, includeFriendlies: true }).length).toBeGreaterThan(0);
   }, 60_000);

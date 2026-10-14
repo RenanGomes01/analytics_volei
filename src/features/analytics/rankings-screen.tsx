@@ -3,7 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { competitionToCsv } from "@/domain/export/competition-csv";
-import type { TournamentCategory } from "@/domain/roster/types";
+import type { PhaseFilter, TournamentCategory } from "@/domain/roster/types";
 import { rankAthletes, rankingSpecs } from "@/domain/stats/rankings";
 import {
   athletesByGender,
@@ -36,6 +36,7 @@ export function RankingsScreen() {
   const [gender, setGender] = useState<GenderFilter>((params.get("gender") as GenderFilter) || "all");
   const [category, setCategory] = useState<Category>((params.get("category") as Category) || "all");
   const [friendlies, setFriendlies] = useState(params.get("friendlies") === "1");
+  const [phase, setPhase] = useState<PhaseFilter>(params.get("phase") === "group" || params.get("phase") === "knockout" ? (params.get("phase") as PhaseFilter) : "all");
   const [yearParam, setYear] = useState<number | null>(params.get("year") ? Number(params.get("year")) : null);
 
   const years = useMemo(() => (season ? availableYears(season.matches) : []), [season]);
@@ -43,7 +44,7 @@ export function RankingsScreen() {
 
   const computed = useMemo(() => {
     if (!season || year === undefined) return null;
-    const matches = filterSeason(season.matches, { year, category, includeFriendlies: friendlies });
+    const matches = filterSeason(season.matches, { year, category, includeFriendlies: friendlies, phase });
     const stats = seasonStats(matches, season.aliases);
     return {
       matches,
@@ -52,7 +53,7 @@ export function RankingsScreen() {
       teams: teamsByGender(stats, season.athletes, gender),
       kinds: pointKinds(matches, season.aliases),
     };
-  }, [season, year, category, friendlies, gender]);
+  }, [season, year, category, friendlies, gender, phase]);
 
   if (!season) return <p className="p-8 text-center text-zinc-400">Carregando temporada…</p>;
   if (year === undefined || !computed) return <p className="p-8 text-center text-zinc-400">Ainda não há partidas neste aparelho.</p>;
@@ -119,6 +120,15 @@ export function RankingsScreen() {
             update({ gender: v === "all" ? undefined : v });
           }}
         />
+        <Segmented
+          label="Fase"
+          value={phase}
+          options={[["all", "Todas as fases"], ["group", "Grupos"], ["knockout", "Mata-mata"]]}
+          onChange={(v) => {
+            setPhase(v);
+            update({ phase: v === "all" ? undefined : v });
+          }}
+        />
         <div className="flex gap-2">
           <select
             aria-label="Categoria da etapa"
@@ -157,7 +167,10 @@ export function RankingsScreen() {
 
       {view === "athletes" ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {rankingSpecs("beach").map((spec) => {
+          {rankingSpecs("beach")
+            // Passe na mão só quando há recepções avaliadas no recorte (o modo rápido não avalia o passe).
+            .filter((spec) => spec.metric !== "reception" || computed.athletes.included.some((a) => a.reception.positive.den > 0))
+            .map((spec) => {
             const rows = rankAthletes(computed.athletes.included, spec, { nameOf: athleteName });
             return (
               <Card key={spec.metric} title={spec.label} note={spec.min ? `mín. ${spec.min} ${spec.metric === "attack" ? "ataques" : "recepções avaliadas"}` : undefined}>

@@ -1,4 +1,4 @@
-import type { Modality, Quality, Skill } from "@/domain/types";
+import type { Modality, PointDetail, Quality, Skill } from "@/domain/types";
 import { QUALITIES } from "./labels";
 
 /**
@@ -117,10 +117,22 @@ export const QUALITY_HINTS: Record<Modality, HintTable> = { beach: BEACH, indoor
 export interface QualityOption {
   quality: Quality;
   hint: string;
+  /** Detalhe gravado junto com o lance (ex.: erro de saque na rede × fora). */
+  detail?: PointDetail;
 }
+
+/** O erro de saque vira dois botões, para o Box Score separar ES na rede (ES-R) e fora (ES-F). */
+const SERVE_ERRORS: QualityOption[] = [
+  { quality: "=", hint: "Erro: na rede", detail: "net" },
+  { quality: "=", hint: "Erro: fora", detail: "out" },
+];
 
 /** Botões de qualidade visíveis para o fundamento, na ordem da escala (# → =). */
 export function qualityOptions(modality: Modality, skill: Skill): QualityOption[] {
   const table = QUALITY_HINTS[modality][skill];
-  return QUALITIES.flatMap((quality) => (table[quality] ? [{ quality, hint: table[quality] }] : []));
+  return QUALITIES.flatMap((quality) => {
+    if (!table[quality]) return [];
+    if (skill === "serve" && quality === "=") return SERVE_ERRORS;
+    return [{ quality, hint: table[quality] }];
+  });
 }

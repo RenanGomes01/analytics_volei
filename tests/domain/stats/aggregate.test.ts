@@ -51,7 +51,7 @@ describe("aggregateCompetition — regra estatística", () => {
     expect(perMatch).toEqual([0.4, 1]);
 
     const agg = aggregateCompetition([m1, m2]);
-    expect(agg.athletes.R.attack).toEqual({ attempts: 12, kills: 7, errors: 1, in_play: 4, efficiency: 0.5 });
+    expect(agg.athletes.R.attack).toMatchObject({ attempts: 12, kills: 7, errors: 1, in_play: 4, efficiency: 0.5 });
     expect(agg.athletes.R.matches).toBe(2);
   });
 

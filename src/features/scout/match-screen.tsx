@@ -13,6 +13,9 @@ import { TeamPanel } from "./components/team-panel";
 import type { NextAction } from "@/domain/rally/next-action";
 import { StatsSheet } from "@/features/stats/stats-sheet";
 import type { TeamSide } from "@/domain/types";
+import { getDB } from "@/db/client";
+import { finishMatch, type FinishMatchInput } from "@/services/rally-ledger-service";
+import { FinishMatchSheet } from "./components/finish-match-sheet";
 import { useMatchData } from "./use-match-data";
 import { useScoutCommands } from "./use-scout-commands";
 import { ServeChooser } from "./components/serve-chooser";
@@ -38,6 +41,22 @@ function ScoutBoard({ matchId }: { matchId: string }) {
   const [mode, setMode] = useScoutMode(matchId);
   const [statsOpen, setStatsOpen] = useState(false);
   const closeStats = useCallback(() => setStatsOpen(false), []);
+  const [finishOpen, setFinishOpen] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  const [finishError, setFinishError] = useState<string | null>(null);
+
+  async function finish(input: FinishMatchInput) {
+    setFinishing(true);
+    setFinishError(null);
+    try {
+      await finishMatch(getDB(), scope, input);
+      setFinishOpen(false);
+    } catch (e) {
+      setFinishError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setFinishing(false);
+    }
+  }
   useWakeLock(!!match && !derived?.state.winner);
 
   if (match === null) return <Notice text="Partida não encontrada neste aparelho." />;
@@ -63,7 +82,7 @@ function ScoutBoard({ matchId }: { matchId: string }) {
 
   return (
     <div className="relative grid h-dvh touch-manipulation select-none grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden overscroll-none bg-zinc-950 text-zinc-100">
-      <Scoreboard match={match} state={state} next={next} rules={rules} sides={sides} />
+      <Scoreboard match={match} state={state} next={next} rules={rules} sides={sides} onFinish={() => setFinishOpen(true)} />
 
       {mode === "quick" ? (
         <QuickBoard
@@ -121,13 +140,22 @@ function ScoutBoard({ matchId }: { matchId: string }) {
         <StatsSheet match={match} rules={rules} events={events} athletes={athletes} sides={sides} onClose={closeStats} />
       )}
 
-      {commands.ui.error && (
+      {finishOpen && !state.winner && (
+        <FinishMatchSheet match={match} state={state} saving={finishing} onConfirm={finish} onCancel={() => setFinishOpen(false)} />
+      )}
+
+      {(commands.ui.error || finishError) && (
         <div
           role="alert"
           className="absolute inset-x-0 top-2 mx-auto flex w-fit max-w-[90%] items-center gap-3 rounded-xl bg-red-700 px-4 py-3 text-white shadow-lg"
         >
-          <span>Não foi possível salvar: {commands.ui.error}</span>
-          <button type="button" onClick={commands.dismissError} className="min-h-10 rounded-lg bg-black/20 px-3 font-semibold">
+          <span>Não foi possível salvar: {commands.ui.error ?? finishError}</span>
+          <button
+            type="button"
+            onClick={() => {
+              commands.dismissError();
+              setFinishError(null);
+            }} className="min-h-10 rounded-lg bg-black/20 px-3 font-semibold">
             OK
           </button>
         </div>

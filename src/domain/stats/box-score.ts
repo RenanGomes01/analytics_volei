@@ -23,9 +23,16 @@ const attackLine = (c: TouchCounters): AttackLine => ({
   errors: c.attack_errors,
   in_play: c.attack_attempts - c.kills - c.attack_errors,
   efficiency: efficiency(c.kills, c.attack_errors, c.attack_attempts),
+  second_ball: { attempts: c.second_ball_attempts, kills: c.second_ball_kills },
 });
 
-const serveLine = (c: TouchCounters): ServeLine => ({ attempts: c.serve_attempts, aces: c.aces, errors: c.serve_errors });
+const serveLine = (c: TouchCounters): ServeLine => ({
+  attempts: c.serve_attempts,
+  aces: c.aces,
+  errors: c.serve_errors,
+  errors_net: c.serve_errors_net,
+  errors_out: c.serve_errors_out,
+});
 
 const receptionLine = (c: TouchCounters): ReceptionLine => ({
   attempts: c.receptions,

@@ -28,3 +28,10 @@
 - **Domínio puro** `src/domain/stats/season.ts` (`filterSeason`, `seasonStats`, `athleteSeries`, `athletePartners`, `teamSeries`, `pointKinds`, recortes por gênero) e `team-rankings.ts` (`rankTeams`).
 - **Gráficos:** Recharts 3.10, só em `src/features/charts/` e importado apenas pelas telas de análise — a tela de scout (`/match`) não carrega o pacote. Paleta validada para daltonismo em `palette.ts`.
 - **Rotas estáticas por query string, pré-cacheadas:** `/rankings?year=&gender=&view=&category=&friendlies=`, `/athlete?id=`, `/team?key=`. O service worker ignora esses parâmetros ao casar com o pré-cache.
+
+## Fluxo in-game e fases (Fase 7)
+- **Sem nova versão do Dexie.** `match_end` é mais um tipo de evento do ledger (append-only, rally_id próprio, anulável por `void`); `TournamentEntry.phase` é opcional e sem índice. O envelope de exportação continua v1 (o validador aceita `match_end`).
+- `finishMatch()` (`rally-ledger-service.ts`) grava o encerramento; `replayMatch` descarta o rali aberto, marca o set `interrupted` e expõe `state.end`.
+- `appendRallies()` grava vários ralis numa transação (gerador de dados de teste).
+- `setMatchPhase()` reclassifica a fase (upsert no outbox). `filterSeason({ phase })` e `useCompetitionData(…, phase)` filtram por fase.
+- **Estatísticas in-game:** `src/domain/stats/match-insights.ts` (evolução do placar, maiores sequências, desfecho de ataques e saques, "como os pontos aconteceram"). Os gráficos (`src/features/stats/match-charts.tsx`) entram por `next/dynamic` só quando a aba abre; o chunk fica no pré-cache.

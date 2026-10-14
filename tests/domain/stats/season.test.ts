@@ -74,7 +74,7 @@ describe("temporada: recorte e soma entre torneios", () => {
 
   it("estatística da temporada soma numeradores e denominadores ATRAVÉS de torneios (40% + 100% → 50%)", () => {
     const stats = seasonStats(filterSeason(all, { year: 2026, category: "M" }), noAliases);
-    expect(stats.athletes.R.attack).toEqual({ attempts: 12, kills: 7, errors: 1, in_play: 4, efficiency: 0.5 });
+    expect(stats.athletes.R.attack).toMatchObject({ attempts: 12, kills: 7, errors: 1, in_play: 4, efficiency: 0.5 });
     expect(stats.athletes.R.matches).toBe(2);
   });
 
@@ -177,11 +177,11 @@ describe("como os pontos aconteceram", () => {
     ];
     expect(pointKinds(games, noAliases).map((k) => [k.label, k.count, k.group])).toEqual([
       ["Erro de levantamento (dois toques)", 1, "error"],
-      ["Erro de saque", 1, "error"],
+      ["Erro de saque (fora)", 1, "error"],
       ["Falta (toque na rede)", 1, "error"],
       ["Ponto de ataque", 1, "won"],
       ["Ponto de bloqueio", 1, "won"],
     ]);
-    expect(pointKinds(games, noAliases, pairKey(["R", "P"])).map((k) => k.label)).toEqual(["Erro de saque", "Ponto de ataque"]);
+    expect(pointKinds(games, noAliases, pairKey(["R", "P"])).map((k) => k.label)).toEqual(["Erro de saque (fora)", "Ponto de ataque"]);
   });
 });

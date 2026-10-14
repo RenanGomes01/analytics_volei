@@ -22,6 +22,13 @@ describe.each(MODALITIES)("qualityOptions (%s)", (modality) => {
     }
   });
 
+  it("erro de saque vira dois botões: na rede e fora (com o detalhe gravado no lance)", () => {
+    expect(qualityOptions(modality, "serve").filter((o) => o.quality === "=")).toEqual([
+      { quality: "=", hint: "Erro: na rede", detail: "net" },
+      { quality: "=", hint: "Erro: fora", detail: "out" },
+    ]);
+  });
+
   it("falta tem um único botão: ponto do adversário", () => {
     expect(qualityOptions(modality, "fault")).toEqual([{ quality: "=", hint: "Ponto adversário" }]);
   });

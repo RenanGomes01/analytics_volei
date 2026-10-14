@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
 import { getDB } from "@/db/client";
 import { pairKey } from "@/domain/roster/identity";
-import type { Team } from "@/domain/roster/types";
+import { PHASE_LABEL, TOURNAMENT_PHASES, type Team, type TournamentPhase } from "@/domain/roster/types";
 import type { Modality, TeamSide } from "@/domain/types";
 import { useRosterData } from "@/features/roster/use-roster-data";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
@@ -26,6 +26,7 @@ export function NewMatchForm() {
   const [freeModality, setFreeModality] = useState<Modality>("beach");
   const [teams, setTeams] = useState<Record<TeamSide, Team | null>>({ A: null, B: null });
   const [firstServer, setFirstServer] = useState<TeamSide>("A");
+  const [phase, setPhase] = useState<TournamentPhase>("group");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -76,6 +77,7 @@ export function NewMatchForm() {
         team_b_id: teams.B.id,
         first_server: firstServer,
         tournament_id: tournamentId || undefined,
+        ...(tournamentId ? { phase } : {}),
       });
       // Navegação completa: a tela de scout vem do pré-cache, mesmo offline (ver HardLink).
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
@@ -92,6 +94,21 @@ export function NewMatchForm() {
   return (
     <form onSubmit={submit} className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
       <TournamentPicker tournaments={roster.tournaments} value={tournamentId} onChange={changeTournament} />
+
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-2 text-sm uppercase tracking-wide text-zinc-400">Fase</legend>
+        {tournament ? (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Fase da partida">
+            {TOURNAMENT_PHASES.map((p) => (
+              <button key={p} type="button" role="radio" aria-checked={phase === p} className={segmentedClass(phase === p)} onClick={() => setPhase(p)}>
+                {PHASE_LABEL[p]}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="rounded-xl bg-zinc-900 px-3 py-3 text-zinc-300">Amistoso (partida sem torneio)</p>
+        )}
+      </fieldset>
 
       <fieldset className="flex gap-2">
         <legend className="mb-2 text-sm uppercase tracking-wide text-zinc-400">

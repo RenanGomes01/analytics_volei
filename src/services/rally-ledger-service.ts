@@ -3,6 +3,8 @@ import { phaseForTouch } from "@/domain/rally/phase";
 import { activeEvents, replayMatch, type MatchState } from "@/domain/rally/replay";
 import { rulesFor } from "@/domain/rules/modality";
 import type {
+  MatchEndEvent,
+  MatchEndReason,
   RallyEndEvent,
   RallyEndReason,
   RallyEvent,
@@ -254,5 +256,32 @@ export function appendRallies(db: ScoutDB, scope: MatchScope, next: (state: Matc
       events.push(await append(db, { ...stamp(), ...rally.end, kind: "rally_end" } satisfies RallyEndEvent));
       local_seq += offset;
     }
+  });
+}
+
+export interface FinishMatchInput {
+  winner: TeamSide;
+  reason: MatchEndReason;
+  note?: string;
+}
+
+/**
+ * Encerra a partida manualmente (lesão, chuva, W.O., set único…). O rali aberto é descartado no replay e o set
+ * em andamento fica interrompido. Desfazer (anular este evento) reabre a partida.
+ */
+export function finishMatch(db: ScoutDB, scope: MatchScope, input: FinishMatchInput): Promise<MatchEndEvent> {
+  return ledgerTransaction(db, async () => {
+    const { state, local_seq } = await loadMatchContext(db, scope);
+    if (state.winner) throw new Error("A partida já está encerrada.");
+    const base = eventBase(scope, state, local_seq, await getDeviceId(db));
+    const note = input.note?.trim();
+    return append(db, {
+      ...base,
+      rally_id: newId(), // fora de qualquer rali: o rali aberto não recebe este evento
+      kind: "match_end",
+      winner: input.winner,
+      reason: input.reason,
+      ...(note ? { note } : {}),
+    } satisfies MatchEndEvent);
   });
 }

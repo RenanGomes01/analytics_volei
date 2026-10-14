@@ -56,10 +56,31 @@ describe("pointOutcomes — 'como foi o ponto?' (vôlei de praia)", () => {
     [["A1", "B1", "B2", "B1", "A2"], "B", ["kill_through_defense", "dig_error"]],
     [["A1", "B1", "B2", "B1", "A2*"], "A", ["block_point"]],
     [["A1", "B1", "B2", "B1", "A2*"], "B", ["block_error:out", "block_error:net"]],
-    [["A1", "B1", "B2"], "A", ["ball_error:double", "ball_error:lift", "ball_error:out"]],
+    [["A1", "B1", "B2"], "A", ["attack_error:out", "attack_error:net", "blocked:blocked", "ball_error:double", "ball_error:lift", "ball_error:out"]],
+    [["A1", "B1", "B2"], "B", ["kill", "kill:shot", "kill:block_out"]],
     [[], "A", []],
-  ] as [string[], TeamSide, string[]][])("%j, ponto %s → %j", (seq, winner, expected) => {
-    expect(opts(taps(...seq), winner)).toEqual(expected);
+  ] as [string[], TeamSide, string[]][])("%j, ponto %s → %j (+ 'Não vi como foi')", (seq, winner, expected) => {
+    expect(opts(taps(...seq), winner)).toEqual([...expected, "unseen"]);
+  });
+
+  it("bola de segunda e de primeira têm rótulos próprios", () => {
+    expect(pointOutcomes(taps("A1", "B1", "B2"), "B")[0].label).toBe("Bola de segunda (ponto)");
+    expect(pointOutcomes(taps("A1", "B1", "B2"), "A")[0].label).toBe("Bola de segunda fora");
+    expect(pointOutcomes(taps("A1", "B1"), "B")[0].label).toBe("Bola de primeira (ponto)");
+    expect(pointOutcomes(taps("A1", "B1", "B2", "B1", "A2"), "A")[0].label).toBe("Bola de primeira (ponto)");
+  });
+
+  it("nunca é beco sem saída: toda sequência de até 4 toques tem opções além de 'Não vi'", () => {
+    const ids = ["A1", "A2", "B1", "B2"];
+    const seqs: string[][] = [[]];
+    for (let n = 0; n < 4; n++) for (const s of [...seqs]) if (s.length === n) for (const id of ids) seqs.push([...s, id]);
+    for (const seq of seqs) {
+      for (const w of ["A", "B"] as TeamSide[]) {
+        const o = pointOutcomes(taps(...seq), w);
+        expect(o.at(-1)?.id).toBe("unseen");
+        if (seq.length > 0) expect(o.length, `${seq.join(",")} → ${w}`).toBeGreaterThan(1);
+      }
+    }
   });
 
   it("'Bloqueado' pede o bloqueador (um toque a mais)", () => {
@@ -83,6 +104,38 @@ describe("buildQuickRally — o ponto define a qualidade e o crédito estatísti
     const b = box(taps("A1", "B1", "B2"), "B", { outcome: "kill" }); // B2 atacou de segunda
     expect(b.athletes.B2.attack).toMatchObject({ attempts: 1, kills: 1 });
     expect(b.teams.B.points).toMatchObject({ total: 1, kills: 1 });
+  });
+
+  it("bola de segunda que errou ou foi bloqueada vira ataque de quem levantaria", () => {
+    const out = box(taps("A1", "B1", "B2"), "A", { outcome: "attack_error", detail: "out", as_attack: true });
+    expect(out.athletes.B2.attack).toMatchObject({ attempts: 1, errors: 1 });
+    const blocked = box(taps("A1", "B1", "B2"), "A", { outcome: "blocked", detail: "blocked", athlete_id: "A2", as_attack: true });
+    expect(blocked.athletes.B2.attack).toMatchObject({ attempts: 1, errors: 1 });
+    expect(blocked.athletes.A2.blocks).toBe(1);
+    // sem a conversão continua sendo erro de levantamento
+    expect(box(taps("A1", "B1", "B2"), "A", { outcome: "ball_error", detail: "double" }).athletes.B2.attack.attempts).toBe(0);
+  });
+
+  it("erro de saque separado em rede e fora; sem detalhe só entra no total", () => {
+    expect(box(taps("A1"), "B", { outcome: "serve_error", detail: "net" }).athletes.A1.serve).toMatchObject({ errors: 1, errors_net: 1, errors_out: 0 });
+    expect(box(taps("A1"), "B", { outcome: "serve_error", detail: "out" }).athletes.A1.serve).toMatchObject({ errors: 1, errors_net: 0, errors_out: 1 });
+    expect(box(taps("A1"), "B", { outcome: "serve_error" }).athletes.A1.serve).toMatchObject({ errors: 1, errors_net: 0, errors_out: 0 });
+  });
+
+  it("bola de segunda conta em TA/PA e na linha '2ª'; o 3º toque não", () => {
+    const second = box(taps("A1", "B1", "B2"), "B", { outcome: "kill" });
+    expect(second.athletes.B2.attack).toMatchObject({ attempts: 1, kills: 1, second_ball: { attempts: 1, kills: 1 } });
+    const third = box(taps("A1", "B1", "B2", "B1"), "B", { outcome: "kill" });
+    expect(third.athletes.B1.attack.second_ball).toEqual({ attempts: 0, kills: 0 });
+    const missed = box(taps("A1", "B1", "B2"), "A", { outcome: "attack_error", detail: "net", as_attack: true });
+    expect(missed.athletes.B2.attack.second_ball).toEqual({ attempts: 1, kills: 0 });
+  });
+
+  it("'Não vi como foi' marca o ponto sem avaliar nenhum lance", () => {
+    const r = buildQuickRally(taps("A1", "B1", "B2"), "B", { outcome: "unseen" });
+    expect(r.end).toEqual({ point_to: "B", reason: "manual" });
+    expect(r.touches.every((t) => t.quality === "?")).toBe(true);
+    expect(buildQuickRally([], "A", { outcome: "unseen" }).end).toEqual({ point_to: "A", reason: "manual" });
   });
 
   it("ponto de ataque com defesa que não segurou: PA do atacante, erro de defesa do outro lado", () => {
