@@ -1,5 +1,6 @@
 "use client";
 
+import { useLiveQuery } from "dexie-react-hooks";
 import { useState } from "react";
 import { getDB } from "@/db/client";
 import { matchesSearch } from "@/domain/roster/identity";
@@ -13,7 +14,7 @@ import { toast } from "@/features/toast/toast";
 import { NewAthleteSheet } from "./new-athlete-sheet";
 import { NewTeamSheet } from "./new-team-sheet";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
-import { deleteAthlete, deleteTeam, mergeAthletes, renameTeam, unmergeAthlete, updateAthlete } from "@/services/roster-service";
+import { athleteUsage, deleteAthlete, deleteTeam, mergeAthletes, renameTeam, unmergeAthlete, updateAthlete } from "@/services/roster-service";
 import { useRosterData, type RosterData } from "./use-roster-data";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -37,7 +38,10 @@ function AthleteRow({
   const [gender, setGender] = useState<Gender | null>(athlete.gender ?? null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const aliases = roster.aliasesOf.get(athlete.id) ?? [];
-  const games = roster.matchCount.get(athlete.id) ?? 0;
+  // Mesma checagem do serviço (inclui partidas na lixeira e uniões), só quando o diálogo abre.
+  const usage = useLiveQuery(() => (confirmDelete ? athleteUsage(getDB(), LOCAL_TENANT_ID, athlete.id) : null), [confirmDelete, athlete.id]);
+  const games = usage?.matches ?? 0;
+  const blocked = games > 0 || !!usage?.merged;
 
   async function run(action: () => Promise<unknown>, done: string) {
     onError(null);
@@ -107,18 +111,22 @@ function AthleteRow({
           title={`Excluir ${athlete.name}?`}
           confirmLabel="Excluir atleta"
           danger
-          canConfirm={games === 0}
+          canConfirm={!!usage && !blocked}
           onConfirm={async () => {
             await deleteAthlete(getDB(), LOCAL_TENANT_ID, athlete.id);
             toast.success(`${athlete.name} excluída do cadastro.`);
           }}
           onClose={() => setConfirmDelete(false)}
         >
-          {games > 0 ? (
+          {!usage ? (
+            <p>Conferindo onde ela aparece…</p>
+          ) : games > 0 ? (
             <p>
-              {athlete.name} joga em {plural(games, "partida", "partidas")}: os lances guardam o cadastro dela, então não dá para excluir. Se é um
-              cadastro duplicado, marque os dois e use “Unir”.
+              {athlete.name} joga em {plural(games, "partida", "partidas")} (contando a lixeira): os lances guardam o cadastro dela, então não dá para
+              excluir. Se é um cadastro duplicado, marque os dois e use “Unir”.
             </p>
+          ) : usage.merged ? (
+            <p>{athlete.name} está unida a outro cadastro: desfaça a união antes de excluir.</p>
           ) : (
             <p>Para cadastros feitos por engano. As duplas do cadastro com ela também saem. A exclusão vai para a nuvem na próxima sincronização.</p>
           )}
