@@ -1,6 +1,6 @@
 "use client";
 
-import { useLiveQuery } from "dexie-react-hooks";
+import { useVisibleLiveQuery } from "@/lib/use-visible-live-query";
 import { toast } from "@/features/toast/toast";
 import { useState } from "react";
 import { getDB } from "@/db/client";
@@ -33,8 +33,8 @@ const action = "min-h-12 rounded-xl px-4 font-semibold disabled:opacity-40";
  * enviar, onde o envio parou e o que a nuvem recusou — cada falha com o motivo e o que fazer.
  */
 export function SyncCenter() {
-  const summary = useLiveQuery(() => getSyncSummary(getDB(), LOCAL_TENANT_ID), []);
-  const pullConflicts = useLiveQuery(() => listPullConflicts(getDB()), []);
+  const summary = useVisibleLiveQuery(() => getSyncSummary(getDB(), LOCAL_TENANT_ID), []);
+  const pullConflicts = useVisibleLiveQuery(() => listPullConflicts(getDB()), []);
   const status = useSyncStatus();
   const activity = useSyncActivity();
   const [busy, setBusy] = useState<string | null>(null);

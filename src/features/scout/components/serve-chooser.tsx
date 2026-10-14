@@ -1,20 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { getDB } from "@/db/client";
+import { planChooseServer } from "@/domain/rally/plan-events";
 import type { MatchState } from "@/domain/rally/replay";
 import type { Match, TeamSide } from "@/domain/types";
-import { chooseServer, type MatchScope } from "@/services/rally-ledger-service";
+import type { ScoutExec } from "../use-match-data";
 
 interface Props {
-  scope: MatchScope;
+  exec: ScoutExec;
   match: Match;
   state: MatchState;
   sides: [TeamSide, TeamSide];
 }
 
 /** No 0×0 de cada set (sorteio): escolhe qual lado começa sacando. Some depois do primeiro ponto. */
-export function ServeChooser({ scope, match, state, sides }: Props) {
+export function ServeChooser({ exec, match, state, sides }: Props) {
   const [error, setError] = useState<string | null>(null);
   const current = state.sets.at(-1)!;
   if (state.winner || state.open_rally || current.score.A + current.score.B > 0) return null;
@@ -29,10 +29,10 @@ export function ServeChooser({ scope, match, state, sides }: Props) {
             key={t}
             type="button"
             aria-pressed={state.serving_team === t}
-            onClick={async () => {
+            onClick={() => {
               setError(null);
               try {
-                await chooseServer(getDB(), scope, t);
+                exec((d) => planChooseServer(d, t));
               } catch (e) {
                 setError(e instanceof Error ? e.message : String(e));
               }

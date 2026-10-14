@@ -1,6 +1,6 @@
 "use client";
 
-import { useLiveQuery } from "dexie-react-hooks";
+import { useVisibleLiveQuery } from "@/lib/use-visible-live-query";
 import { useState } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { HardLink } from "@/components/hard-link";
@@ -17,8 +17,8 @@ import { EditMatchSheet } from "./edit-match-sheet";
 const dateFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" });
 
 export function MatchList() {
-  const matches = useLiveQuery(() => listMatches(getDB(), LOCAL_TENANT_ID), []);
-  const deleted = useLiveQuery(() => listDeletedMatches(getDB(), LOCAL_TENANT_ID), []);
+  const matches = useVisibleLiveQuery(() => listMatches(getDB(), LOCAL_TENANT_ID), []);
+  const deleted = useVisibleLiveQuery(() => listDeletedMatches(getDB(), LOCAL_TENANT_ID), []);
   const roster = useRosterData();
   const [editing, setEditing] = useState<Match | null>(null);
 

@@ -28,8 +28,8 @@
 - Telas com navegação ficam em `src/app/(main)/` (o grupo não entra na URL): o layout dele dá o cabeçalho global (`AppHeader`) e a faixa de rede (`NetworkBanner`). Página nova vai para lá e **não** monta cabeçalho/"← Início" próprio. O scout (`/match`) fica fora (tela cheia; sai pelo "← Sair" do placar).
 
 ## UI de scout (`src/features/scout/`)
-- **Tela = f(ledger):** `use-match-data.ts` faz `useLiveQuery` → `replayMatch` → `nextAction`. Placar, rali, posse e sugestões nunca viram estado React.
-- O único estado de UI é a seleção efêmera (`scout-ui-reducer.ts`: idle → armed → saving). Ele volta para idle sempre que o tamanho do ledger muda.
+- **Tela = f(ledger):** `use-match-data.ts` faz `useLiveQuery` → `ScoutLedger` (gravados ∪ fila, Fase 14) → `replayMatch` → `nextAction`. Placar, rali, posse e sugestões nunca viram estado React.
+- O único estado de UI é a seleção efêmera (`scout-ui-reducer.ts`: idle → armed). Ele volta para idle sempre que o tamanho do ledger (em memória) muda.
 - O ponto sai da qualidade do lance (`domain/rally/implied-point.ts`): `#` em saque, ataque ou bloqueio e `=` em qualquer fundamento. Os botões Ponto A/B: sem toques no rali, falta sem lance; com o rali aberto, abrem "Como foi o ponto?" (`resolve-detailed-point.ts` + `resolvePoint`), nunca um ponto "manual" às cegas.
 - A inferência destaca a equipe esperada, mas só bloqueia o que é fisicamente impossível. O analista precisa conseguir registrar o que viu, inclusive um 4º toque.
 - Tela de scout: `h-dvh overflow-hidden`, sem scroll; alvos de toque com no mínimo 48px (botões principais com 64px).
@@ -108,6 +108,12 @@
 - Loops sobre muitas linhas usam `bulkGet`/consultas por índice, nunca `await table.get()` por item (ver `applyPulledPage`).
 - Dexie v4: índices `rally_events.athlete_id` e `teams.*athlete_ids`. Índice novo = nova `version(n)` só com índices + teste de migração.
 - **Todo botão que grava** usa `useSubmit()`/`runOnce` (trava por `ref`, vale no mesmo toque) e `SubmitButton` (desabilitado + spinner). Estado do React sozinho não impede o duplo toque no tablet.
+
+## Scout sem espera de banco (Fase 14)
+- **Nada no scout espera o IndexedDB.** Comando novo de scout = planejador puro em `src/domain/rally/plan-events.ts` (recebe um `LedgerDraft`, empilha eventos, lança o erro do comando) + `exec(plan)` de `use-match-data.ts`. Nunca `await` de serviço num botão do scout. O serviço equivalente em `rally-ledger-service.ts` usa o mesmo planejador (`command()`).
+- `ScoutLedger` (`src/features/scout/scout-ledger.ts`) = gravados ∪ fila; gravação serial por `persistEvents` (só `rally_events` + `outbox`, idempotente). Falha nunca é silenciosa nem descarta lance (faixa "N lances ainda não foram salvos", aviso ao sair).
+- **Sem sync em `/match`** (`syncAllowedOn` em `sync-config.ts`). Consulta ao vivo pesada em tela de análise/conta usa `useVisibleLiveQuery` (`src/lib/`), não `useLiveQuery`.
+- `/match` nunca fica em "Carregando…" para sempre: `ScoutErrorBoundary` + timeout de 8 s → `LoadFailure` com diagnóstico (`load-diagnostics.ts`). "Recarregar banco de dados local" (`reopenDB`) nunca apaga dados.
 
 ## Dados de teste (`/dev/seed`)
 - Gerador puro em `src/domain/dev/rally-generator.ts` (semente fixa, modo detalhado, fim do rali sempre por `impliedPoint`); serviço em `src/services/dev/seed-service.ts`, gravando pelos services reais (`appendRallies` = vários ralis numa transação).

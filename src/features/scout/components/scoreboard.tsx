@@ -1,3 +1,4 @@
+import type { MouseEvent } from "react";
 import { HardLink } from "@/components/hard-link";
 import type { NextAction } from "@/domain/rally/next-action";
 import type { MatchState } from "@/domain/rally/replay";
@@ -13,6 +14,8 @@ interface Props {
   sides: [TeamSide, TeamSide];
   /** Abre o encerramento manual (só com a partida em andamento). */
   onFinish?: () => void;
+  /** "← Sair": pode impedir a saída (ex.: lances ainda na fila de gravação). */
+  onExit?: (e: MouseEvent) => void;
 }
 
 /** Beach: troca de lado a cada 7 pontos somados (5 no set decisivo). */
@@ -46,7 +49,7 @@ function TeamHeader({ match, state, team, align }: TeamHeaderProps) {
   );
 }
 
-export function Scoreboard({ match, state, next, rules, sides, onFinish }: Props) {
+export function Scoreboard({ match, state, next, rules, sides, onFinish, onExit }: Props) {
   const score = state.sets.at(-1)!.score;
 
   return (
@@ -54,6 +57,7 @@ export function Scoreboard({ match, state, next, rules, sides, onFinish }: Props
       {/* Saída do scout: tudo já está salvo no aparelho (inclusive o rali em andamento). */}
       <HardLink
         href="/"
+        onClick={onExit}
         aria-label="Sair do scout e voltar às partidas (tudo fica salvo)"
         className="min-h-12 content-center rounded-xl bg-zinc-800 px-3 font-semibold text-zinc-300"
       >

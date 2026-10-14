@@ -1,6 +1,6 @@
 "use client";
 
-import { useLiveQuery } from "dexie-react-hooks";
+import { useVisibleLiveQuery } from "@/lib/use-visible-live-query";
 import { useMemo } from "react";
 import { getDB } from "@/db/client";
 import { replayMatch, type MatchState } from "@/domain/rally/replay";
@@ -25,11 +25,11 @@ export interface CompetitionData {
  * `undefined` = carregando; `null` = torneio não encontrado.
  */
 export function useCompetitionData(tournamentId: string, aliases: ReadonlyMap<string, string> | undefined, phase: PhaseFilter = "all") {
-  const tournament = useLiveQuery(
+  const tournament = useVisibleLiveQuery(
     async () => (await getTournament(getDB(), LOCAL_TENANT_ID, tournamentId)) ?? null,
     [tournamentId],
   );
-  const loaded = useLiveQuery(async () => {
+  const loaded = useVisibleLiveQuery(async () => {
     const db = getDB();
     const matches = await listTournamentMatches(db, LOCAL_TENANT_ID, tournamentId);
     const entries = await db.tournament_entries.where("tournament_id").equals(tournamentId).toArray();

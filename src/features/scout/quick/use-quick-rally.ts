@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { getDB } from "@/db/client";
 import type { NextAction } from "@/domain/rally/next-action";
 import {
   buildQuickRally,
@@ -11,9 +10,10 @@ import {
   type QuickOutcome,
   type QuickTap,
 } from "@/domain/rally/quick-rally";
+import { planRally, planUndoLastRally, type MatchScope } from "@/domain/rally/plan-events";
 import type { MatchState } from "@/domain/rally/replay";
 import type { TeamSide } from "@/domain/types";
-import { appendRally, undoLastRally, type MatchScope } from "@/services/rally-ledger-service";
+import type { ScoutExec } from "../use-match-data";
 
 const vibrate = () => {
   try {
@@ -25,9 +25,10 @@ const vibrate = () => {
 
 /**
  * Rali em andamento no modo rápido. Os toques ficam na tela (e no sessionStorage, para sobreviver a
- * um recarregamento acidental) e só vão para o ledger, numa transação, quando o ponto é marcado.
+ * um recarregamento acidental) e só vão para o ledger quando o ponto é marcado: o rali inteiro aparece
+ * no placar no mesmo toque e é gravado numa transação, em segundo plano (Fase 14).
  */
-export function useQuickRally(scope: MatchScope, state: MatchState, next: NextAction) {
+export function useQuickRally(scope: MatchScope, exec: ScoutExec, state: MatchState, next: NextAction) {
   const key = `scout:quick:${scope.match_id}`;
   const [taps, setTaps] = useState<QuickTap[]>(() => {
     try {
@@ -38,7 +39,6 @@ export function useQuickRally(scope: MatchScope, state: MatchState, next: NextAc
   });
   const [blockNext, setBlockNext] = useState(false);
   const [pending, setPending] = useState<{ winner: TeamSide; options: QuickOutcome[] } | null>(null);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -81,36 +81,33 @@ export function useQuickRally(scope: MatchScope, state: MatchState, next: NextAc
   );
 
   const choose = useCallback(
-    async (choice: QuickChoice) => {
-      if (!pending || saving) return;
-      setSaving(true);
+    (choice: QuickChoice) => {
+      if (!pending) return;
       try {
         const { touches, end } = buildQuickRally(taps, pending.winner, choice);
-        await appendRally(getDB(), scope, touches, end);
+        if (exec((d) => planRally(d, touches, end)) === undefined) return;
         setTaps([]);
         setPending(null);
         vibrate();
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        setSaving(false);
       }
     },
-    [pending, saving, taps, scope],
+    [pending, taps, exec],
   );
 
   /** Durante o rali: apaga o último toque. Sem toques: desfaz o último ponto e devolve os toques. */
-  const undo = useCallback(async () => {
+  const undo = useCallback(() => {
     setError(null);
     if (blockNext) return setBlockNext(false);
     if (taps.length > 0) return setTaps((t) => t.slice(0, -1));
     try {
-      const back = await undoLastRally(getDB(), scope);
-      setTaps(tapsFromTouches(back));
+      const back = exec(planUndoLastRally);
+      if (back) setTaps(tapsFromTouches(back));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, [blockNext, taps.length, scope]);
+  }, [blockNext, taps.length, exec]);
 
   return {
     taps,
@@ -128,7 +125,6 @@ export function useQuickRally(scope: MatchScope, state: MatchState, next: NextAc
     },
     choose,
     undo,
-    saving,
     error,
     dismissError: () => setError(null),
   };

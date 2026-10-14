@@ -31,3 +31,12 @@ export const SYNC_MODE: SyncMode = resolveMode();
 export const SYNC_NOW_EVENT = "scout:sync-now";
 
 export const requestSyncNow = () => window.dispatchEvent(new Event(SYNC_NOW_EVENT));
+
+/**
+ * Na tela de scout NÃO há sync (Fase 14): nem envio nem pull, nem timers. As transações do outbox
+ * disputariam o IndexedDB com a gravação dos lances num tablet lento. O outbox acumula e sobe ao sair
+ * do scout ("← Sair" é navegação completa: a próxima tela monta o SyncAgent e sincroniza na hora).
+ */
+export function syncAllowedOn(pathname: string): boolean {
+  return pathname !== "/match" && !pathname.startsWith("/match/");
+}

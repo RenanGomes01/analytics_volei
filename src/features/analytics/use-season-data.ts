@@ -1,6 +1,6 @@
 "use client";
 
-import { useLiveQuery } from "dexie-react-hooks";
+import { useVisibleLiveQuery } from "@/lib/use-visible-live-query";
 import { useMemo } from "react";
 import { getDB } from "@/db/client";
 import { pairKey } from "@/domain/roster/identity";
@@ -15,7 +15,7 @@ export interface SeasonView extends SeasonData {
 
 /** Temporada inteira do aparelho, reativa ao banco local. `undefined` enquanto carrega. */
 export function useSeasonData(): SeasonView | undefined {
-  const data = useLiveQuery(() => loadSeason(getDB(), LOCAL_TENANT_ID), []);
+  const data = useVisibleLiveQuery(() => loadSeason(getDB(), LOCAL_TENANT_ID), []);
   return useMemo(() => {
     if (!data) return undefined;
     const registry = new Map(data.teams.map((t) => [pairKey(t.athlete_ids, data.aliases), t.name]));

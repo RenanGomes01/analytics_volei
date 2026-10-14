@@ -14,7 +14,7 @@ import { lastServerSeq, runSyncCycle, type SyncCycleReport } from "@/services/sy
 import { BLOCKED_KEY, PULL_ERROR_KEY } from "@/services/sync/sync-keys";
 import { isAppOutdated } from "@/features/update/app-update";
 import { setSyncActivity } from "./sync-activity";
-import { SUPABASE_CONFIG, SYNC_MODE, SYNC_NOW_EVENT } from "./sync-config";
+import { SUPABASE_CONFIG, SYNC_MODE, SYNC_NOW_EVENT, syncAllowedOn } from "./sync-config";
 
 const INTERVAL_MS = 30_000;
 const AFTER_WRITE_DELAY_MS = 2_000;
@@ -29,9 +29,6 @@ async function withSyncLock(fn: () => Promise<unknown>): Promise<void> {
     if (lock) await fn();
   });
 }
-
-/** Na tela de scout só envia: o pull (gravações vindas de fora) espera a pessoa sair da quadra. */
-const onScoutScreen = () => window.location.pathname.startsWith("/match");
 
 /** Um ciclo do modo de teste: só envio para o servidor em memória. */
 type CycleResult = SyncCycleReport | null;
@@ -74,7 +71,7 @@ function supabaseCycle(db: ScoutDB) {
       if (manual) await retryPendingNow(db, LOCAL_TENANT_ID);
       const report = await runSyncCycle(db, transport, { tenant_id: LOCAL_TENANT_ID });
       result = report;
-      if (report.error || onScoutScreen()) return;
+      if (report.error) return;
       try {
         await runPull(db, transport, { tenant_id: LOCAL_TENANT_ID });
         await setSyncNotice(db, PULL_ERROR_KEY, null);
@@ -93,7 +90,7 @@ function supabaseCycle(db: ScoutDB) {
  */
 export function SyncAgent() {
   useEffect(() => {
-    if (SYNC_MODE === "off" || typeof indexedDB === "undefined") return;
+    if (SYNC_MODE === "off" || typeof indexedDB === "undefined" || !syncAllowedOn(window.location.pathname)) return;
     const db = getDB();
     const cycle = SYNC_MODE === "supabase" ? supabaseCycle(db) : mockCycle(db);
     let running = false;

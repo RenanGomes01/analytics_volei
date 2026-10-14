@@ -1,21 +1,23 @@
 import { newId } from "@/lib/id";
-import { phaseForTouch } from "@/domain/rally/phase";
+import {
+  LedgerDraft,
+  planChooseServer,
+  planFinishMatch,
+  planRally,
+  planRallyEnd,
+  planResolvePoint,
+  planTouch,
+  planUndoLastAction,
+  planUndoLastRally,
+  planVoid,
+  type FinishMatchInput,
+  type MatchScope,
+  type RallyEndInput,
+  type TouchInput,
+} from "@/domain/rally/plan-events";
 import type { DetailedPointPlan } from "@/domain/rally/resolve-detailed-point";
-import { activeEvents, replayMatch, type MatchState } from "@/domain/rally/replay";
-import { rulesFor } from "@/domain/rules/modality";
-import type {
-  MatchEndEvent,
-  MatchEndReason,
-  RallyEndEvent,
-  RallyEndReason,
-  RallyEvent,
-  PointDetail,
-  RallyEventBase,
-  SetStartEvent,
-  TeamSide,
-  TouchEvent,
-  VoidEvent,
-} from "@/domain/types";
+import type { MatchState } from "@/domain/rally/replay";
+import type { MatchEndEvent, RallyEndEvent, RallyEvent, SetStartEvent, TeamSide, TouchEvent, VoidEvent } from "@/domain/types";
 import type { ScoutDB } from "@/db/schema";
 import { getDeviceId } from "./device-service";
 import { getMatch } from "./match-service";
@@ -24,20 +26,13 @@ import { enqueue } from "./outbox-service";
 /**
  * Ledger de eventos de rali. Só existem operações de append:
  * correções são feitas com voidEvent(), que grava um evento compensatório.
+ *
+ * Quem decide QUAIS eventos gravar são os planejadores puros (`domain/rally/plan-events.ts`). Aqui
+ * eles rodam sobre o ledger lido dentro da transação; a tela de scout roda os mesmos planejadores
+ * sobre o ledger em memória e grava só com `persistEvents` (Fase 14).
  */
 
-export interface MatchScope {
-  tenant_id: string;
-  match_id: string;
-}
-
-export type TouchInput = Pick<TouchEvent, "team" | "athlete_id" | "skill" | "quality" | "detail" | "replaces_event_id" | "via_point">;
-
-export interface RallyEndInput {
-  point_to: TeamSide;
-  reason: RallyEndReason;
-  detail?: PointDetail;
-}
+export type { FinishMatchInput, MatchScope, RallyEndInput, TouchInput };
 
 export async function listMatchEvents(db: ScoutDB, { tenant_id, match_id }: MatchScope): Promise<RallyEvent[]> {
   const events = await db.rally_events
@@ -47,99 +42,61 @@ export async function listMatchEvents(db: ScoutDB, { tenant_id, match_id }: Matc
   return events.filter((e) => e.tenant_id === tenant_id);
 }
 
-async function loadMatchContext(db: ScoutDB, scope: MatchScope) {
-  const match = await getMatch(db, scope.tenant_id, scope.match_id);
-  if (!match) throw new Error(`Partida ${scope.match_id} não encontrada.`);
-  const rules = rulesFor(match.modality);
-  const events = await listMatchEvents(db, scope);
-  const state = replayMatch(events, { rules, first_server: match.first_server });
-  const local_seq = Math.max(0, ...events.map((e) => e.local_seq)) + 1;
-  return { rules, state, local_seq };
-}
-
-export async function getMatchState(db: ScoutDB, scope: MatchScope): Promise<MatchState> {
-  return (await loadMatchContext(db, scope)).state;
-}
-
-/** Campos comuns do próximo evento: continua o rali aberto ou abre um novo no set atual. */
-function eventBase(scope: MatchScope, state: MatchState, local_seq: number, device_id: string): RallyEventBase {
-  const open = state.open_rally;
-  const set_number = open?.set_number ?? state.current_set;
-  return {
-    ...scope,
-    id: newId(),
-    set_id: `${scope.match_id}:s${set_number}`,
-    set_number,
-    rally_id: open?.rally_id ?? newId(),
-    rally_number: open?.rally_number ?? state.rallies.filter((r) => r.set_number === set_number).length + 1,
-    local_seq,
-    device_id,
-    timestamp: Date.now(),
-  };
-}
-
-async function nextEventBase(db: ScoutDB, scope: MatchScope, state: MatchState, local_seq: number): Promise<RallyEventBase> {
-  return eventBase(scope, state, local_seq, await getDeviceId(db));
+/**
+ * Grava eventos já planejados, na ordem, com o outbox, numa transação que toca SÓ `rally_events` e
+ * `outbox` (nada de releitura do ledger nem replay aqui dentro: transação curta, pouca disputa).
+ * Idempotente: se todos os eventos já estão gravados (retentativa depois de um commit cujo retorno
+ * se perdeu), não faz nada. Um lote nunca fica pela metade.
+ */
+export function persistEvents(db: ScoutDB, events: readonly RallyEvent[]): Promise<void> {
+  if (events.length === 0) return Promise.resolve();
+  return db.transaction("rw", db.rally_events, db.outbox, async () => {
+    const existing = await db.rally_events.bulkGet(events.map((e) => e.id));
+    if (existing.every(Boolean)) return;
+    if (existing.some(Boolean)) throw new Error("Lote de lances gravado pela metade: recarregue a partida.");
+    await db.rally_events.bulkAdd([...events]);
+    for (const event of events) await enqueue(db, "rally_event", event);
+  });
 }
 
 function ledgerTransaction<T>(db: ScoutDB, fn: () => Promise<T>): Promise<T> {
   return db.transaction("rw", [db.matches, db.rally_events, db.outbox, db.meta], fn);
 }
 
-async function append<T extends RallyEvent>(db: ScoutDB, event: T): Promise<T> {
-  await db.rally_events.add(event);
-  await enqueue(db, "rally_event", event);
-  return event;
+async function loadDraft(db: ScoutDB, scope: MatchScope): Promise<LedgerDraft> {
+  const match = await getMatch(db, scope.tenant_id, scope.match_id);
+  if (!match) throw new Error(`Partida ${scope.match_id} não encontrada.`);
+  const events = await listMatchEvents(db, scope);
+  return new LedgerDraft(events, { scope, match, device_id: await getDeviceId(db), newId, now: Date.now });
+}
+
+/** Carrega o ledger, planeja o comando e grava o que ele produziu, tudo na mesma transação. */
+function command<T>(db: ScoutDB, scope: MatchScope, plan: (draft: LedgerDraft) => T): Promise<T> {
+  return ledgerTransaction(db, async () => {
+    const draft = await loadDraft(db, scope);
+    const result = plan(draft);
+    await persistEvents(db, draft.added);
+    return result;
+  });
+}
+
+export async function getMatchState(db: ScoutDB, scope: MatchScope): Promise<MatchState> {
+  const match = await getMatch(db, scope.tenant_id, scope.match_id);
+  if (!match) throw new Error(`Partida ${scope.match_id} não encontrada.`);
+  const events = await listMatchEvents(db, scope);
+  return new LedgerDraft(events, { scope, match, device_id: "", newId, now: Date.now }).state();
 }
 
 export function appendTouch(db: ScoutDB, scope: MatchScope, input: TouchInput): Promise<TouchEvent> {
-  return ledgerTransaction(db, async () => {
-    const { rules, state, local_seq } = await loadMatchContext(db, scope);
-    if (state.winner) throw new Error("Partida encerrada: não é possível registrar novos toques.");
-    const phase = phaseForTouch(state.open_rally?.touches ?? [], input.team, state.serving_team, rules);
-    const base = await nextEventBase(db, scope, state, local_seq);
-    return append(db, { ...base, ...input, kind: "touch", phase });
-  });
+  return command(db, scope, (d) => planTouch(d, input));
 }
 
 export function appendRallyEnd(db: ScoutDB, scope: MatchScope, input: RallyEndInput): Promise<RallyEndEvent> {
-  return ledgerTransaction(db, async () => {
-    const { state, local_seq } = await loadMatchContext(db, scope);
-    if (state.winner) throw new Error("Partida encerrada: não é possível registrar novos pontos.");
-    const base = await nextEventBase(db, scope, state, local_seq);
-    return append(db, { ...base, ...input, kind: "rally_end" });
-  });
+  return command(db, scope, (d) => planRallyEnd(d, input));
 }
 
 export function voidEvent(db: ScoutDB, scope: MatchScope, event_id: string): Promise<VoidEvent> {
-  return ledgerTransaction(db, async () => {
-    const { local_seq } = await loadMatchContext(db, scope);
-    const target = await db.rally_events.get(event_id);
-    if (!target || target.tenant_id !== scope.tenant_id || target.match_id !== scope.match_id) {
-      throw new Error(`Evento ${event_id} não encontrado nesta partida.`);
-    }
-    if (target.kind === "void") throw new Error("Não é possível anular uma anulação; registre o evento novamente.");
-    const alreadyVoided = await db.rally_events
-      .where("rally_id")
-      .equals(target.rally_id)
-      .filter((e) => e.kind === "void" && e.voids_event_id === event_id)
-      .count();
-    if (alreadyVoided) throw new Error(`Evento ${event_id} já foi anulado.`);
-
-    return append(db, {
-      ...scope,
-      id: newId(),
-      set_id: target.set_id,
-      set_number: target.set_number,
-      rally_id: target.rally_id,
-      rally_number: target.rally_number,
-      local_seq,
-      device_id: await getDeviceId(db),
-      timestamp: Date.now(),
-      kind: "void",
-      voids_event_id: event_id,
-    });
-  });
+  return command(db, scope, (d) => planVoid(d, event_id));
 }
 
 /**
@@ -148,25 +105,7 @@ export function voidEvent(db: ScoutDB, scope: MatchScope, event_id: string): Pro
  * e as cópias corrigidas e regrava os toques originais, como estavam antes do "Ponto".
  */
 export function undoLastAction(db: ScoutDB, scope: MatchScope): Promise<VoidEvent | null> {
-  return ledgerTransaction(db, async () => {
-    const all = await listMatchEvents(db, scope);
-    const active = activeEvents(all);
-    const last = active.at(-1);
-    if (!last) return null;
-    if (last.kind !== "rally_end") return voidEvent(db, scope, last.id);
-
-    const written = active.filter((e): e is TouchEvent => e.kind === "touch" && e.rally_id === last.rally_id && !!e.via_point);
-    const undone = await voidEvent(db, scope, last.id);
-    for (const e of [...written].reverse()) await voidEvent(db, scope, e.id);
-    const byId = new Map(all.map((e) => [e.id, e]));
-    for (const copy of written) {
-      const original = copy.replaces_event_id ? byId.get(copy.replaces_event_id) : undefined;
-      if (original?.kind !== "touch") continue;
-      const { team, athlete_id, skill, quality, detail } = original;
-      await appendTouch(db, scope, { team, athlete_id, skill, quality, ...(detail ? { detail } : {}) });
-    }
-    return undone;
-  });
+  return command(db, scope, planUndoLastAction);
 }
 
 /**
@@ -179,28 +118,7 @@ export function appendRally(
   touches: TouchInput[],
   end: RallyEndInput,
 ): Promise<{ touches: TouchEvent[]; end: RallyEndEvent }> {
-  return ledgerTransaction(db, async () => {
-    const { rules, state, local_seq } = await loadMatchContext(db, scope);
-    if (state.winner) throw new Error("Partida encerrada: não é possível registrar novos pontos.");
-    const base = await nextEventBase(db, scope, state, local_seq);
-    const rallyTouches: TouchEvent[] = [...(state.open_rally?.touches ?? [])];
-    const written: TouchEvent[] = [];
-    let offset = 0;
-    // Cada evento ganha id próprio e local_seq/horário sequenciais dentro do mesmo rali.
-    const next = () => {
-      const i = offset++;
-      return { ...base, id: newId(), local_seq: local_seq + i, timestamp: base.timestamp + i };
-    };
-
-    for (const input of touches) {
-      const phase = phaseForTouch(rallyTouches, input.team, state.serving_team, rules);
-      const event = await append(db, { ...next(), ...input, kind: "touch", phase } satisfies TouchEvent);
-      rallyTouches.push(event);
-      written.push(event);
-    }
-    const endEvent = await append(db, { ...next(), ...end, kind: "rally_end" } satisfies RallyEndEvent);
-    return { touches: written, end: endEvent };
-  });
+  return command(db, scope, (d) => planRally(d, touches, end));
 }
 
 /**
@@ -209,14 +127,7 @@ export function appendRally(
  * `via_point`) e fecha o rali. Nada é alterado nem apagado.
  */
 export function resolvePoint(db: ScoutDB, scope: MatchScope, plan: DetailedPointPlan): Promise<RallyEndEvent> {
-  return ledgerTransaction(db, async () => {
-    const { state } = await loadMatchContext(db, scope);
-    const open = new Set((state.open_rally?.touches ?? []).map((t) => t.id));
-    if (plan.void_ids.some((id) => !open.has(id))) throw new Error("O rali mudou: confira os toques e marque o ponto de novo.");
-    for (const id of [...plan.void_ids].reverse()) await voidEvent(db, scope, id);
-    const { end } = await appendRally(db, scope, plan.touches.map((t) => ({ ...t, via_point: true as const })), plan.end);
-    return end;
-  });
+  return command(db, scope, (d) => planResolvePoint(d, plan));
 }
 
 /**
@@ -224,14 +135,7 @@ export function resolvePoint(db: ScoutDB, scope: MatchScope, plan: DetailedPoint
  * para o analista corrigir "como foi o ponto". Nada é apagado: só eventos de anulação são gravados.
  */
 export function undoLastRally(db: ScoutDB, scope: MatchScope): Promise<TouchEvent[]> {
-  return ledgerTransaction(db, async () => {
-    const active = activeEvents(await listMatchEvents(db, scope));
-    const last = active.at(-1);
-    if (!last) return [];
-    const inRally = active.filter((e) => e.rally_id === last.rally_id);
-    for (const event of [...inRally].reverse()) await voidEvent(db, scope, event.id);
-    return inRally.filter((e): e is TouchEvent => e.kind === "touch");
-  });
+  return command(db, scope, planUndoLastRally);
 }
 
 /**
@@ -239,17 +143,7 @@ export function undoLastRally(db: ScoutDB, scope: MatchScope): Promise<TouchEven
  * primeiro ponto do set e sem rali em andamento. Grava um evento no ledger: dá para desfazer.
  */
 export function chooseServer(db: ScoutDB, scope: MatchScope, serving_team: TeamSide): Promise<SetStartEvent | null> {
-  return ledgerTransaction(db, async () => {
-    const { state, local_seq } = await loadMatchContext(db, scope);
-    if (state.winner) throw new Error("Partida encerrada.");
-    const current = state.sets.at(-1)!;
-    if (current.score.A + current.score.B > 0 || state.open_rally) {
-      throw new Error("Só dá para escolher quem saca antes do primeiro ponto do set.");
-    }
-    if (state.serving_team === serving_team) return null;
-    const base = await nextEventBase(db, scope, state, local_seq);
-    return append(db, { ...base, kind: "set_start", serving_team } satisfies SetStartEvent);
-  });
+  return command(db, scope, (d) => planChooseServer(d, serving_team));
 }
 
 export interface RallyInput {
@@ -263,42 +157,14 @@ export interface RallyInput {
  * para parar; para sozinho quando a partida termina. Devolve o estado final.
  */
 export function appendRallies(db: ScoutDB, scope: MatchScope, next: (state: MatchState) => RallyInput | null): Promise<MatchState> {
-  return ledgerTransaction(db, async () => {
-    const match = await getMatch(db, scope.tenant_id, scope.match_id);
-    if (!match) throw new Error(`Partida ${scope.match_id} não encontrada.`);
-    const rules = rulesFor(match.modality);
-    const options = { rules, first_server: match.first_server };
-    const events = await listMatchEvents(db, scope);
-    const device_id = await getDeviceId(db);
-    let local_seq = Math.max(0, ...events.map((e) => e.local_seq)) + 1;
-
+  return command(db, scope, (d) => {
     for (;;) {
-      const state = replayMatch(events, options);
+      const state = d.state();
       const rally = state.winner ? null : next(state);
       if (!rally) return state;
-      const base = eventBase(scope, state, local_seq, device_id);
-      const rallyTouches: TouchEvent[] = [...(state.open_rally?.touches ?? [])];
-      let offset = 0;
-      const stamp = () => {
-        const i = offset++;
-        return { ...base, id: newId(), local_seq: local_seq + i, timestamp: base.timestamp + i };
-      };
-      for (const input of rally.touches) {
-        const phase = phaseForTouch(rallyTouches, input.team, state.serving_team, rules);
-        const event = await append(db, { ...stamp(), ...input, kind: "touch", phase } satisfies TouchEvent);
-        rallyTouches.push(event);
-        events.push(event);
-      }
-      events.push(await append(db, { ...stamp(), ...rally.end, kind: "rally_end" } satisfies RallyEndEvent));
-      local_seq += offset;
+      planRally(d, rally.touches, rally.end);
     }
   });
-}
-
-export interface FinishMatchInput {
-  winner: TeamSide;
-  reason: MatchEndReason;
-  note?: string;
 }
 
 /**
@@ -306,18 +172,5 @@ export interface FinishMatchInput {
  * em andamento fica interrompido. Desfazer (anular este evento) reabre a partida.
  */
 export function finishMatch(db: ScoutDB, scope: MatchScope, input: FinishMatchInput): Promise<MatchEndEvent> {
-  return ledgerTransaction(db, async () => {
-    const { state, local_seq } = await loadMatchContext(db, scope);
-    if (state.winner) throw new Error("A partida já está encerrada.");
-    const base = eventBase(scope, state, local_seq, await getDeviceId(db));
-    const note = input.note?.trim();
-    return append(db, {
-      ...base,
-      rally_id: newId(), // fora de qualquer rali: o rali aberto não recebe este evento
-      kind: "match_end",
-      winner: input.winner,
-      reason: input.reason,
-      ...(note ? { note } : {}),
-    } satisfies MatchEndEvent);
-  });
+  return command(db, scope, (d) => planFinishMatch(d, input));
 }

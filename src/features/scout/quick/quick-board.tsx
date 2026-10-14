@@ -4,7 +4,8 @@ import type { NextAction } from "@/domain/rally/next-action";
 import { inferSkills } from "@/domain/rally/quick-rally";
 import type { MatchState } from "@/domain/rally/replay";
 import type { Athlete, Match, TeamSide } from "@/domain/types";
-import type { MatchScope } from "@/services/rally-ledger-service";
+import type { MatchScope } from "@/domain/rally/plan-events";
+import type { ScoutExec } from "../use-match-data";
 import { SKILL_LABEL } from "../labels";
 import { MatchOver } from "../components/match-over";
 import { reasonLabel } from "../components/rally-trail";
@@ -14,6 +15,7 @@ import { useQuickRally } from "./use-quick-rally";
 
 interface Props {
   scope: MatchScope;
+  exec: ScoutExec;
   match: Match;
   state: MatchState;
   next: NextAction;
@@ -30,8 +32,8 @@ const big = "rounded-2xl font-bold active:scale-[0.98] disabled:opacity-30";
  * Modo rápido: durante o rali só se toca em quem tocou na bola; no fim, "Ponto" + como foi.
  * Os fundamentos são deduzidos pela sequência (ver domain/rally/quick-rally.ts).
  */
-export function QuickBoard({ scope, match, state, next, athletes, sides, onDetailedMode, onOpenStats, onSwapSides }: Props) {
-  const quick = useQuickRally(scope, state, next);
+export function QuickBoard({ scope, exec, match, state, next, athletes, sides, onDetailedMode, onOpenStats, onSwapSides }: Props) {
+  const quick = useQuickRally(scope, exec, state, next);
   const teamName = (t: TeamSide) => (t === "A" ? match.team_a.name : match.team_b.name);
   const touches = inferSkills(quick.taps);
   const lastId = quick.taps.at(-1)?.athlete_id;
@@ -57,7 +59,7 @@ export function QuickBoard({ scope, match, state, next, athletes, sides, onDetai
               <button
                 key={id}
                 type="button"
-                disabled={over || quick.saving || servingBlocked}
+                disabled={over || servingBlocked}
                 onClick={() => quick.tapAthlete(team, id)}
                 className={`${big} flex min-h-20 items-center gap-3 border-2 px-4 text-left ${
                   isLast
@@ -76,7 +78,7 @@ export function QuickBoard({ scope, match, state, next, athletes, sides, onDetai
         </div>
         <button
           type="button"
-          disabled={over || quick.saving}
+          disabled={over}
           onClick={() => quick.openPoint(team)}
           className={`${big} min-h-20 bg-emerald-600 text-2xl text-white`}
         >
@@ -95,7 +97,7 @@ export function QuickBoard({ scope, match, state, next, athletes, sides, onDetai
             <MatchOver match={match} state={state} />
           ) : (
             <>
-              {waitingServe && <ServeChooser scope={scope} match={match} state={state} sides={sides} />}
+              {waitingServe && <ServeChooser exec={exec} match={match} state={state} sides={sides} />}
               <p className="text-center text-lg font-semibold">
                 {waitingServe
                   ? quick.suggestedServer
@@ -131,7 +133,7 @@ export function QuickBoard({ scope, match, state, next, athletes, sides, onDetai
       </main>
 
       <footer className="grid grid-cols-[minmax(0,1.6fr)_auto_auto_auto] gap-2 border-t border-zinc-800 p-2">
-        <button type="button" onClick={quick.undo} disabled={quick.saving} className={`${big} min-h-16 truncate bg-zinc-100 px-4 text-lg text-zinc-950`}>
+        <button type="button" onClick={quick.undo} className={`${big} min-h-16 truncate bg-zinc-100 px-4 text-lg text-zinc-950`}>
           ↶ {quick.taps.length > 0 || quick.blockNext ? "Desfazer toque" : "Desfazer último ponto"}
         </button>
         <button type="button" onClick={onDetailedMode} className={`${big} min-h-16 bg-zinc-800 px-4 text-base`}>
@@ -152,7 +154,7 @@ export function QuickBoard({ scope, match, state, next, athletes, sides, onDetai
           teamName={teamName}
           roster={(t) => (t === "A" ? match.team_a.athlete_ids : match.team_b.athlete_ids)}
           athletes={athletes}
-          saving={quick.saving}
+          saving={false}
           onChoose={quick.choose}
           onCancel={quick.cancelPoint}
           onReplay={quick.replayRally}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useLiveQuery } from "dexie-react-hooks";
+import { useVisibleLiveQuery } from "@/lib/use-visible-live-query";
 import { useEffect, useState } from "react";
 import { HardLink } from "@/components/hard-link";
 import { getDB } from "@/db/client";
@@ -37,7 +37,7 @@ export function NetworkBanner() {
   // Contagens leves (índice), compartilhadas com o cabeçalho; o detalhe por tipo só é lido quando a
   // faixa de reconexão aparece.
   const status = useSyncStatus();
-  const linked = useLiveQuery(() => (cloud ? getLinkedAccount(getDB()) : null), [cloud]);
+  const linked = useVisibleLiveQuery(() => (cloud ? getLinkedAccount(getDB()) : null), [cloud]);
   const pending = cloud ? (status?.pending ?? 0) : 0;
   const [dismissed, setDismissed] = useState(false);
   const input = { online, pending, cloud, linked: !!linked, dismissed };
@@ -54,7 +54,7 @@ export function NetworkBanner() {
   }
 
   const showDetail = banner.kind === "reconnected";
-  const summary = useLiveQuery(
+  const summary = useVisibleLiveQuery(
     () => (showDetail ? getSyncSummary(getDB(), LOCAL_TENANT_ID, { maxIssues: 0, maxMatches: 0 }) : null),
     [showDetail],
   );

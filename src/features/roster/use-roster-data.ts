@@ -1,6 +1,6 @@
 "use client";
 
-import { useLiveQuery } from "dexie-react-hooks";
+import { useVisibleLiveQuery } from "@/lib/use-visible-live-query";
 import { useMemo } from "react";
 import { getDB } from "@/db/client";
 import { pairKey, resolveAthlete } from "@/domain/roster/identity";
@@ -32,12 +32,12 @@ export interface RosterData {
 /** Tudo do cadastro, reativo ao banco local. `null` enquanto carrega. */
 export function useRosterData(): RosterData | null {
   const db = () => getDB();
-  const athletes = useLiveQuery(() => listAthletes(db(), LOCAL_TENANT_ID), []);
-  const aliases = useLiveQuery(() => getAliasMap(db(), LOCAL_TENANT_ID), []);
-  const teams = useLiveQuery(() => listTeams(db(), LOCAL_TENANT_ID), []);
-  const matches = useLiveQuery(() => listMatches(db(), LOCAL_TENANT_ID), []);
-  const tournaments = useLiveQuery(() => listTournaments(db(), LOCAL_TENANT_ID), []);
-  const entries = useLiveQuery(() => db().tournament_entries.where("tenant_id").equals(LOCAL_TENANT_ID).toArray(), []);
+  const athletes = useVisibleLiveQuery(() => listAthletes(db(), LOCAL_TENANT_ID), []);
+  const aliases = useVisibleLiveQuery(() => getAliasMap(db(), LOCAL_TENANT_ID), []);
+  const teams = useVisibleLiveQuery(() => listTeams(db(), LOCAL_TENANT_ID), []);
+  const matches = useVisibleLiveQuery(() => listMatches(db(), LOCAL_TENANT_ID), []);
+  const tournaments = useVisibleLiveQuery(() => listTournaments(db(), LOCAL_TENANT_ID), []);
+  const entries = useVisibleLiveQuery(() => db().tournament_entries.where("tenant_id").equals(LOCAL_TENANT_ID).toArray(), []);
 
   return useMemo(() => {
     if (!athletes || !aliases || !teams || !matches || !tournaments || !entries) return null;

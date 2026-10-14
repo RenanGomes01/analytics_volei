@@ -57,9 +57,10 @@ describe("status do sync não lê o histórico do outbox", () => {
   });
 
   it("com fila: lê só a cabeça para o status e só a fila para o resumo", async () => {
-    await createAthlete(db, { tenant_id: T, name: "Ana" });
+    // A cabeça da fila é a Ana (criada primeiro); o erro dela é o que o status mostra.
+    const ana = await createAthlete(db, { tenant_id: T, name: "Ana" });
     await createAthlete(db, { tenant_id: T, name: "Bia" });
-    await db.outbox.where("entity_id").equals((await db.athletes.toArray())[0].id).modify({ attempts: 2, last_error: "Sem conexão com o servidor." });
+    await db.outbox.where("entity_id").equals(ana.id).modify({ attempts: 2, last_error: "Sem conexão com o servidor." });
     reads = 0;
 
     const status = await getSyncStatus(db, T);
