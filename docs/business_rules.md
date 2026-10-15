@@ -152,3 +152,5 @@ Tudo é recalculado do ledger (nada persistido) e cada métrica é um contador b
 - **Narrativa do placar:** maior sequência de cada dupla (a partir de 3), viradas de liderança, empates e **trocação** (a partir de 6 side-outs seguidos: pontos de quem recebia).
 - **Construtor:** marcar um grupo ordena, em ordem decrescente, pela métrica-foco dele (Geral → Pts, Ataque → Efic., Saque → Ace, Recepção → passe, Bloqueio → Blq, Defesa → Def, Levantamento → TL, Erros → Err). Em métricas de erro, decrescente = quem mais errou primeiro.
 - **Drill por grupo:** em "Partida", "Set", "Momento", "K1/K2" e "Adversário", cada linha mostra a própria taxa da métrica (ex.: eficiência daquele jogo) e o **pico** fica destacado.
+- **Toque decisivo (hotfix):** num ponto de ataque/bloqueio, a causa vem do último toque de quem GANHOU — não do último toque do rali. "Ataque # → defesa = do adversário → ponto" é ponto da atacante ("Ataque (3º toque)") e cedido pela defensora ("… não defendido").
+- **"Como cada ponto saiu" da atleta** usa os mesmos contadores dos Pts (ataque # + ace + bloqueio # de cada lance): a soma das barras é sempre os pontos dela e a % é sobre esse total.

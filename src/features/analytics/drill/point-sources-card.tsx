@@ -1,4 +1,5 @@
 import { pointSources, type PointSourceKey } from "@/domain/stats/point-sources";
+import type { DrillRow } from "@/domain/stats/drill";
 import { causeRows, type RallyFact } from "@/domain/stats/rally-facts";
 import { DrillBars } from "./drill-bars";
 
@@ -7,11 +8,14 @@ export function PointSourcesCard({
   title = "Origem dos pontos",
   points,
   rallies,
+  rows,
 }: {
   title?: string;
   points: Partial<Record<PointSourceKey, number>>;
-  /** Ralis ganhos: detalha cada fonte pelo mérito ("Explorou o bloqueio", "Largada de segunda"…). */
+  /** Dupla: ralis ganhos, detalhados pelo mérito (somam o placar). */
   rallies?: readonly RallyFact[];
+  /** Atleta: linhas prontas da mesma fonte do total (`scoredBreakdown`), que somam os pontos dela. */
+  rows?: readonly DrillRow[];
 }) {
   const ps = pointSources(points);
   const top = ps.sources.find((s) => s.key === ps.dominant);
@@ -37,12 +41,19 @@ export function PointSourcesCard({
           </li>
         ))}
       </ul>
-      {rallies && rallies.length > 0 && (
-        <details className="rounded-xl bg-zinc-950/50 p-2" open>
-          <summary className="min-h-10 cursor-pointer content-center text-sm font-semibold">Como cada ponto saiu</summary>
-          <DrillBars rows={causeRows(rallies, "merit").map((r) => ({ key: r.code, label: r.label, count: r.count, share: r.share }))} />
-        </details>
-      )}
+      {(() => {
+        const detail = rows ?? (rallies ? causeRows(rallies, "merit").map((r) => ({ key: r.code, label: r.label, count: r.count, share: r.share })) : null);
+        if (!detail || detail.length === 0) return null;
+        const sum = detail.reduce((n, r) => n + r.count, 0);
+        return (
+          <details className="rounded-xl bg-zinc-950/50 p-2" open>
+            <summary className="min-h-10 cursor-pointer content-center text-sm font-semibold">
+              Como cada ponto saiu <span className="font-normal text-zinc-400">({sum} {sum === 1 ? "ponto" : "pontos"})</span>
+            </summary>
+            <DrillBars rows={detail} />
+          </details>
+        );
+      })()}
     </section>
   );
 }

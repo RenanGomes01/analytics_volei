@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { replayMatch } from "@/domain/rally/replay";
 import type { ModalityRules } from "@/domain/rules/modality";
+import { scoredBreakdown } from "@/domain/stats/drill";
 import { buildAnalytics } from "@/domain/stats/facts";
 import { pointsConceded, pointsWon } from "@/domain/stats/rally-facts";
 import type { AthleteStats, StatsFilter } from "@/domain/stats/types";
@@ -137,7 +138,7 @@ export function StatsSheet({ match, rules, events, athletes, sides, onClose }: P
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <PointSourcesCard
                   points={{ kills: box.athletes[view.athlete_id].attack.kills, aces: box.athletes[view.athlete_id].serve.aces, blocks: box.athletes[view.athlete_id].blocks }}
-                  rallies={rallyFacts.filter((f) => f.scorer === view.athlete_id)}
+                  rows={scoredBreakdown(facts.filter((f) => f.athlete_id === view.athlete_id)).rows}
                 />
                 <ConcededCard
                   title={`Pontos que ${athleteName(view.athlete_id)} cedeu`}

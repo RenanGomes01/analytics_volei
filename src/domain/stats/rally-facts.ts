@@ -88,21 +88,31 @@ export function classifyRally(r: RallyResult): RallyCause | null {
       return { code: "ace", group: "aces", merit: "Ace", conceded: "Ace sofrido", fault: "opponent", scorer: by(serve, winner), culprit: reception?.athlete_id ?? null };
     }
     case "kill": {
-      if (last?.skill === "block") {
+      // O grupo segue pointCategory (rally-lines.ts): bloqueio só se o ÚLTIMO toque é bloqueio. Assim a
+      // soma continua sendo o placar.
+      const group: PointGroup = last?.skill === "block" ? "blocks" : "kills";
+      // A causa vem do toque DECISIVO de quem ganhou (o último dele), não do último toque do rali: no
+      // "ataque # → defesa = do adversário → ponto", o último toque é a defesa que falhou.
+      let d = touches.length - 1;
+      while (d >= 0 && touches[d].team !== winner) d -= 1;
+      const decisive = d >= 0 ? touches[d] : undefined;
+      // Quem perdeu e tocou depois do lance decisivo (a defesa que não segurou) é quem sofreu o ponto.
+      const after = touches.slice(d + 1).find((t) => t.team === loser);
+      if (decisive?.skill === "block") {
         // Bloqueio # para ponto: o espelho é o ataque bloqueado de quem atacou antes.
-        const attacker = touches.slice(0, i).reverse().find((t) => t.team === loser);
-        return { code: "block_point", group: "blocks", merit: "Ponto de bloqueio", conceded: "Ataque bloqueado", fault: "own", scorer: by(last, winner), culprit: attacker?.athlete_id ?? null };
+        const attacker = touches.slice(0, d).reverse().find((t) => t.team === loser);
+        return { code: "block_point", group, merit: "Ponto de bloqueio", conceded: "Ataque bloqueado", fault: "own", scorer: decisive.athlete_id, culprit: attacker?.athlete_id ?? null };
       }
-      if (last?.skill === "attack") {
-        if (last.detail === "block_out") {
-          // A bloqueadora explorada só é conhecida se o toque de bloqueio foi registrado antes.
-          const blocker = touches.slice(0, i).reverse().find((t) => t.team === loser && t.skill === "block");
-          return { code: "block_out", group: "kills", merit: "Explorou o bloqueio", conceded: "Bloqueio explorado", fault: "opponent", scorer: by(last, winner), culprit: blocker?.athlete_id ?? null };
+      if (decisive?.skill === "attack") {
+        if (decisive.detail === "block_out") {
+          // A bloqueadora explorada só é conhecida se o toque de bloqueio foi registrado.
+          const blocker = [...touches.slice(0, d)].reverse().find((t) => t.team === loser && t.skill === "block") ?? (after?.skill === "block" ? after : undefined);
+          return { code: "block_out", group, merit: "Explorou o bloqueio", conceded: "Bloqueio explorado", fault: "opponent", scorer: decisive.athlete_id, culprit: blocker?.athlete_id ?? null };
         }
-        const label = attackLabel({ skill: "attack", detail: last.detail, touch_in_possession: pos[i], delta: {}, quality: last.quality });
-        return { code: `attack:${label}`, group: "kills", merit: label, conceded: sufferedAttack(label), fault: "opponent", scorer: by(last, winner), culprit: null };
+        const label = attackLabel({ skill: "attack", detail: decisive.detail, touch_in_possession: pos[d], delta: {}, quality: decisive.quality });
+        return { code: `attack:${label}`, group, merit: label, conceded: sufferedAttack(label), fault: "opponent", scorer: decisive.athlete_id, culprit: after?.athlete_id ?? null };
       }
-      return { code: "kill_other", group: "kills", merit: "Ponto direto", conceded: "Ponto direto do adversário", fault: "opponent", scorer: by(last, winner), culprit: null };
+      return { code: "kill_other", group, merit: "Ponto direto", conceded: "Ponto direto do adversário", fault: "opponent", scorer: decisive?.athlete_id ?? null, culprit: after?.athlete_id ?? null };
     }
     case "four_touches":
       return { code: "four_touches", group: "opponent_errors", merit: "Erro do adversário: 4 toques", conceded: "4 toques", fault: "own", scorer: null, culprit: by(last, loser) };

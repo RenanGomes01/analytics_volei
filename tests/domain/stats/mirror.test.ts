@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { replayMatch } from "@/domain/rally/replay";
 import { BEACH_RULES } from "@/domain/rules/modality";
 import { aggregateCompetition } from "@/domain/stats/aggregate";
-import { drillDown, factsIn } from "@/domain/stats/drill";
+import { drillDown, factsIn, scoredBreakdown } from "@/domain/stats/drill";
 import { duelLabel } from "@/domain/stats/fact-labels";
 import { buildAnalytics } from "@/domain/stats/facts";
 import { setStory, storyLines } from "@/domain/stats/match-story";
@@ -41,7 +41,13 @@ function randomMatch(seed: number, rallies: number, id = `m${seed}`) {
       const t = team();
       l.touch(t, pick(SKILLS), { athlete_id: `${t}${1 + Math.floor(random() * 2)}`, quality: pick(QUALITIES) });
     }
-    if (random() < 0.15) l.end(team(), pick(["manual", "kill", "ace"] as const));
+    // Bola que passou pela defesa (o padrão do bug): ataque # → defesa = do adversário → ponto.
+    if (random() < 0.2) {
+      const atk = team();
+      l.touch(atk, "attack", { athlete_id: `${atk}${1 + Math.floor(random() * 2)}`, quality: "#" });
+      l.touch(atk === "A" ? "B" : "A", "dig", { athlete_id: `${atk === "A" ? "B" : "A"}${1 + Math.floor(random() * 2)}`, quality: "=" });
+      l.end(atk, "kill");
+    } else if (random() < 0.15) l.end(team(), pick(["manual", "kill", "ace"] as const));
     if (random() < 0.1) l.void(pick(l.events).id);
   }
   for (const e of l.events) if (e.kind === "touch" && pick(DETAILS)) e.detail = pick(DETAILS);
@@ -73,6 +79,39 @@ describe("espelho tático (ledgers aleatórios)", () => {
       const { byAthlete, unattributed } = concededByAthlete(lost);
       expect([...byAthlete.values()].reduce((s, n) => s + n, 0) + unattributed).toBe(lost.length);
     }
+  });
+});
+
+describe("hotfix: nenhum ponto da atleta fica fora do detalhamento", () => {
+  it.each([3, 21, 99, 2026, 7, 11])("semente %i: 'Como cada ponto saiu' soma exatamente os Pts de cada atleta", (seed) => {
+    const matches = [randomMatch(seed, 160)];
+    const { touches } = buildAnalytics(matches);
+    const stats = aggregateCompetition(matches);
+    for (const a of Object.values(stats.athletes)) {
+      const b = scoredBreakdown(factsIn(touches, { athlete_id: a.athlete_id }));
+      expect(b.total, a.athlete_id).toBe(a.points);
+      expect(b.rows.reduce((s, r) => s + r.count, 0)).toBe(a.points);
+      const count = (label: string) => b.rows.find((r) => r.label === label)?.count ?? 0;
+      expect(count("Ace")).toBe(a.serve.aces);
+      expect(count("Ponto de bloqueio")).toBe(a.blocks);
+      expect(b.rows.filter((r) => r.label !== "Ace" && r.label !== "Ponto de bloqueio").reduce((s, r) => s + r.count, 0)).toBe(a.attack.kills);
+      if (b.total) expect(b.rows.reduce((s, r) => s + r.share, 0)).toBeCloseTo(1, 10); // % sobre o total real
+    }
+  });
+
+  it("ataque # → defesa = do adversário → ponto: a autora é a atacante e a culpada é a defensora", () => {
+    const l = ledger("pd");
+    l.rally();
+    l.touch("B", "serve", { athlete_id: "B1" });
+    l.touch("A", "reception", { athlete_id: "A2" });
+    l.touch("A", "set", { athlete_id: "A2" });
+    l.touch("A", "attack", { athlete_id: "A1", quality: "#" });
+    l.touch("B", "dig", { athlete_id: "B2", quality: "=" });
+    l.end("A", "kill");
+    const matches = [{ match: { ...matchFixture("beach"), id: "pd" }, events: l.events }];
+    const { rallies, touches } = buildAnalytics(matches);
+    expect(rallies[0]).toMatchObject({ code: "attack:Ataque (3º toque)", merit: "Ataque (3º toque)", conceded: "Ataque (3º toque) não defendido", scorer: "A1", culprit: "B2", group: "kills" });
+    expect(scoredBreakdown(factsIn(touches, { athlete_id: "A1" })).rows).toEqual([expect.objectContaining({ label: "Ataque (3º toque)", count: 1, share: 1 })]);
   });
 });
 

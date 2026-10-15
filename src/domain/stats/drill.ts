@@ -1,5 +1,5 @@
 import { MOMENT_LABEL, type TouchFact } from "./facts";
-import { duelLabel, outcomeLabel, touchLabel, typeLabel } from "./fact-labels";
+import { attackLabel, duelLabel, outcomeLabel, touchLabel, typeLabel } from "./fact-labels";
 import { addCounters, emptyTouchCounters, type TouchCounters, type TouchDelta } from "./touch-lines";
 
 /**
@@ -62,12 +62,14 @@ export interface DrillOptions {
   limit?: number;
   /** Soma os contadores de cada grupo (para a taxa por grupo). */
   withCounters?: boolean;
+  /** Rótulo próprio da dimensão "Tipo" (ex.: o mérito do ponto). */
+  label?: (f: TouchFact) => string;
 }
 
 function keyOf(f: TouchFact, dimension: DrillDimension, o: DrillOptions): [string, string] {
   switch (dimension) {
     case "type": {
-      const l = typeLabel(f, o.errors);
+      const l = o.label ? o.label(f) : typeLabel(f, o.errors);
       return [l, l];
     }
     case "outcome": {
@@ -165,3 +167,20 @@ export const ERROR_COLUMNS = new Set([
   "points_given",
   "faults",
 ]);
+
+/** Como o lance pontuou, pelo mérito (o mesmo texto do espelho tático). */
+function scoredLabel(f: TouchFact): string {
+  if (f.delta.aces) return "Ace";
+  if (f.delta.blocks) return "Ponto de bloqueio";
+  if (f.detail === "block_out") return "Explorou o bloqueio";
+  return attackLabel(f);
+}
+
+/**
+ * "Como cada ponto saiu" de uma atleta (hotfix Fase 16): a partir dos MESMOS contadores do total
+ * (Pts = kills + aces + blocks de cada lance). A soma das linhas é sempre os pontos da atleta e a %
+ * é sobre esse total — nenhum ponto fica de fora, qualquer que seja o rótulo.
+ */
+export function scoredBreakdown(facts: readonly TouchFact[]): DrillResult {
+  return drillDown(facts, (d) => (d.kills ?? 0) + (d.aces ?? 0) + (d.blocks ?? 0), "type", { limit: 0, label: scoredLabel });
+}

@@ -31,6 +31,7 @@ import { formatStat, StatTable } from "@/features/stats/stat-table";
 import { DrillPanel } from "./drill/drill-panel";
 import type { TrendPoint } from "@/features/charts/trend-chart";
 import { replaceQuery, useSeasonData } from "./use-season-data";
+import { scoredBreakdown } from "@/domain/stats/drill";
 import { buildAnalytics } from "@/domain/stats/facts";
 import { explainEfficiency, explainPass } from "@/features/stats/explain";
 import { ConcededCard } from "./drill/conceded-card";
@@ -80,12 +81,10 @@ export function AthleteProfile() {
       season.aliases,
     );
     const facts = analytics.touches.filter((f) => f.athlete_id === id);
-    const scored = analytics.rallies.filter((f) => f.scorer === id);
     const conceded = analytics.rallies.filter((f) => f.culprit === id);
     return {
       mine,
       facts,
-      scored,
       conceded,
       me: seasonStats(mine, season.aliases).athletes[id],
       series: athleteSeries(mine, id, season.aliases),
@@ -230,7 +229,7 @@ export function AthleteProfile() {
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">
-            <PointSourcesCard points={{ kills: me.attack.kills, aces: me.serve.aces, blocks: me.blocks }} rallies={computed.scored} />
+            <PointSourcesCard points={{ kills: me.attack.kills, aces: me.serve.aces, blocks: me.blocks }} rows={scoredBreakdown(computed.facts).rows} />
             <ConcededCard title={`Pontos que ${athlete.name} cedeu`} rallies={computed.conceded} athleteView />
           </div>
 
