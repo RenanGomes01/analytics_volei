@@ -20,8 +20,8 @@ import { PointsMixChart } from "@/features/charts/points-mix-chart";
 import { pct } from "@/features/charts/palette";
 import { deliverFile } from "@/features/export/deliver-file";
 import { EmptyState } from "@/components/empty-state";
-import { buildFacts } from "@/domain/stats/facts";
-import { ErrorSourcesCard } from "@/features/analytics/drill/error-sources-card";
+import { buildAnalytics } from "@/domain/stats/facts";
+import { ConcededCard } from "@/features/analytics/drill/conceded-card";
 import { PrintButton } from "@/features/print/print-button";
 import { PrintHeader } from "@/features/print/print-header";
 import { ReportBuilder } from "./report-builder";
@@ -55,14 +55,16 @@ export function RankingsScreen() {
     const matches = filterSeason(season.matches, { year, category, includeFriendlies: friendlies, phase });
     const stats = seasonStats(matches, season.aliases);
     // Lances com contexto (drill-down, construtor e fontes de erro): uma passada pelo recorte.
-    const facts = buildFacts(
+    const analytics = buildAnalytics(
       matches.map((m) => ({ match: m.match, events: m.events, tournament_id: m.tournament?.id ?? null })),
       season.aliases,
     );
+    const facts = analytics.touches;
     return {
       matches,
       stats,
       facts,
+      rallies: analytics.rallies,
       athletes: athletesByGender(stats, season.athletes, gender),
       teams: teamsByGender(stats, season.athletes, gender),
       kinds: pointKinds(matches, season.aliases),
@@ -319,7 +321,7 @@ export function RankingsScreen() {
 
       {!empty && mode === "highlights" && (
       <div className="grid gap-3 lg:grid-cols-2">
-        <ErrorSourcesCard title="Maior fonte de erros do recorte" facts={computed.facts} />
+        <ConcededCard title="Pontos cedidos no recorte: de onde vieram" rallies={computed.rallies} nameOf={athleteName} />
         <Card title={`Distribuição dos pontos — top 10 ${unit}`} note="Ataque, ace e bloqueio (e erro do adversário, para duplas)">
           <PointsMixChart
             data={

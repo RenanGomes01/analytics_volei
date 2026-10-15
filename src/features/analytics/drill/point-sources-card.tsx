@@ -1,7 +1,18 @@
 import { pointSources, type PointSourceKey } from "@/domain/stats/point-sources";
+import { causeRows, type RallyFact } from "@/domain/stats/rally-facts";
+import { DrillBars } from "./drill-bars";
 
 /** "Qual fundamento mais pontuou": barras por fonte, com a dominante em destaque. */
-export function PointSourcesCard({ title = "Origem dos pontos", points }: { title?: string; points: Partial<Record<PointSourceKey, number>> }) {
+export function PointSourcesCard({
+  title = "Origem dos pontos",
+  points,
+  rallies,
+}: {
+  title?: string;
+  points: Partial<Record<PointSourceKey, number>>;
+  /** Ralis ganhos: detalha cada fonte pelo mérito ("Explorou o bloqueio", "Largada de segunda"…). */
+  rallies?: readonly RallyFact[];
+}) {
   const ps = pointSources(points);
   const top = ps.sources.find((s) => s.key === ps.dominant);
   const max = Math.max(1, ...ps.sources.map((s) => s.count));
@@ -26,6 +37,12 @@ export function PointSourcesCard({ title = "Origem dos pontos", points }: { titl
           </li>
         ))}
       </ul>
+      {rallies && rallies.length > 0 && (
+        <details className="rounded-xl bg-zinc-950/50 p-2" open>
+          <summary className="min-h-10 cursor-pointer content-center text-sm font-semibold">Como cada ponto saiu</summary>
+          <DrillBars rows={causeRows(rallies, "merit").map((r) => ({ key: r.code, label: r.label, count: r.count, share: r.share }))} />
+        </details>
+      )}
     </section>
   );
 }

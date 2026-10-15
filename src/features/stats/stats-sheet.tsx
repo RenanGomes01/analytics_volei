@@ -4,10 +4,11 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { replayMatch } from "@/domain/rally/replay";
 import type { ModalityRules } from "@/domain/rules/modality";
-import { factsIn } from "@/domain/stats/drill";
-import { buildFacts } from "@/domain/stats/facts";
+import { buildAnalytics } from "@/domain/stats/facts";
+import { pointsConceded, pointsWon } from "@/domain/stats/rally-facts";
 import type { AthleteStats, StatsFilter } from "@/domain/stats/types";
-import { ErrorSourcesCard } from "@/features/analytics/drill/error-sources-card";
+import { ConcededCard } from "@/features/analytics/drill/conceded-card";
+import { MirrorCard } from "@/features/analytics/drill/mirror-card";
 import { PointSourcesCard } from "@/features/analytics/drill/point-sources-card";
 import { PrintButton } from "@/features/print/print-button";
 import { PrintHeader } from "@/features/print/print-header";
@@ -18,6 +19,7 @@ import { SyncBadge } from "@/features/sync/sync-badge";
 import { AthleteTable } from "./athlete-table";
 import { SetFilter } from "./set-filter";
 import { TeamSummary } from "./team-summary";
+import { explainEfficiency } from "./explain";
 import { pct } from "./format";
 import type { StatsView } from "./match-charts";
 import { useBoxScore } from "./use-box-score";
@@ -65,9 +67,10 @@ export function StatsSheet({ match, rules, events, athletes, sides, onClose }: P
     return filter.set === "all" ? all : all.filter((r) => r.set_number === filter.set);
   }, [events, rules, match.first_server, filter]);
   // Lances com contexto (drill-down): mesmos ralis e mesma contribuição do Box Score.
-  const facts = useMemo(() => {
-    const all = buildFacts([{ match, events }]);
-    return filter.set === "all" ? all : all.filter((f) => f.set_number === filter.set);
+  const { facts, rallyFacts } = useMemo(() => {
+    const all = buildAnalytics([{ match, events }]);
+    const inSet = <T extends { set_number: number }>(xs: T[]) => (filter.set === "all" ? xs : xs.filter((f) => f.set_number === filter.set));
+    return { facts: inSet(all.touches), rallyFacts: inSet(all.rallies) };
   }, [match, events, filter]);
   // Passe na mão só aparece quando alguém avaliou recepções (o modo rápido não avalia).
   const showReception = box.teams.A.reception.positive.den + box.teams.B.reception.positive.den > 0;
@@ -134,8 +137,13 @@ export function StatsSheet({ match, rules, events, athletes, sides, onClose }: P
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <PointSourcesCard
                   points={{ kills: box.athletes[view.athlete_id].attack.kills, aces: box.athletes[view.athlete_id].serve.aces, blocks: box.athletes[view.athlete_id].blocks }}
+                  rallies={rallyFacts.filter((f) => f.scorer === view.athlete_id)}
                 />
-                <ErrorSourcesCard facts={factsIn(facts, { athlete_id: view.athlete_id })} />
+                <ConcededCard
+                  title={`Pontos que ${athleteName(view.athlete_id)} cedeu`}
+                  rallies={rallyFacts.filter((f) => f.culprit === view.athlete_id)}
+                  athleteView
+                />
               </div>
             )}
           </>
@@ -148,12 +156,22 @@ export function StatsSheet({ match, rules, events, athletes, sides, onClose }: P
             </div>
             <div className={`mt-3 grid gap-3 ${teamsShown.length > 1 ? "md:grid-cols-2" : ""}`}>
               {teamsShown.map((t) => (
-                <PointSourcesCard key={t} title={`Origem dos pontos — ${teamName(t)}`} points={box.teams[t].points} />
+                <PointSourcesCard key={t} title={`Origem dos pontos — ${teamName(t)}`} points={box.teams[t].points} rallies={pointsWon(rallyFacts, { match_id: match.id, team: t })} />
               ))}
               {teamsShown.map((t) => (
-                <ErrorSourcesCard key={`e${t}`} title={`De onde vieram os erros — ${teamName(t)}`} facts={facts.filter((f) => f.team === t)} />
+                <ConcededCard
+                  key={`c${t}`}
+                  title={`Pontos cedidos por ${teamName(t)}: de onde vieram`}
+                  rallies={pointsConceded(rallyFacts, { match_id: match.id, team: t })}
+                  nameOf={athleteName}
+                />
               ))}
             </div>
+            {view.kind === "all" && (
+              <div className="mt-3">
+                <MirrorCard rallies={rallyFacts} match_id={match.id} teamName={teamName} />
+              </div>
+            )}
           </>
         )}
 
@@ -210,9 +228,13 @@ function AthleteHeader({ stats, name, team }: { stats: AthleteStats | undefined;
       </p>
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <Tile label="Pontos" value={stats.points} detail={`${attack.kills} ataque · ${serve.aces} ace · ${stats.blocks} bloq.`} />
-        <Tile label="Eficiência de ataque" value={pct(attack.efficiency)} detail={`${attack.kills}-${attack.errors}/${attack.attempts}`} />
+        <Tile label="Eficiência de ataque" value={pct(attack.efficiency)} detail={explainEfficiency(attack)} />
         <Tile label="Bola de segunda" value={`${attack.second_ball.kills}/${attack.second_ball.attempts}`} detail="pontos / tentativas" />
-        <Tile label="Saque" value={`${serve.aces} ace${serve.aces === 1 ? "" : "s"}`} detail={`erros: ${serve.errors_net} rede · ${serve.errors_out} fora / ${serve.attempts}`} />
+        <Tile
+          label="Saque"
+          value={`${serve.aces} ace${serve.aces === 1 ? "" : "s"}`}
+          detail={serve.attempts ? `${serve.attempts} saques · ${serve.errors_net} na rede · ${serve.errors_out} fora` : "nenhum saque ainda"}
+        />
       </div>
     </div>
   );

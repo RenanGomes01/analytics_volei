@@ -41,9 +41,9 @@ export function TournamentReport({ data, roster }: { data: CompetitionData; rost
   const athleteName = (id: string) => roster.athleteById.get(id)?.name ?? id.slice(0, 6);
   const teamName = (key: string) => roster.teamByKey.get(key)?.name ?? data.stats.teams[key]?.name ?? key;
   const report = useMemo(
-    () => tournamentReport(data.stats, data.facts, { athletes: roster.athleteById, nameOf: athleteName, teamNameOf: teamName }),
+    () => tournamentReport(data.stats, data, { athletes: roster.athleteById, nameOf: athleteName, teamNameOf: teamName }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- os nomes derivam de roster/stats, já nas deps
-    [data.stats, data.facts, roster],
+    [data.stats, data, roster],
   );
 
   if (report.sections.length === 0) return <p className="text-zinc-400">Ainda não há lances neste torneio.</p>;
@@ -87,9 +87,15 @@ export function TournamentReport({ data, roster }: { data: CompetitionData; rost
             <section className="flex flex-col gap-2 rounded-2xl bg-zinc-900 p-4 print-card">
               <header>
                 <h4 className="font-bold">Maior fonte de erros</h4>
-                <p className="text-sm text-zinc-400">Pontos entregues ao adversário, por tipo — e quem mais cometeu cada um</p>
+                <p className="text-sm text-zinc-400">Pontos cedidos por erro próprio, por tipo — e quem mais cometeu cada um</p>
               </header>
               <DrillBars rows={s.errorSources.slice(0, 8).map((e) => ({ key: e.label, label: e.leader ? `${e.label} · ${athleteName(e.leader.athlete_id)} (${e.leader.count})` : e.label, count: e.count, share: e.share }))} />
+              {s.opponentMerit.length > 0 && (
+                <>
+                  <h5 className="mt-2 text-xs font-semibold uppercase tracking-wide text-sky-300 print:text-black">Cedidos por mérito do adversário</h5>
+                  <DrillBars rows={s.opponentMerit.slice(0, 6).map((e) => ({ key: e.label, label: e.leader ? `${e.label} · ${athleteName(e.leader.athlete_id)} (${e.leader.count})` : e.label, count: e.count, share: e.share }))} />
+                </>
+              )}
             </section>
           </div>
 

@@ -3,7 +3,7 @@ import { createRng, generateRally, type PlayerProfile } from "@/domain/dev/rally
 import { LedgerDraft, planRally } from "@/domain/rally/plan-events";
 import { aggregateCompetition } from "@/domain/stats/aggregate";
 import { drillDown, factsIn } from "@/domain/stats/drill";
-import { buildFacts, type FactsMatch } from "@/domain/stats/facts";
+import { buildAnalytics, type FactsMatch } from "@/domain/stats/facts";
 import { tournamentReport } from "@/domain/stats/report";
 import { athleteColumns } from "@/domain/stats/stat-columns";
 import type { Athlete, Match, TeamSide } from "@/domain/types";
@@ -55,10 +55,11 @@ const time = <T,>(fn: () => T): [T, number] => {
 describe("performance do motor de analytics", () => {
   it("temporada de 200 partidas: fatos + agregação + relatório + drill dentro do orçamento", () => {
     const matches = season(200);
-    const [facts, tFacts] = time(() => buildFacts(matches));
+    const [analytics, tFacts] = time(() => buildAnalytics(matches));
+    const facts = analytics.touches;
     const [stats, tAgg] = time(() => aggregateCompetition(matches));
     const athletes = new Map<string, Athlete>(Object.keys(stats.athletes).map((id, i) => [id, { id, tenant_id: "t1", name: id, created_at: 0, gender: i % 2 ? "F" : "M" }]));
-    const [report, tReport] = time(() => tournamentReport(stats, facts, { athletes, nameOf: (x) => x, teamNameOf: (x) => x }));
+    const [report, tReport] = time(() => tournamentReport(stats, analytics, { athletes, nameOf: (x) => x, teamNameOf: (x) => x }));
     const errors = athleteColumns({ modality: "beach", aggregated: true }).find((c) => c.key === "errors")!;
     const [drill, tDrillAll] = time(() => drillDown(facts, errors.drill!, "type", { errors: true }));
     const one = factsIn(facts, { athlete_id: "p7" });
@@ -66,9 +67,10 @@ describe("performance do motor de analytics", () => {
 
     const rallies = stats.totals.rallies;
     console.info(
-      `[perf] ${matches.length} partidas · ${rallies} ralis · ${facts.length} lances — fatos ${tFacts.toFixed(0)} ms · agregação ${tAgg.toFixed(0)} ms · relatório ${tReport.toFixed(0)} ms · drill (todos) ${tDrillAll.toFixed(1)} ms · drill (1 atleta) ${tDrillOne.toFixed(2)} ms`,
+      `[perf] ${matches.length} partidas · ${rallies} ralis · ${facts.length} lances · ${analytics.rallies.length} fatos de rali — fatos ${tFacts.toFixed(0)} ms · agregação ${tAgg.toFixed(0)} ms · relatório ${tReport.toFixed(0)} ms · drill (todos) ${tDrillAll.toFixed(1)} ms · drill (1 atleta) ${tDrillOne.toFixed(2)} ms`,
     );
     expect(rallies).toBeGreaterThan(10_000);
+    expect(analytics.rallies.length).toBe(rallies); // um fato de rali por rali com ponto
     expect(report.sections.length).toBeGreaterThan(0);
     expect(drill.total).toBe(Object.values(stats.athletes).reduce((s, a) => s + a.errors, 0));
     expect(tFacts + tAgg + tReport).toBeLessThan(6_000);

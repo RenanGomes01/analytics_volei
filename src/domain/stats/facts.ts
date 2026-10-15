@@ -1,7 +1,8 @@
 import { replayMatch } from "../rally/replay";
 import { pairKey, resolveAthlete, type AliasMap } from "../roster/identity";
 import { rulesFor, setTarget } from "../rules/modality";
-import type { Match, PointDetail, Quality, RallyEvent, RallyPhase, Skill, TeamSide } from "../types";
+import type { Match, PointDetail, Quality, RallyEvent, RallyPhase, Skill, TeamSide, TouchEvent } from "../types";
+import { classifyRally, type RallyFact } from "./rally-facts";
 import { tallyTouches, type TouchDelta } from "./touch-lines";
 
 /**
@@ -46,6 +47,13 @@ export interface TouchFact {
   won: boolean;
   /** O que o lance soma às estatísticas (o mesmo das tabelas). */
   delta: TouchDelta;
+  /**
+   * Duelo (Fase 16): a adversária do lance, deduzida da sequência do rali (id canônico) — quem a
+   * bloqueadora bloqueou, quem bloqueou/defendeu o ataque, quem recebeu o saque. Ausente quando o
+   * ledger não tem o toque do outro lado: nunca se inventa um nome.
+   */
+  opponent_id?: string;
+  opponent_skill?: Skill;
 }
 
 export interface FactsMatch {
@@ -60,8 +68,32 @@ function momentOf(top: number, target: number): Moment {
   return "final";
 }
 
+/** Fundamentos cuja adversária é o toque SEGUINTE do outro lado (o resto olha o anterior). */
+const LOOKS_AHEAD = new Set<Skill>(["serve", "attack"]);
+const DUELS = new Set<Skill>(["serve", "attack", "block", "reception", "dig"]);
+
+function opponentOf(touches: readonly TouchEvent[], i: number): TouchEvent | undefined {
+  const t = touches[i];
+  if (!DUELS.has(t.skill)) return undefined;
+  const other = LOOKS_AHEAD.has(t.skill) ? touches[i + 1] : touches[i - 1];
+  return other && other.team !== t.team ? other : undefined;
+}
+
+export interface Analytics {
+  touches: TouchFact[];
+  /** Um por rali com ponto: mérito de quem ganhou e espelho em quem perdeu (Fase 16). */
+  rallies: RallyFact[];
+}
+
 export function buildFacts(matches: readonly FactsMatch[], aliases: AliasMap = new Map()): TouchFact[] {
+  return buildAnalytics(matches, aliases).touches;
+}
+
+/** Fatos de lance e de rali numa ÚNICA passada (um replay por partida). */
+export function buildAnalytics(matches: readonly FactsMatch[], aliases: AliasMap = new Map()): Analytics {
   const facts: TouchFact[] = [];
+  const rallyFacts: RallyFact[] = [];
+  const canon = (id: string | null) => (id ? resolveAthlete(aliases, id) : null);
   for (const { match, events, tournament_id = null } of matches) {
     const rules = rulesFor(match.modality);
     const { rallies } = replayMatch(events, { rules, first_server: match.first_server });
@@ -80,6 +112,7 @@ export function buildFacts(matches: readonly FactsMatch[], aliases: AliasMap = n
       tallyTouches(rally, (team, athlete_id, delta, i) => {
         const touch = rally.touches[i];
         const other: TeamSide = team === "A" ? "B" : "A";
+        const opponent = opponentOf(rally.touches, i);
         facts.push({
           match_id: match.id,
           tournament_id,
@@ -99,12 +132,36 @@ export function buildFacts(matches: readonly FactsMatch[], aliases: AliasMap = n
           clutch,
           won: rally.point_to === team,
           delta,
+          ...(opponent ? { opponent_id: resolveAthlete(aliases, opponent.athlete_id), opponent_skill: opponent.skill } : {}),
         });
       });
+      const cause = classifyRally(rally);
+      if (cause && rally.point_to) {
+        const w = rally.point_to;
+        const l: TeamSide = w === "A" ? "B" : "A";
+        rallyFacts.push({
+          ...cause,
+          scorer: canon(cause.scorer),
+          culprit: canon(cause.culprit),
+          match_id: match.id,
+          tournament_id,
+          set_number: rally.set_number,
+          rally_number: rally.rally_number,
+          winner: w,
+          loser: l,
+          winner_key: keys[w],
+          loser_key: keys[l],
+          serving_team: rally.serving_team,
+          score_winner: score[w],
+          score_loser: score[l],
+          moment: momentOf(top, target),
+          clutch,
+        });
+      }
       if (rally.point_to) score[rally.point_to] += 1;
     }
   }
-  return facts;
+  return { touches: facts, rallies: rallyFacts };
 }
 
 function possessionIndex(touches: readonly { team: TeamSide }[], i: number): number {

@@ -4,10 +4,10 @@ import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { normalizeName } from "@/domain/roster/identity";
 import type { AthleteAggregate, TeamAggregate } from "@/domain/stats/aggregate";
-import { factsIn } from "@/domain/stats/drill";
+import { ERROR_COLUMNS, factsIn } from "@/domain/stats/drill";
 import type { TouchFact } from "@/domain/stats/facts";
 import type { SortDir } from "@/domain/stats/sort";
-import { athleteColumns, GROUP_LABEL, GROUP_ORDER, tableColumns, teamColumns, type StatGroup } from "@/domain/stats/stat-columns";
+import { athleteColumns, GROUP_LABEL, GROUP_ORDER, tableColumns, teamColumns, type StatColumn, type StatGroup } from "@/domain/stats/stat-columns";
 import { StatTable, type StatRow } from "@/features/stats/stat-table";
 import { athleteHref, EntityLink, teamHref } from "./ui";
 import { replaceQuery } from "./use-season-data";
@@ -46,6 +46,17 @@ export function ReportBuilder({ view, athletes, teams, facts, athleteName, teamN
   const [search, setSearch] = useState("");
 
   const isTeams = view === "teams";
+  const showReception = (isTeams ? teams : athletes).some((x) => x.reception.positive.den > 0);
+  const allColumns: StatColumn<never>[] = (
+    isTeams
+      ? tableColumns(teamColumns({ modality: "beach", showReception: showReception }), { detailed: true })
+      : tableColumns(athleteColumns({ modality: "beach", aggregated: true, showReception: showReception }), { detailed: true })
+  ) as StatColumn<never>[];
+  /** A coluna em foco vem logo depois do nome. */
+  const focusFirst = <T,>(cols: StatColumn<T>[], key: string) => {
+    const i = cols.findIndex((c) => c.key === key);
+    return i <= 0 ? cols : [cols[i], ...cols.slice(0, i), ...cols.slice(i + 1)];
+  };
   // "Pts" não existe na tabela de duplas: lá o padrão é vitórias.
   const effectiveSort = isTeams && sort.key === "points" ? { ...sort, key: "wins" } : sort;
   const nameOf = isTeams ? teamName : athleteName;
@@ -53,23 +64,27 @@ export function ReportBuilder({ view, athletes, teams, facts, athleteName, teamN
     () => (isTeams ? teams.map((t) => ({ id: t.pair_key, matches: t.matches })) : athletes.map((a) => ({ id: a.athlete_id, matches: a.matches }))),
     [isTeams, athletes, teams],
   );
-  const showReception = (isTeams ? teams : athletes).some((x) => x.reception.positive.den > 0);
 
   const update = (patch: Record<string, string | undefined>) => replaceQuery(patch);
   const setSelection = (next: string[]) => {
     setIds(next);
     update({ ids: next.length ? next.join(",") : undefined });
   };
-  const toggleGroup = (g: StatGroup) => {
-    const next = groups.includes(g) ? groups.filter((x) => x !== g) : GROUP_ORDER.filter((x) => x === g || groups.includes(x));
-    setGroups(next);
-    update({ cols: next.join(",") });
-  };
-  const onSort = (key: string) => {
-    const next = { key, dir: (effectiveSort.key === key && effectiveSort.dir === "desc" ? "asc" : "desc") as SortDir };
+  const setSortTo = (next: { key: string; dir: SortDir }) => {
     setSort(next);
     update({ sort: next.key, dir: next.dir });
   };
+  const toggleGroup = (g: StatGroup) => {
+    const adding = !groups.includes(g);
+    const next = adding ? GROUP_ORDER.filter((x) => x === g || groups.includes(x)) : groups.filter((x) => x !== g);
+    setGroups(next);
+    update({ cols: next.join(",") });
+    // Marcar um grupo põe a métrica-foco dele em ordem decrescente (Fase 16): "Saque" → mais aces primeiro.
+    const focus = allColumns.find((c) => c.group === g && c.focus);
+    if (adding && focus) setSortTo({ key: focus.key, dir: "desc" });
+  };
+  const onSort = (key: string) =>
+    setSortTo({ key, dir: effectiveSort.key === key && effectiveSort.dir === "desc" ? "asc" : "desc" });
 
   const suggestions = useMemo(() => {
     const q = normalizeName(search);
@@ -85,7 +100,7 @@ export function ReportBuilder({ view, athletes, teams, facts, athleteName, teamN
   const table = isTeams ? (
     <StatTable<TeamAggregate>
       firstHeader={header}
-      columns={tableColumns(teamColumns({ modality: "beach", showReception }), { detailed: true }).filter((c) => groups.includes(c.group))}
+      columns={focusFirst(tableColumns(teamColumns({ modality: "beach", showReception }), { detailed: true }).filter((c) => groups.includes(c.group)), effectiveSort.key)}
       rows={teams
         .filter((t) => keep(t.pair_key, t.matches))
         .map((t): StatRow<TeamAggregate> => ({ key: t.pair_key, name: teamName(t.pair_key), line: t, label: <EntityLink href={teamHref(t.pair_key)}>{teamName(t.pair_key)}</EntityLink> }))}
@@ -97,14 +112,14 @@ export function ReportBuilder({ view, athletes, teams, facts, athleteName, teamN
   ) : (
     <StatTable<AthleteAggregate>
       firstHeader={header}
-      columns={tableColumns(athleteColumns({ modality: "beach", aggregated: true, showReception }), { detailed: true }).filter((c) => groups.includes(c.group))}
+      columns={focusFirst(tableColumns(athleteColumns({ modality: "beach", aggregated: true, showReception }), { detailed: true }).filter((c) => groups.includes(c.group)), effectiveSort.key)}
       rows={athletes
         .filter((a) => keep(a.athlete_id, a.matches))
         .map((a): StatRow<AthleteAggregate> => ({ key: a.athlete_id, name: athleteName(a.athlete_id), line: a, label: <EntityLink href={athleteHref(a.athlete_id)}>{athleteName(a.athlete_id)}</EntityLink> }))}
       sort={sort}
       onSort={onSort}
       minWidth={900}
-      drill={(row) => ({ facts: factsIn(facts, { athlete_id: row.key }), matchLabel })}
+      drill={(row) => ({ facts: factsIn(facts, { athlete_id: row.key }), matchLabel, athleteLabel: athleteName })}
     />
   );
 
@@ -198,8 +213,33 @@ export function ReportBuilder({ view, athletes, teams, facts, athleteName, teamN
               </option>
             ))}
           </select>
-          <span className="text-zinc-500">Toque no cabeçalho para ordenar (↓ maior primeiro, ↑ menor). “–” vai sempre para o fim.</span>
         </label>
+
+        <label className="flex flex-wrap items-center gap-2 text-sm text-zinc-300">
+          Ordenar por:
+          <select
+            value={effectiveSort.key}
+            onChange={(e) => setSortTo({ key: e.target.value, dir: "desc" })}
+            className="min-h-11 max-w-full rounded-xl border-2 border-zinc-700 bg-zinc-950 px-2"
+          >
+            {allColumns
+              .filter((c) => groups.includes(c.group) && c.format !== "text")
+              .map((c) => (
+                <option key={c.key} value={c.key}>
+                  {GROUP_LABEL[c.group]} · {c.full}
+                </option>
+              ))}
+          </select>
+          <button type="button" onClick={() => onSort(effectiveSort.key)} className="min-h-11 rounded-xl bg-zinc-800 px-3 font-semibold">
+            {effectiveSort.dir === "desc" ? "↓ maior primeiro" : "↑ menor primeiro"}
+          </button>
+        </label>
+        <p className="text-xs text-zinc-500">
+          {ERROR_COLUMNS.has(effectiveSort.key) && effectiveSort.dir === "desc"
+            ? "Métrica de erro: decrescente mostra quem MAIS errou primeiro (mais → menos). "
+            : ""}
+          Marcar um grupo ordena pela métrica principal dele. Toque no cabeçalho para ordenar por outra coluna. “–” (sem base) vai sempre para o fim.
+        </p>
       </section>
       {groups.length === 0 ? <p className="text-zinc-400">Escolha ao menos um grupo de métricas.</p> : table}
     </div>

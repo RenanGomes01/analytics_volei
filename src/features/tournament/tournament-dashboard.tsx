@@ -145,7 +145,7 @@ function AthletesTable({ data, roster, detailed }: { data: CompetitionData; rost
       columns={tableColumns(athleteColumns({ modality: data.tournament.modality, aggregated: true, showReception }), { detailed })}
       rows={rows}
       minWidth={detailed ? 2400 : 1000}
-      drill={(row) => ({ facts: factsIn(data.facts, { athlete_id: row.key }), matchLabel: matchLabelOf(data) })}
+      drill={(row) => ({ facts: factsIn(data.facts, { athlete_id: row.key }), matchLabel: matchLabelOf(data), athleteLabel: athleteName, defaultDimension: "match" })}
     />
   );
 }

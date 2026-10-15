@@ -27,10 +27,13 @@ import {
 } from "./ui";
 import { EmptyState } from "@/components/empty-state";
 import { athleteColumns, tableColumns } from "@/domain/stats/stat-columns";
-import { StatTable } from "@/features/stats/stat-table";
+import { formatStat, StatTable } from "@/features/stats/stat-table";
+import { DrillPanel } from "./drill/drill-panel";
+import type { TrendPoint } from "@/features/charts/trend-chart";
 import { replaceQuery, useSeasonData } from "./use-season-data";
-import { buildFacts } from "@/domain/stats/facts";
-import { ErrorSourcesCard } from "./drill/error-sources-card";
+import { buildAnalytics } from "@/domain/stats/facts";
+import { explainEfficiency, explainPass } from "@/features/stats/explain";
+import { ConcededCard } from "./drill/conceded-card";
 import { PointSourcesCard } from "./drill/point-sources-card";
 import { PrintButton } from "@/features/print/print-button";
 import { PrintHeader } from "@/features/print/print-header";
@@ -72,13 +75,18 @@ export function AthleteProfile() {
       ),
     );
     // Lances dela com contexto: drill-down e fontes de erro (o mesmo cálculo da tabela).
-    const facts = buildFacts(
+    const analytics = buildAnalytics(
       mine.map((m) => ({ match: m.match, events: m.events, tournament_id: m.tournament?.id ?? null })),
       season.aliases,
-    ).filter((f) => f.athlete_id === id);
+    );
+    const facts = analytics.touches.filter((f) => f.athlete_id === id);
+    const scored = analytics.rallies.filter((f) => f.scorer === id);
+    const conceded = analytics.rallies.filter((f) => f.culprit === id);
     return {
       mine,
       facts,
+      scored,
+      conceded,
       me: seasonStats(mine, season.aliases).athletes[id],
       series: athleteSeries(mine, id, season.aliases),
       partners: athletePartners(mine, id, season.aliases),
@@ -86,6 +94,8 @@ export function AthleteProfile() {
     };
   }, [season, id, yearParam, phase]);
   const [detailed, setDetailed] = useState(false);
+  /** Ponto do gráfico por torneio aberto no detalhamento por partida. */
+  const [trendDrill, setTrendDrill] = useState<{ point: TrendPoint; column: "atk_eff" | "rec_positive" } | null>(null);
 
   if (!season || !computed)
     return <p className="p-8 text-center text-zinc-400">Carregando atleta…</p>;
@@ -96,6 +106,18 @@ export function AthleteProfile() {
     );
 
   const { me, series, partners, mine } = computed;
+  const matchLabel = (mid: string) => {
+    const m = mine.find((x) => x.match.id === mid);
+    return m ? `${m.match.team_a.name} × ${m.match.team_b.name}${m.tournament ? "" : " (amistoso)"}` : mid.slice(0, 6);
+  };
+  /** Lances de um ponto da série: o torneio, ou os amistosos daquele mês. */
+  const factsOfBucket = (key: string) => {
+    if (!key.startsWith("amistosos:")) return computed.facts.filter((f) => f.tournament_id === key);
+    const month = key.slice("amistosos:".length);
+    const ids = new Set(mine.filter((m) => !m.tournament && new Date(m.match.created_at).toISOString().slice(0, 7) === month).map((m) => m.match.id));
+    return computed.facts.filter((f) => ids.has(f.match_id));
+  };
+  const columnsAll = athleteColumns({ modality: mine[0]?.match.modality ?? "beach", aggregated: true, showReception: true });
   const wins = partners.reduce((s, p) => s + p.wins, 0);
   const losses = partners.reduce((s, p) => s + p.losses, 0);
   // Passe na mão só com recepções avaliadas (o modo rápido não avalia o passe).
@@ -190,13 +212,13 @@ export function AthleteProfile() {
             <Stat
               label="Eficiência de ataque"
               value={pct(me.attack.efficiency)}
-              detail={`${me.attack.kills}-${me.attack.errors}/${me.attack.attempts}`}
+              detail={explainEfficiency(me.attack)}
             />
             {showReception ? (
               <Stat
                 label="Passe na mão"
                 value={pct(me.reception.positive.pct)}
-                detail={`${me.reception.positive.num}/${me.reception.positive.den} avaliados`}
+                detail={explainPass(me.reception.positive, true)}
               />
             ) : (
               <Stat
@@ -208,8 +230,8 @@ export function AthleteProfile() {
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">
-            <PointSourcesCard points={{ kills: me.attack.kills, aces: me.serve.aces, blocks: me.blocks }} />
-            <ErrorSourcesCard facts={computed.facts} />
+            <PointSourcesCard points={{ kills: me.attack.kills, aces: me.serve.aces, blocks: me.blocks }} rallies={computed.scored} />
+            <ConcededCard title={`Pontos que ${athlete.name} cedeu`} rallies={computed.conceded} athleteView />
           </div>
 
           <div className={`grid gap-3 ${showReception ? "lg:grid-cols-2" : ""}`}>
@@ -219,7 +241,9 @@ export function AthleteProfile() {
             >
               <TrendChart
                 name="Eficiência de ataque"
+                onSelect={(point) => setTrendDrill({ point, column: "atk_eff" })}
                 data={series.map((p) => ({
+                  key: p.key,
                   label: p.label,
                   value: p.attack.efficiency,
                   detail: `${p.attack.kills}-${p.attack.errors}/${p.attack.attempts}`,
@@ -235,7 +259,9 @@ export function AthleteProfile() {
                 <TrendChart
                   name="Passe na mão"
                   color="#d95926"
+                  onSelect={(point) => setTrendDrill({ point, column: "rec_positive" })}
                   data={series.map((p) => ({
+                    key: p.key,
                     label: p.label,
                     value: p.reception.positive.pct,
                     detail: `${p.reception.positive.num}/${p.reception.positive.den}`,
@@ -245,6 +271,38 @@ export function AthleteProfile() {
               </Card>
             )}
           </div>
+
+          <p className="-mt-1 text-sm text-zinc-400" data-print="hide">
+            Toque num ponto do gráfico para ver o torneio separado por partida (e em qual jogo foi o pico).
+          </p>
+          {series.length > 0 && (
+            <div className="flex flex-wrap gap-2" data-print="hide">
+              {series.map((p) => (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => setTrendDrill({ point: { key: p.key, label: p.label, value: p.attack.efficiency, detail: "", lowVolume: false }, column: "atk_eff" })}
+                  className="min-h-11 rounded-xl bg-zinc-800 px-3 text-sm font-semibold"
+                >
+                  {p.label}: por partida
+                </button>
+              ))}
+            </div>
+          )}
+          {trendDrill && (() => {
+            const col = columnsAll.find((c) => c.key === trendDrill.column)!;
+            const facts = factsOfBucket(trendDrill.point.key ?? "");
+            const bucket = computed.byCompetition.find((c) => c.key === trendDrill.point.key)?.stats;
+            return (
+              <DrillPanel
+                title={`${athlete.name} · ${trendDrill.point.label}`}
+                column={col}
+                value={bucket ? formatStat(col, bucket) : (trendDrill.point.value === null ? "–" : pct(trendDrill.point.value))}
+                context={{ facts, matchLabel, athleteLabel: season.athleteName, defaultDimension: "match", dimensions: ["match", "type", "outcome", "opponent", "set", "moment", "phase"] }}
+                onClose={() => setTrendDrill(null)}
+              />
+            );
+          })()}
 
           <Card
             title="Números por torneio"
@@ -259,10 +317,9 @@ export function AthleteProfile() {
               columns={tableColumns(athleteColumns({ modality: computed.mine[0]?.match.modality ?? "beach", aggregated: true, showReception }), { detailed })}
               drill={(row) => ({
                 facts: row.key === "total" ? computed.facts : computed.facts.filter((f) => (f.tournament_id ?? "friendly") === row.key),
-                matchLabel: (mid) => {
-                  const m = mine.find((x) => x.match.id === mid)?.match;
-                  return m ? `${m.team_a.name} × ${m.team_b.name}` : mid.slice(0, 6);
-                },
+                matchLabel,
+                athleteLabel: season.athleteName,
+                defaultDimension: "match",
               })}
               rows={computed.byCompetition.map((c) => ({
                 key: c.key,

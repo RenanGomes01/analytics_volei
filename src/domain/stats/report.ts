@@ -1,9 +1,8 @@
 import { teamGender } from "../roster/identity";
 import type { Athlete, Gender } from "../types";
 import type { AthleteAggregate, CompetitionStats, TeamAggregate } from "./aggregate";
-import { drillDown } from "./drill";
-import { errorLabel } from "./fact-labels";
-import type { TouchFact } from "./facts";
+import type { Analytics } from "./facts";
+import { causeRows, type RallyFact } from "./rally-facts";
 import { pointSources, type PointSources } from "./point-sources";
 import { efficiency, rate } from "./rate";
 
@@ -97,7 +96,7 @@ export interface ErrorSource {
   label: string;
   count: number;
   share: number;
-  /** Quem mais cometeu este erro. */
+  /** Quem mais cometeu este erro (null quando o lance não identifica a atleta). */
   leader: { athlete_id: string; count: number } | null;
 }
 
@@ -109,8 +108,10 @@ export interface ReportSection {
   awards: Award[];
   teamAwards: Award[];
   points: PointSources;
-  /** Erros que deram ponto ao adversário, por tipo (o mais frequente primeiro). */
+  /** Pontos cedidos por erro próprio, por tipo (o mais frequente primeiro). Fase 16: dos fatos de rali. */
   errorSources: ErrorSource[];
+  /** Pontos cedidos por mérito do adversário (ace sofrido, bloqueio explorado, largada sofrida…). */
+  opponentMerit: ErrorSource[];
   /** Quem mais entregou pontos (individual) e qual dupla. */
   topGivers: { athlete_id: string; count: number }[];
   topTeamGivers: { pair_key: string; count: number }[];
@@ -122,29 +123,14 @@ export interface TournamentReport {
   missingGender: number;
 }
 
-const POINTS_GIVEN = (d: TouchFact["delta"]) => d.points_given ?? 0;
-
-function errorSources(facts: readonly TouchFact[]): ErrorSource[] {
-  const result = drillDown(facts, POINTS_GIVEN, "type", { errors: true, limit: 0 });
-  const byType = new Map<string, Map<string, number>>();
-  for (const f of facts) {
-    if (!f.delta.points_given) continue;
-    const label = errorLabel(f);
-    const m = byType.get(label) ?? new Map<string, number>();
-    m.set(f.athlete_id, (m.get(f.athlete_id) ?? 0) + f.delta.points_given);
-    byType.set(label, m);
-  }
-  return result.rows.map((r) => {
-    let leader: ErrorSource["leader"] = null;
-    for (const [athlete_id, count] of byType.get(r.key) ?? []) if (!leader || count > leader.count) leader = { athlete_id, count };
-    return { label: r.label, count: r.count, share: r.share, leader };
-  });
+function sources(rallies: readonly RallyFact[], fault: RallyFact["fault"]): ErrorSource[] {
+  const mine = rallies.filter((f) => f.fault === fault);
+  return causeRows(mine, "conceded").map(({ label, count, share, leader }) => ({ label, count, share, leader }));
 }
-
 
 export function tournamentReport(
   stats: CompetitionStats,
-  facts: readonly TouchFact[],
+  { rallies }: Pick<Analytics, "rallies">,
   { athletes, nameOf, teamNameOf }: { athletes: ReadonlyMap<string, Athlete>; nameOf: (id: string) => string; teamNameOf: (key: string) => string },
 ): TournamentReport {
   const allAthletes = Object.values(stats.athletes);
@@ -158,10 +144,15 @@ export function tournamentReport(
     const sAthletes = key === "Mixed" ? [] : allAthletes.filter((a) => (genderOf(a.athlete_id) ?? "none") === key);
     const sTeams = allTeams.filter((t) => sectionOfTeam(t) === key);
     if (sAthletes.length === 0 && sTeams.length === 0) continue;
-    // Misto: só as duplas mistas (as atletas aparecem na seção do gênero delas).
+    // Pontos cedidos pelas duplas da seção (Misto: só as duplas mistas; as atletas ficam na seção do gênero).
     const ids = new Set(sAthletes.map((a) => a.athlete_id));
     const teamKeys = new Set(sTeams.map((t) => t.pair_key));
-    const sFacts = key === "Mixed" ? facts.filter((f) => teamKeys.has(f.pair_key)) : facts.filter((f) => ids.has(f.athlete_id));
+    const conceded = rallies.filter((f) => teamKeys.has(f.loser_key));
+    const own = conceded.filter((f) => f.fault === "own");
+    const byAthlete = new Map<string, number>();
+    for (const f of own) if (f.culprit && (key === "Mixed" || ids.has(f.culprit))) byAthlete.set(f.culprit, (byAthlete.get(f.culprit) ?? 0) + 1);
+    const byTeam = new Map<string, number>();
+    for (const f of own) byTeam.set(f.loser_key, (byTeam.get(f.loser_key) ?? 0) + 1);
     const pts = sTeams.reduce(
       (acc, t) => ({ kills: acc.kills + t.points.kills, aces: acc.aces + t.points.aces, blocks: acc.blocks + t.points.blocks, opponent_errors: acc.opponent_errors + t.points.opponent_errors }),
       { kills: 0, aces: 0, blocks: 0, opponent_errors: 0 },
@@ -174,16 +165,15 @@ export function tournamentReport(
       awards: key === "Mixed" ? [] : athleteAwardSpecs().map((s) => award(sAthletes, s, (a) => a.athlete_id, nameOf)),
       teamAwards: teamAwardSpecs().map((s) => award(sTeams, s, (t) => t.pair_key, teamNameOf)),
       points: pointSources(pts),
-      errorSources: errorSources(sFacts),
-      topGivers: [...sAthletes]
-        .map((a) => ({ athlete_id: a.athlete_id, count: a.counters.points_given }))
-        .filter((x) => x.count > 0)
+      errorSources: sources(conceded, "own"),
+      opponentMerit: sources(conceded, "opponent"),
+      topGivers: [...byAthlete]
+        .map(([athlete_id, count]) => ({ athlete_id, count }))
         .sort((a, b) => b.count - a.count || nameOf(a.athlete_id).localeCompare(nameOf(b.athlete_id), "pt-BR"))
         .slice(0, 5),
-      topTeamGivers: [...sTeams]
-        .map((t) => ({ pair_key: t.pair_key, count: t.counters.points_given }))
-        .filter((x) => x.count > 0)
-        .sort((a, b) => b.count - a.count)
+      topTeamGivers: [...byTeam]
+        .map(([pair_key, count]) => ({ pair_key, count }))
+        .sort((a, b) => b.count - a.count || teamNameOf(a.pair_key).localeCompare(teamNameOf(b.pair_key), "pt-BR"))
         .slice(0, 5),
     });
   }

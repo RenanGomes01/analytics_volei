@@ -81,3 +81,28 @@ export function outcomeLabel(f: LabelFact): string {
 }
 
 export const touchLabel = (n: number) => (n <= 1 ? "1º toque" : n === 2 ? "2º toque" : "3º toque ou mais");
+
+type DuelFact = Pick<TouchFact, "skill" | "delta" | "opponent_id" | "opponent_skill">;
+
+/**
+ * Quem enfrentou quem (Fase 16), quando o ledger tem o toque do outro lado: "Bloqueou Vinícius",
+ * "Bloqueado por Ana", "Ace em Bia". null sem adversária registrada (nunca um nome inventado).
+ */
+export function duelLabel(f: DuelFact, nameOf: (id: string) => string): string | null {
+  if (!f.opponent_id) return null;
+  const n = nameOf(f.opponent_id);
+  switch (f.skill) {
+    case "block":
+      return `Bloqueou ${n}`;
+    case "attack":
+      return f.opponent_skill === "block" ? `Bloqueado por ${n}` : `Defendido por ${n}`;
+    case "serve":
+      return f.delta.aces ? `Ace em ${n}` : `Sacou em ${n}`;
+    case "reception":
+      return `Recebeu o saque de ${n}`;
+    case "dig":
+      return `Defendeu ataque de ${n}`;
+    default:
+      return null;
+  }
+}

@@ -1,17 +1,18 @@
 import { MOMENT_LABEL, type TouchFact } from "./facts";
-import { outcomeLabel, touchLabel, typeLabel } from "./fact-labels";
-import type { TouchDelta } from "./touch-lines";
+import { duelLabel, outcomeLabel, touchLabel, typeLabel } from "./fact-labels";
+import { addCounters, emptyTouchCounters, type TouchCounters, type TouchDelta } from "./touch-lines";
 
 /**
  * Drill-down (Fase 15): abre qualquer número das tabelas em "de onde ele veio". `drill` é a
  * contribuição de cada lance à coluna (stat-columns.ts); aqui só se filtra e agrupa. Puro.
  */
 
-export type DrillDimension = "type" | "outcome" | "set" | "moment" | "phase" | "touch" | "match" | "athlete";
+export type DrillDimension = "type" | "outcome" | "opponent" | "set" | "moment" | "phase" | "touch" | "match" | "athlete";
 
 export const DIMENSION_LABEL: Record<DrillDimension, string> = {
   type: "Tipo",
   outcome: "Resultado",
+  opponent: "Adversário",
   set: "Set",
   moment: "Momento",
   phase: "K1/K2",
@@ -26,6 +27,11 @@ export interface DrillRow {
   count: number;
   /** Fração do total (0–1); total 0 = 0. */
   share: number;
+  /**
+   * Contadores brutos do grupo (só com `withCounters`): permitem calcular a MESMA coluna dentro do
+   * grupo — ex.: a eficiência de ataque de cada partida, para achar o pico.
+   */
+  counters?: TouchCounters;
 }
 
 export interface DrillOccurrence {
@@ -36,6 +42,8 @@ export interface DrillOccurrence {
   score_opp: number;
   athlete_id: string;
   label: string;
+  /** Duelo: "Bloqueou Vinícius" (quando o ledger tem o toque da adversária). */
+  duel: string | null;
   count: number;
 }
 
@@ -52,6 +60,8 @@ export interface DrillOptions {
   matchLabel?: (match_id: string) => string;
   athleteLabel?: (athlete_id: string) => string;
   limit?: number;
+  /** Soma os contadores de cada grupo (para a taxa por grupo). */
+  withCounters?: boolean;
 }
 
 function keyOf(f: TouchFact, dimension: DrillDimension, o: DrillOptions): [string, string] {
@@ -64,6 +74,8 @@ function keyOf(f: TouchFact, dimension: DrillDimension, o: DrillOptions): [strin
       const l = outcomeLabel(f);
       return [l, l];
     }
+    case "opponent":
+      return f.opponent_id ? [f.opponent_id, o.athleteLabel?.(f.opponent_id) ?? f.opponent_id.slice(0, 6)] : ["", "Sem adversária registrada"];
     case "set":
       return [String(f.set_number), `Set ${f.set_number}`];
     case "moment":
@@ -100,8 +112,9 @@ export function drillDown(
     if (!count) continue;
     total += count;
     const [key, label] = keyOf(f, dimension, options);
-    const row = groups.get(key) ?? { key, label, count: 0, share: 0 };
+    const row = groups.get(key) ?? { key, label, count: 0, share: 0, ...(options.withCounters ? { counters: emptyTouchCounters() } : {}) };
     row.count += count;
+    if (row.counters) addCounters(row.counters, f.delta);
     groups.set(key, row);
     if (occurrences.length < limit) {
       occurrences.push({
@@ -112,6 +125,7 @@ export function drillDown(
         score_opp: f.score_opp,
         athlete_id: f.athlete_id,
         label: typeLabel(f, options.errors),
+        duel: duelLabel(f, options.athleteLabel ?? ((id) => id.slice(0, 6))),
         count,
       });
     }

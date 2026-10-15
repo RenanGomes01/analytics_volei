@@ -122,6 +122,12 @@
 - **PDF** = `PrintButton` (`window.print()`) + `@media print` em `globals.css`. Elemento só de tela: `data-print="hide"`; só de papel: `PrintHeader`/`print:block`.
 - **Modo comissão técnica** (`src/features/staff/`): `StaffHidden` em botões de scout/CRUD, `StaffGuard` em telas de edição. É foco de interface, não segurança. A tela Nuvem fica acessível (a comissão entra na conta para receber dados).
 
+## Espelho tático e duelos (Fase 16)
+- **Como o ponto aconteceu** = só `classifyRally` (`src/domain/stats/rally-facts.ts`): mérito de quem ganhou + espelho em quem perdeu, com `fault` (erro próprio × mérito do adversário). Causa nova = uma linha lá (as duas leituras juntas); nunca rotule o ponto em outro lugar.
+- "Pontos cedidos" (`ConcededCard`) e "Origem dos pontos" leem os MESMOS `RallyFact` (`buildAnalytics`); o espelho é garantido por construção e testado (`mirror.test.ts`).
+- Duelo (`opponent_id` em `TouchFact`) só vem do ledger; sem toque do outro lado, sem nome.
+- Textos de métrica para o técnico: `src/features/stats/explain.ts` (plural e base 0). Resumo com pílulas, nunca "a · b · c / d".
+
 ## Dados de teste (`/dev/seed`)
 - Gerador puro em `src/domain/dev/rally-generator.ts` (semente fixa, modo detalhado, fim do rali sempre por `impliedPoint`); serviço em `src/services/dev/seed-service.ts`, gravando pelos services reais (`appendRallies` = vários ralis numa transação).
 - Os ids criados ficam em `meta["dev_seed"]`. `removeDemoData` apaga **só** esses ids (exceção deliberada ao append-only, restrita a dados sintéticos).

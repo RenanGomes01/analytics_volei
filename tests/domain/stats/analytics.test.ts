@@ -4,7 +4,7 @@ import { BEACH_RULES } from "@/domain/rules/modality";
 import { aggregateCompetition } from "@/domain/stats/aggregate";
 import { drillDown, factsIn } from "@/domain/stats/drill";
 import { attackLabel, errorLabel } from "@/domain/stats/fact-labels";
-import { buildFacts } from "@/domain/stats/facts";
+import { buildAnalytics, buildFacts } from "@/domain/stats/facts";
 import { pointSources } from "@/domain/stats/point-sources";
 import { tournamentReport } from "@/domain/stats/report";
 import { athleteColumns, teamColumns } from "@/domain/stats/stat-columns";
@@ -160,9 +160,9 @@ describe("relatório de torneio", () => {
     masc.events = masc.events.map((e) => ({ ...e, ...(e.kind === "touch" ? { athlete_id: e.athlete_id.replace("A", "C").replace("B", "D") } : {}) }));
     const matches = [fem, masc];
     const stats = aggregateCompetition(matches);
-    const facts = buildFacts(matches);
+    const analytics = buildAnalytics(matches);
     const athletes = people([["A1", "F"], ["A2", "F"], ["B1", "F"], ["B2", "F"], ["C1", "M"], ["C2", "M"], ["D1", "M"], ["D2", undefined]]);
-    const report = tournamentReport(stats, facts, { athletes, nameOf: (id) => id, teamNameOf: (k) => k });
+    const report = tournamentReport(stats, analytics, { athletes, nameOf: (id) => id, teamNameOf: (k) => k });
 
     expect(report.sections.map((s) => s.key)).toEqual(["F", "M", "none"]);
     expect(report.missingGender).toBe(1);
@@ -171,11 +171,13 @@ describe("relatório de torneio", () => {
     // Prêmio de taxa nunca vai para quem não tem o volume mínimo.
     const attack = f.awards.find((a) => a.key === "attack")!;
     for (const w of attack.podium) expect(stats.athletes[w.id].attack.attempts).toBeGreaterThanOrEqual(10);
-    // Fontes de erro: ordenadas e somando os pontos entregues da seção.
-    const given = f.athletes.reduce((s, a) => s + a.counters.points_given, 0);
-    expect(f.errorSources.reduce((s, e) => s + e.count, 0)).toBe(given);
+    // Fontes de erro (Fase 16: pontos cedidos por erro próprio + mérito do adversário = pontos contra das duplas).
+    const against = f.teams.reduce((s, t) => s + t.points_against, 0);
+    expect([...f.errorSources, ...f.opponentMerit].reduce((s, e) => s + e.count, 0)).toBeLessThanOrEqual(against);
+    const lostBySection = analytics.rallies.filter((r) => f.teams.some((t) => t.pair_key === r.loser_key)).length;
+    expect([...f.errorSources, ...f.opponentMerit].reduce((s, e) => s + e.count, 0) + analytics.rallies.filter((r) => r.fault === "none" && f.teams.some((t) => t.pair_key === r.loser_key)).length).toBe(lostBySection);
     expect(f.errorSources[0].count).toBeGreaterThanOrEqual(f.errorSources.at(-1)!.count);
-    expect(f.errorSources[0].leader).not.toBeNull();
+    expect(f.errorSources.some((e) => e.leader !== null)).toBe(true);
     // Dupla com uma atleta sem gênero cai em "sem gênero".
     expect(report.sections[2].teams.map((t) => t.pair_key)).toEqual(["D1|D2"]);
   });

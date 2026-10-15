@@ -77,7 +77,8 @@ export function StatTable<L>({ columns, rows, total, firstHeader, caption, minWi
     setTip({ key: col.key, full: col.full, hint: col.hint, x: Math.min(Math.max(r.left + r.width / 2, 140), window.innerWidth - 140), y: r.bottom + 6, pinned });
   };
 
-  const cell = (col: StatColumn<L>) => (col.total ? "bg-amber-400/10 font-bold text-zinc-50" : "");
+  const cell = (col: StatColumn<L>) =>
+    sort?.key === col.key && onSort ? "bg-sky-400/15 font-bold text-zinc-50" : col.total ? "bg-amber-400/10 font-bold text-zinc-50" : "";
 
   const bodyRow = (row: StatRow<L>, isTotal = false) => (
     <tr key={row.key} className={isTotal ? "border-t-2 border-zinc-700 font-semibold" : "odd:bg-zinc-900/60"}>

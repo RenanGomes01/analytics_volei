@@ -11,13 +11,26 @@ export interface TrendPoint {
   /** Volume que sustenta a taxa (ex.: "61-12/102"). */
   detail: string;
   lowVolume: boolean;
+  /** Chave do recorte (ex.: id do torneio), devolvida no clique. */
+  key?: string;
 }
 
 /**
  * Evolução de UMA taxa por torneio (uma série, um eixo). Duas medidas = dois gráficos, nunca eixo duplo.
  * Pontos com pouco volume ficam esmaecidos; o tooltip sempre mostra o volume.
  */
-export function TrendChart({ data, name, color = SERIES[0] }: { data: TrendPoint[]; name: string; color?: string }) {
+export function TrendChart({
+  data,
+  name,
+  color = SERIES[0],
+  onSelect,
+}: {
+  data: TrendPoint[];
+  name: string;
+  color?: string;
+  /** Clique/toque no ponto: abre o detalhamento daquele torneio (Fase 16). */
+  onSelect?: (point: TrendPoint) => void;
+}) {
   const values = data.flatMap((d) => (d.value === null ? [] : [d.value]));
   const min = Math.min(0, ...values);
   return (
@@ -61,16 +74,23 @@ export function TrendChart({ data, name, color = SERIES[0] }: { data: TrendPoint
               props.cx === undefined || props.cy === undefined || props.payload?.value === null ? (
                 <g key={props.index} />
               ) : (
-                <circle
+                <g
                   key={props.index}
-                  cx={props.cx}
-                  cy={props.cy}
-                  r={5}
-                  fill={color}
-                  stroke={CHART.surface}
-                  strokeWidth={2}
-                  opacity={props.payload?.lowVolume ? LOW_VOLUME_OPACITY : 1}
-                />
+                  onClick={onSelect && props.payload ? () => onSelect(props.payload!) : undefined}
+                  style={onSelect ? { cursor: "pointer" } : undefined}
+                >
+                  {/* Alvo de toque maior que o ponto (tablet). */}
+                  {onSelect && <circle cx={props.cx} cy={props.cy} r={16} fill="transparent" />}
+                  <circle
+                    cx={props.cx}
+                    cy={props.cy}
+                    r={5}
+                    fill={color}
+                    stroke={CHART.surface}
+                    strokeWidth={2}
+                    opacity={props.payload?.lowVolume ? LOW_VOLUME_OPACITY : 1}
+                  />
+                </g>
               )
             }
             activeDot={{ r: 7, stroke: CHART.surface, strokeWidth: 2 }}

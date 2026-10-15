@@ -176,12 +176,13 @@ describe("como os pontos aconteceram", () => {
       quick("q5", [t("X"), t("R")], "B", { outcome: "fault", detail: "net_touch", athlete_id: "R" }),
     ];
     expect(pointKinds(games, noAliases).map((k) => [k.label, k.count, k.group])).toEqual([
-      ["Erro de levantamento (dois toques)", 1, "error"],
-      ["Erro de saque (fora)", 1, "error"],
-      ["Falta (toque na rede)", 1, "error"],
-      ["Ponto de ataque", 1, "won"],
+      // Fase 16: os rótulos vêm do classificador do espelho tático (rally-facts.ts).
+      ["Ataque (3º toque)", 1, "won"],
+      ["Erro do adversário: falta (toque na rede)", 1, "error"],
+      ["Erro do adversário: levantamento (dois toques)", 1, "error"],
+      ["Erro do adversário: saque fora", 1, "error"],
       ["Ponto de bloqueio", 1, "won"],
     ]);
-    expect(pointKinds(games, noAliases, pairKey(["R", "P"])).map((k) => k.label)).toEqual(["Erro de saque (fora)", "Ponto de ataque"]);
+    expect(pointKinds(games, noAliases, pairKey(["R", "P"])).map((k) => k.label)).toEqual(["Ataque (3º toque)", "Erro do adversário: saque fora"]);
   });
 });

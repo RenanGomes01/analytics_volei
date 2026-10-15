@@ -73,3 +73,8 @@
 - **Relatório** (`report.ts`), **origem dos pontos** (`point-sources.ts`) e **ordenação** (`sort.ts`) são puros. Telas calculam fatos uma vez por recorte (`useMemo`); 200 partidas ≈ 0,6 s no Node em modo econômico.
 - **PDF** = `window.print()` + `@media print` (A4, claro, sem menus/botões, gráficos com texto preto). Sem biblioteca, offline.
 - **Modo comissão** (`features/staff`): `localStorage` do aparelho; `StaffHidden`/`StaffGuard` escondem scout e CRUD. Os dados continuam vindo do Dexie local (nuvem via pull).
+
+## Espelho tático (Fase 16)
+- `buildAnalytics` faz UMA passada (um replay por partida) e devolve `touches` (fatos de lance, agora com `opponent_id`) e `rallies` (`RallyFact`: causa com `merit`/`conceded`, `fault`, `scorer`, `culprit`). O espelho não junta listas: o mesmo fato é lido por quem ganhou e por quem perdeu (`pointsWon`/`pointsConceded`). Invariantes testadas: espelho por causa, cedidos = placar do adversário, grupos = origem dos pontos, atletas + "sem atleta" = dupla.
+- `pointKindLabel` (gráficos) usa o mesmo classificador (`classifyRally`): não há dois textos para o mesmo ponto.
+- `match-story.ts` (puro) alimenta os marcadores do `ScoreProgressionChart` e as frases embaixo do gráfico.

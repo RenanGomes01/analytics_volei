@@ -43,6 +43,8 @@ export interface StatColumn<L> {
   only?: "table" | "csv";
   /** Micro-métrica (Fase 15): fica fora das tabelas compactas; aparece em "todas as métricas", no construtor e no CSV. */
   detail?: true;
+  /** Métrica-foco do grupo (Fase 16): ao marcar o grupo no construtor, a tabela ordena por ela. */
+  focus?: true;
   value: (line: L) => number | Rate | string | null;
   /**
    * Drill-down: quanto cada lance soma a esta coluna (a partir do mesmo `touchDelta` das estatísticas).
@@ -81,6 +83,7 @@ const receptionColumn = <L extends { reception: ReceptionLine }>(modality: Modal
   modality === "beach"
     ? {
         key: "rec_positive",
+        focus: true,
         short: "Na mão",
         full: "Passe na mão (%)",
         hint: "Passes # (na mão) sobre as recepções avaliadas. As do modo rápido (não avaliadas) ficam fora.",
@@ -91,6 +94,7 @@ const receptionColumn = <L extends { reception: ReceptionLine }>(modality: Modal
       }
     : {
         key: "rec_positive",
+        focus: true,
         short: "#+",
         full: "Recepção perfeita ou positiva (%)",
         hint: "Recepções # e + sobre as recepções avaliadas.",
@@ -105,7 +109,7 @@ export function athleteColumns({ modality, aggregated = false, showReception = t
   const c = (l: PlayerLine) => l.counters;
   const cols: (StatColumn<PlayerLine> | false)[] = [
     aggregated && { key: "matches", short: "J", full: "Jogos", hint: "Partidas em que a atleta estava em quadra.", group: "geral", format: "count", value: (l) => l.matches ?? 0 },
-    { key: "points", short: "Pts", full: "Pontos (ataque + ace + bloqueio)", hint: "Pontos feitos pela atleta: ataques #, aces e bloqueios #.", group: "geral", format: "count", value: (l) => l.points, drill: (d) => (d.kills ?? 0) + (d.aces ?? 0) + (d.blocks ?? 0) },
+    { key: "points", focus: true, short: "Pts", full: "Pontos (ataque + ace + bloqueio)", hint: "Pontos feitos pela atleta: ataques #, aces e bloqueios #.", group: "geral", format: "count", value: (l) => l.points, drill: (d) => (d.kills ?? 0) + (d.aces ?? 0) + (d.blocks ?? 0) },
 
     { key: "atk_total", short: "TA", full: "Total de ataques", hint: "Todas as bolas atacadas: pontos + erros + em jogo.", group: "ataque", format: "count", total: true, value: (l) => l.attack.attempts, drill: n("attack_attempts") },
     { key: "atk_kills", short: "PA", full: "Pontos de ataque", hint: "Ataques # que viraram ponto.", group: "ataque", format: "count", value: (l) => l.attack.kills, drill: n("kills") },
@@ -114,7 +118,7 @@ export function athleteColumns({ modality, aggregated = false, showReception = t
     { key: "atk_blocked", short: "Bloq.", full: "Ataques bloqueados", hint: "Ataques que o bloqueio adversário devolveu para ponto (estão dentro dos erros de ataque).", group: "ataque", format: "count", detail: true, value: (l) => c(l).attack_blocked, drill: n("attack_blocked") },
     { key: "atk_kill_pct", short: "%PA", full: "Aproveitamento de ataque (%)", hint: "Pontos de ataque ÷ total de ataques.", group: "ataque", format: "pct", detail: true, value: (l) => rate(c(l).kills, c(l).attack_attempts), drill: n("attack_attempts") },
     { key: "atk_err_pct", short: "%EA", full: "Erros de ataque (%)", hint: "Erros de ataque (inclui bloqueados) ÷ total de ataques.", group: "ataque", format: "pct", detail: true, value: (l) => rate(c(l).attack_errors, c(l).attack_attempts), drill: n("attack_attempts") },
-    { key: "atk_eff", short: "Efic.", full: "Eficiência de ataque (%)", hint: "(Pontos de ataque − erros de ataque) ÷ total de ataques.", group: "ataque", format: "pct", value: (l) => l.attack.efficiency, drill: n("attack_attempts") },
+    { key: "atk_eff", focus: true, short: "Efic.", full: "Eficiência de ataque (%)", hint: "(Pontos de ataque − erros de ataque) ÷ total de ataques.", group: "ataque", format: "pct", value: (l) => l.attack.efficiency, drill: n("attack_attempts") },
     { key: "atk_k1_eff", short: "Efic. K1", full: "Eficiência de ataque na virada de bola (K1)", hint: "(Pontos − erros) ÷ ataques feitos recebendo o saque (side-out).", group: "ataque", format: "pct", detail: true, value: (l) => efficiency(c(l).attack_k1_kills, c(l).attack_k1_errors, c(l).attack_k1_attempts), drill: n("attack_k1_attempts") },
     { key: "atk_k2_eff", short: "Efic. K2", full: "Eficiência de ataque no contra-ataque (K2)", hint: "(Pontos − erros) ÷ ataques de transição (depois de defesa, bloqueio ou bola de graça).", group: "ataque", format: "pct", detail: true, value: (l) => efficiency(c(l).attack_k2_kills, c(l).attack_k2_errors, c(l).attack_k2_attempts), drill: n("attack_k2_attempts") },
     { key: "atk_first", short: "1ª", full: "Ataques de primeira", hint: "Ataque no 1º toque da posse (bola de primeira).", group: "ataque", format: "count", detail: true, value: (l) => c(l).attack_first, drill: n("attack_first") },
@@ -136,7 +140,7 @@ export function athleteColumns({ modality, aggregated = false, showReception = t
     { key: "atk_block_out", short: "ExpB", full: "Pontos explorando o bloqueio", hint: "Ataques que usaram o bloqueio adversário (block-out) e viraram ponto.", group: "ataque", format: "count", detail: true, value: (l) => c(l).attack_block_out_kills, drill: n("attack_block_out_kills") },
 
     { key: "srv_total", short: "TS", full: "Total de saques", hint: "Todos os saques: aces + erros + em jogo.", group: "saque", format: "count", total: true, value: (l) => l.serve.attempts, drill: n("serve_attempts") },
-    { key: "srv_aces", short: "Ace", full: "Pontos de saque (aces)", hint: "Saque # ou recepção = do adversário logo após o saque.", group: "saque", format: "count", value: (l) => l.serve.aces, drill: n("aces") },
+    { key: "srv_aces", focus: true, short: "Ace", full: "Pontos de saque (aces)", hint: "Saque # ou recepção = do adversário logo após o saque.", group: "saque", format: "count", value: (l) => l.serve.aces, drill: n("aces") },
     { key: "srv_errors", short: "ES", full: "Erros de saque (total)", hint: "Todos os erros de saque, inclusive lances antigos sem detalhe de rede/fora.", group: "saque", format: "count", value: (l) => l.serve.errors, drill: n("serve_errors") },
     { key: "srv_errors_net", short: "ES-R", full: "Erros de saque na rede", hint: "Saque = que parou na rede.", group: "saque", format: "count", value: (l) => l.serve.errors_net, drill: n("serve_errors_net") },
     { key: "srv_errors_out", short: "ES-F", full: "Erros de saque pra fora", hint: "Saque = que caiu fora.", group: "saque", format: "count", value: (l) => l.serve.errors_out, drill: n("serve_errors_out") },
@@ -154,18 +158,18 @@ export function athleteColumns({ modality, aggregated = false, showReception = t
     { key: "rec_sideout", short: "K1 rec.", full: "Virada de bola após a recepção dela (%)", hint: "Ralis ganhos pela equipe quando ela recebeu ÷ recepções dela.", group: "recepcao", format: "pct", detail: true, value: (l) => rate(c(l).reception_won, l.reception.attempts), drill: n("receptions") },
 
     { key: "blk_touches", short: "TB", full: "Total de bloqueios (toques)", hint: "Todos os toques de bloqueio registrados.", group: "bloqueio", format: "count", total: true, detail: true, value: (l) => c(l).block_touches, drill: n("block_touches") },
-    { key: "blocks", short: "Blq", full: "Pontos de bloqueio", hint: "Bloqueios # que viraram ponto.", group: "bloqueio", format: "count", value: (l) => l.blocks, drill: n("blocks") },
+    { key: "blocks", focus: true, short: "Blq", full: "Pontos de bloqueio", hint: "Bloqueios # que viraram ponto.", group: "bloqueio", format: "count", value: (l) => l.blocks, drill: n("blocks") },
     { key: "blk_errors", short: "EB", full: "Erros de bloqueio", hint: "Bloqueio = (toque na rede, bola pra fora no bloqueio).", group: "bloqueio", format: "count", detail: true, value: (l) => c(l).block_errors, drill: n("block_errors") },
 
-    { key: "digs", short: "Def", full: "Total de defesas", hint: "Todas as defesas (primeiro toque depois de um ataque).", group: "defesa", format: "count", total: true, value: (l) => l.digs, drill: n("digs") },
+    { key: "digs", focus: true, short: "Def", full: "Total de defesas", hint: "Todas as defesas (primeiro toque depois de um ataque).", group: "defesa", format: "count", total: true, value: (l) => l.digs, drill: n("digs") },
     { key: "dig_positive", short: "Def+", full: "Defesas positivas", hint: "Defesas # ou + (bola boa para o contra-ataque).", group: "defesa", format: "count", detail: true, value: (l) => c(l).dig_positive, drill: n("dig_positive") },
     { key: "dig_errors", short: "ED", full: "Erros de defesa", hint: "Defesa = (a bola caiu ou saiu sem controle).", group: "defesa", format: "count", detail: true, value: (l) => c(l).dig_errors, drill: n("dig_errors") },
     { key: "dig_won", short: "K2 def.", full: "Contra-ataque convertido após a defesa (%)", hint: "Ralis ganhos pela equipe depois de uma defesa dela ÷ defesas dela.", group: "defesa", format: "pct", detail: true, value: (l) => rate(c(l).dig_won, l.digs), drill: n("digs") },
 
-    { key: "sets", short: "TL", full: "Total de levantamentos", hint: "Todos os levantamentos registrados (volume de distribuição).", group: "levantamento", format: "count", total: true, detail: true, value: (l) => c(l).sets, drill: n("sets") },
+    { key: "sets", focus: true, short: "TL", full: "Total de levantamentos", hint: "Todos os levantamentos registrados (volume de distribuição).", group: "levantamento", format: "count", total: true, detail: true, value: (l) => c(l).sets, drill: n("sets") },
     { key: "set_errors", short: "EL", full: "Erros de levantamento", hint: "Levantamento = (dois toques, condução, bola perdida).", group: "levantamento", format: "count", detail: true, value: (l) => c(l).set_errors, drill: n("set_errors") },
 
-    { key: "errors", short: "Err", full: "Erros cometidos (total)", hint: "Todos os lances = da atleta e ataques bloqueados.", group: "erros", format: "count", total: true, detail: true, value: (l) => l.errors, drill: n("errors") },
+    { key: "errors", focus: true, short: "Err", full: "Erros cometidos (total)", hint: "Todos os lances = da atleta e ataques bloqueados.", group: "erros", format: "count", total: true, detail: true, value: (l) => l.errors, drill: n("errors") },
     { key: "points_given", short: "PE", full: "Pontos entregues", hint: "Erros que deram o ponto ao adversário (lance = ou ataque bloqueado num rali perdido).", group: "erros", format: "count", detail: true, value: (l) => c(l).points_given, drill: n("points_given") },
     { key: "faults", short: "Falt.", full: "Faltas", hint: "Faltas sem contato com a bola: toque na rede, invasão, condução, pé na linha…", group: "erros", format: "count", detail: true, value: (l) => c(l).faults, drill: n("faults") },
   ];
@@ -176,7 +180,7 @@ export function athleteColumns({ modality, aggregated = false, showReception = t
 export function teamColumns({ modality, showReception = true }: ColumnOptions): StatColumn<TeamAggregate>[] {
   const cols: (StatColumn<TeamAggregate> | false)[] = [
     { key: "matches", short: "J", full: "Jogos", hint: "Partidas no recorte.", group: "resultado", format: "count", value: (t) => t.matches },
-    { key: "wins", short: "V", full: "Vitórias", hint: "Partidas vencidas.", group: "resultado", format: "count", value: (t) => t.wins },
+    { key: "wins", focus: true, short: "V", full: "Vitórias", hint: "Partidas vencidas.", group: "resultado", format: "count", value: (t) => t.wins },
     { key: "losses", short: "D", full: "Derrotas", hint: "Partidas perdidas.", group: "resultado", format: "count", value: (t) => t.losses },
     { key: "sets", short: "Sets", full: "Sets (vencidos-perdidos)", hint: "Sets vencidos e perdidos.", group: "resultado", format: "text", only: "table", value: (t) => `${t.sets_won}-${t.sets_lost}` },
     { key: "sets_won", short: "S+", full: "Sets vencidos", hint: "Sets vencidos.", group: "resultado", format: "count", only: "csv", value: (t) => t.sets_won },
@@ -192,12 +196,12 @@ export function teamColumns({ modality, showReception = true }: ColumnOptions): 
     { key: "atk_kills", short: "PA", full: "Pontos de ataque", hint: "Ataques # que viraram ponto.", group: "ataque", format: "count", value: (t) => t.attack.kills, drill: n("kills") },
     { key: "atk_errors", short: "EA", full: "Erros de ataque", hint: "Ataque = ou bloqueado para ponto do adversário.", group: "ataque", format: "count", value: (t) => t.attack.errors, drill: n("attack_errors") },
     { key: "atk_blocked", short: "Bloq.", full: "Ataques bloqueados", hint: "Ataques que o bloqueio adversário devolveu para ponto.", group: "ataque", format: "count", detail: true, value: (t) => t.counters.attack_blocked, drill: n("attack_blocked") },
-    { key: "atk_eff", short: "Efic.", full: "Eficiência de ataque (%)", hint: "(Pontos de ataque − erros de ataque) ÷ total de ataques.", group: "ataque", format: "pct", value: (t) => t.attack.efficiency, drill: n("attack_attempts") },
+    { key: "atk_eff", focus: true, short: "Efic.", full: "Eficiência de ataque (%)", hint: "(Pontos de ataque − erros de ataque) ÷ total de ataques.", group: "ataque", format: "pct", value: (t) => t.attack.efficiency, drill: n("attack_attempts") },
     { key: "atk_k1_eff", short: "Efic. K1", full: "Eficiência de ataque na virada de bola (K1)", hint: "(Pontos − erros) ÷ ataques feitos recebendo o saque.", group: "ataque", format: "pct", detail: true, value: (t) => efficiency(t.counters.attack_k1_kills, t.counters.attack_k1_errors, t.counters.attack_k1_attempts), drill: n("attack_k1_attempts") },
     { key: "atk_k2_eff", short: "Efic. K2", full: "Eficiência de ataque no contra-ataque (K2)", hint: "(Pontos − erros) ÷ ataques de transição.", group: "ataque", format: "pct", detail: true, value: (t) => efficiency(t.counters.attack_k2_kills, t.counters.attack_k2_errors, t.counters.attack_k2_attempts), drill: n("attack_k2_attempts") },
 
     { key: "srv_total", short: "TS", full: "Total de saques", hint: "Todos os saques da dupla.", group: "saque", format: "count", total: true, value: (t) => t.serve.attempts, drill: n("serve_attempts") },
-    { key: "srv_aces", short: "Ace", full: "Pontos de saque (aces)", hint: "Aces da dupla.", group: "saque", format: "count", value: (t) => t.points.aces },
+    { key: "srv_aces", focus: true, short: "Ace", full: "Pontos de saque (aces)", hint: "Aces da dupla.", group: "saque", format: "count", value: (t) => t.points.aces },
     { key: "srv_errors", short: "ES", full: "Erros de saque (total)", hint: "Todos os erros de saque da dupla.", group: "saque", format: "count", value: (t) => t.serve.errors, drill: n("serve_errors") },
     { key: "srv_pressure", short: "Press.", full: "Pressão do saque (%)", hint: "Recepções adversárias ruins (-, /, =) forçadas ÷ saques com a recepção avaliada.", group: "saque", format: "pct", detail: true, value: (t) => rate(t.counters.serve_pressure_forced, t.counters.serve_pressure_rated), drill: n("serve_pressure_rated") },
 
@@ -205,12 +209,12 @@ export function teamColumns({ modality, showReception = true }: ColumnOptions): 
     showReception && receptionColumn<TeamAggregate>(modality),
     { key: "rec_errors", short: "ER", full: "Erros de recepção (aces sofridos)", hint: "Recepções = da dupla.", group: "recepcao", format: "count", detail: true, value: (t) => t.reception.errors, drill: n("reception_errors") },
 
-    { key: "blocks", short: "Blq", full: "Pontos de bloqueio", hint: "Bloqueios # que viraram ponto.", group: "bloqueio", format: "count", value: (t) => t.points.blocks },
+    { key: "blocks", focus: true, short: "Blq", full: "Pontos de bloqueio", hint: "Bloqueios # que viraram ponto.", group: "bloqueio", format: "count", value: (t) => t.points.blocks },
     { key: "blk_exploited", short: "Blq expl.", full: "Bloqueios explorados (sofridos)", hint: "Pontos do adversário usando o bloqueio desta dupla (block-out).", group: "bloqueio", format: "count", detail: true, value: (t) => t.counters.blocks_exploited },
 
-    { key: "digs", short: "Def", full: "Total de defesas", hint: "Todas as defesas da dupla.", group: "defesa", format: "count", total: true, detail: true, value: (t) => t.digs, drill: n("digs") },
+    { key: "digs", focus: true, short: "Def", full: "Total de defesas", hint: "Todas as defesas da dupla.", group: "defesa", format: "count", total: true, detail: true, value: (t) => t.digs, drill: n("digs") },
 
-    { key: "errors", short: "Err", full: "Erros cometidos (total)", hint: "Todos os lances = da dupla e ataques bloqueados.", group: "erros", format: "count", total: true, detail: true, value: (t) => t.errors, drill: n("errors") },
+    { key: "errors", focus: true, short: "Err", full: "Erros cometidos (total)", hint: "Todos os lances = da dupla e ataques bloqueados.", group: "erros", format: "count", total: true, detail: true, value: (t) => t.errors, drill: n("errors") },
     { key: "points_given", short: "PE", full: "Pontos entregues", hint: "Erros que deram o ponto ao adversário.", group: "erros", format: "count", detail: true, value: (t) => t.counters.points_given, drill: n("points_given") },
   ];
   return cols.filter((c): c is StatColumn<TeamAggregate> => !!c);

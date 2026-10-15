@@ -132,3 +132,23 @@ Tudo é recalculado do ledger (nada persistido) e cada métrica é um contador b
 - **Origem dos pontos:** ataque, ace, bloqueio (e erro do adversário nas duplas); a soma é o total de pontos (= placar nas duplas), com o fundamento dominante destacado.
 - **Relatório de torneio:** seções Feminino, Masculino, Misto (duplas mistas) e "sem gênero". Destaques com volume mínimo: eficiência de ataque (10 ataques), pressão de saque (10 saques avaliados), passe (10 recepções avaliadas), K2 de ataque (10); duplas K1/K2 (20 saques). Maior fonte de erros = pontos entregues por tipo, com quem mais cometeu cada um.
 - **Modo comissão técnica:** preferência do aparelho que esconde scout e edição. Não é controle de acesso.
+
+## Espelho tático, duelos e narrativa (Fase 16)
+- **Cada rali fechado tem uma causa com duas leituras** (`rally-facts.ts`): o mérito de quem ganhou e o espelho em quem perdeu. Se uma dupla "explorou o bloqueio" 4 vezes, a outra tem "Bloqueio explorado" 4 nos pontos cedidos — sempre.
+
+| Causa | Quem ganhou | Quem perdeu | Tipo do ponto cedido |
+|---|---|---|---|
+| Ace | Ace | Ace sofrido | mérito do adversário |
+| Ataque com block-out | Explorou o bloqueio | Bloqueio explorado | mérito do adversário |
+| Largada | Largada de segunda / (3º toque) | Largada … sofrida | mérito do adversário |
+| Ataque | Ataque de primeira / de segunda / (3º toque) | Ataque … não defendido | mérito do adversário |
+| Bloqueio # | Ponto de bloqueio | Ataque bloqueado | erro próprio (do atacante) |
+| Lance = | Erro do adversário: saque fora… | Saque fora… | erro próprio |
+| 4 toques / falta | Erro do adversário: 4 toques / falta | 4 toques / Falta: … | erro próprio |
+| Ponto marcado sem lance | Ponto sem detalhe | Ponto cedido sem detalhe | sem detalhe |
+
+- **Pontos cedidos** (antes "De onde vieram os erros"): separados em erros próprios e mérito do adversário; a soma é o placar do adversário. Na atleta, contam os ralis em que ela é a culpada (errou, foi bloqueada, sofreu o ace, teve o bloqueio explorado quando o toque de bloqueio foi registrado). Ponto sem atleta identificável conta só para a dupla.
+- **Duelo:** o adversário de cada lance vem da sequência do rali — bloqueio → o atacante anterior; ataque → quem bloqueou/defendeu em seguida; saque → quem recebeu; recepção → quem sacou; defesa → o atacante anterior. Sem o toque do outro lado, não há nome (nunca inventado).
+- **Narrativa do placar:** maior sequência de cada dupla (a partir de 3), viradas de liderança, empates e **trocação** (a partir de 6 side-outs seguidos: pontos de quem recebia).
+- **Construtor:** marcar um grupo ordena, em ordem decrescente, pela métrica-foco dele (Geral → Pts, Ataque → Efic., Saque → Ace, Recepção → passe, Bloqueio → Blq, Defesa → Def, Levantamento → TL, Erros → Err). Em métricas de erro, decrescente = quem mais errou primeiro.
+- **Drill por grupo:** em "Partida", "Set", "Momento", "K1/K2" e "Adversário", cada linha mostra a própria taxa da métrica (ex.: eficiência daquele jogo) e o **pico** fica destacado.

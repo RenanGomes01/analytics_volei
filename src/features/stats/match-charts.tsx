@@ -3,14 +3,15 @@
 import type { ReactNode } from "react";
 import type { RallyResult } from "@/domain/rally/replay";
 import { tallyRallies, type Roster } from "@/domain/stats/box-score";
-import { attackOutcomes, longestRuns, rallyPointKinds, scoreProgression, serveOutcomes } from "@/domain/stats/match-insights";
+import { attackOutcomes, rallyPointKinds, scoreProgression, serveOutcomes } from "@/domain/stats/match-insights";
+import { setStories, storyLines } from "@/domain/stats/match-story";
 import type { TeamSide } from "@/domain/types";
 import { Legend } from "@/features/charts/chart-tooltip";
 import { OutcomeChart } from "@/features/charts/outcome-chart";
 import { SERIES } from "@/features/charts/palette";
 import { PointKindsChart } from "@/features/charts/point-kinds-chart";
 import { PointsMixChart } from "@/features/charts/points-mix-chart";
-import { ScoreProgressionChart } from "@/features/charts/score-progression-chart";
+import { MarkerLegend, ScoreProgressionChart } from "@/features/charts/score-progression-chart";
 
 /** O que a aba de estatísticas está mostrando. */
 export type StatsView = { kind: "all" } | { kind: "team"; team: TeamSide } | { kind: "athlete"; athlete_id: string; team: TeamSide };
@@ -43,19 +44,31 @@ function Panel({ title, note, children }: { title: string; note?: string; childr
 export default function MatchCharts({ view, rallies, roster, teamName, athleteName }: Props) {
   if (view.kind === "all") {
     const sets = [...scoreProgression(rallies)];
-    const runs = longestRuns(rallies);
+    const stories = new Map(setStories(rallies).map((s) => [s.set_number, s]));
     const names = { A: teamName("A"), B: teamName("B") };
     return (
       <div className="grid gap-3 lg:grid-cols-2">
-        <Panel title="Evolução do placar" note={`Maior sequência: ${names.A} ${runs.A} · ${names.B} ${runs.B} pontos seguidos`}>
+        <Panel title="Evolução do placar" note="Sequências, viradas e trocações de side-out marcadas no gráfico e contadas embaixo">
           <Legend items={[{ color: SERIES[0], label: names.A }, { color: SERIES[1], label: names.B }]} />
+          <MarkerLegend />
           {sets.length === 0 && <p className="text-sm text-zinc-500">Ainda sem pontos.</p>}
-          {sets.map(([set, line]) => (
-            <div key={set}>
-              <p className="text-xs uppercase tracking-wide text-zinc-400">Set {set}</p>
-              <ScoreProgressionChart data={line} names={names} />
-            </div>
-          ))}
+          {sets.map(([set, line]) => {
+            const story = stories.get(set);
+            const lines = story ? storyLines(story, (t) => names[t]) : [];
+            return (
+              <div key={set} className="flex flex-col gap-1">
+                <p className="text-xs uppercase tracking-wide text-zinc-400">Set {set}</p>
+                <ScoreProgressionChart data={line} names={names} story={story} />
+                {lines.length > 0 && (
+                  <ul className="flex list-disc flex-col gap-0.5 pl-5 text-sm text-zinc-300">
+                    {lines.map((l) => (
+                      <li key={l}>{l}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
         </Panel>
         <div className="flex flex-col gap-3">
           {(["A", "B"] as const).map((t) => (

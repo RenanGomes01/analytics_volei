@@ -56,7 +56,7 @@ export function AthleteTable({ modality, side, teamName, athleteIds, athletes, s
         facts
           ? (row) => ({
               facts: row.key === "total" ? facts.filter((f) => f.team === side) : factsIn(facts, { athlete_id: row.key }),
-              athleteLabel: row.key === "total" ? athleteName : undefined,
+              athleteLabel: athleteName,
               dimensions: row.key === "total" ? ["type", "outcome", "set", "moment", "phase", "touch", "athlete"] : undefined,
             })
           : undefined

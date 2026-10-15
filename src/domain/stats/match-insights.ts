@@ -1,6 +1,6 @@
-import { POINT_DETAIL_LABEL } from "../rally/quick-rally";
 import type { RallyResult } from "../rally/replay";
-import type { TeamSide, TouchEvent } from "../types";
+import type { TeamSide } from "../types";
+import { classifyRally } from "./rally-facts";
 
 /**
  * Leituras de uma partida para os gráficos in-game (e "como os pontos aconteceram" da temporada).
@@ -14,44 +14,14 @@ export interface PointKind {
   count: number;
 }
 
-/** O ataque é o 2º toque da posse (bola de segunda)? Mesma regra de `touch-lines.ts`. */
-function isSecondTouch(touches: readonly TouchEvent[], i: number): boolean {
-  const prev = touches[i - 1];
-  return i >= 2 && prev.team === touches[i].team && prev.skill !== "serve" && touches[i - 2].team !== touches[i].team;
-}
-
-/** Rótulo de como o ponto aconteceu, do ponto de vista de quem ganhou o rali. */
+/**
+ * Rótulo de como o ponto aconteceu, do ponto de vista de quem ganhou o rali. Vem do mesmo
+ * classificador do espelho tático (rally-facts.ts): o mérito daqui é o "cedido" do outro lado.
+ */
 export function pointKindLabel(r: RallyResult): { label: string; group: PointKind["group"] } {
-  const i = r.touches.length - 1;
-  const last = r.touches[i];
-  const detail = r.detail ? ` (${POINT_DETAIL_LABEL[r.detail]})` : "";
-  switch (r.reason) {
-    case "ace":
-      return { label: "Ace", group: "won" };
-    case "kill":
-      if (r.detail === "shot") return { label: "Largada / shot", group: "won" };
-      if (r.detail === "block_out") return { label: "Explorou o bloqueio", group: "won" };
-      if (last?.skill === "block") return { label: "Ponto de bloqueio", group: "won" };
-      if (last?.skill === "attack" && isSecondTouch(r.touches, i)) return { label: "Bola de segunda", group: "won" };
-      return { label: "Ponto de ataque", group: "won" };
-    case "four_touches":
-      return { label: "4 toques", group: "error" };
-    case "error": {
-      const skill = last?.skill;
-      const base =
-        skill === "serve" ? "Erro de saque"
-        : skill === "attack" ? "Erro de ataque"
-        : skill === "block" ? "Erro de bloqueio"
-        : skill === "dig" ? "Erro de defesa"
-        : skill === "set" ? "Erro de levantamento"
-        : skill === "fault" ? "Falta"
-        : "Erro";
-      const withDetail = skill === "fault" || skill === "set" || skill === "serve";
-      return { label: `${base}${withDetail ? detail : ""}`, group: "error" };
-    }
-    default:
-      return { label: r.detail ? `Falta${detail}` : "Ponto marcado (sem detalhe)", group: "error" };
-  }
+  const cause = classifyRally(r);
+  if (!cause) return { label: "Ponto marcado (sem detalhe)", group: "error" };
+  return { label: cause.merit, group: cause.group === "opponent_errors" ? "error" : "won" };
 }
 
 /** Conta como os pontos aconteceram nos ralis; `wonBy` limita aos pontos de uma equipe. */
