@@ -17,6 +17,7 @@ export const { dynamic, dynamicParams, revalidate, generateStaticParams, GET } =
     { url: "/athlete", revision },
     { url: "/team", revision },
     { url: "/account", revision },
+    { url: "/staff", revision },
     { url: "/~offline", revision },
   ],
   useNativeEsbuild: true,

@@ -22,9 +22,16 @@ import { pct } from "@/features/stats/format";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
 import { addMatchToTournament, removeMatchFromTournament, setMatchPhase } from "@/services/tournament-service";
 import { useCompetitionData, type CompetitionData } from "./use-competition-data";
+import { TournamentReport } from "./tournament-report";
+import { factsIn } from "@/domain/stats/drill";
+import { PrintButton } from "@/features/print/print-button";
+import { PrintHeader } from "@/features/print/print-header";
+import { StaffHidden } from "@/features/staff/staff-hidden";
+import { useStaffMode } from "@/features/staff/staff-mode";
 
-type Tab = "ranking" | "teams" | "athletes" | "matches";
+type Tab = "report" | "ranking" | "teams" | "athletes" | "matches";
 const TABS: [Tab, string][] = [
+  ["report", "Relatório"],
   ["ranking", "Ranking"],
   ["teams", "Duplas"],
   ["athletes", "Atletas"],
@@ -89,7 +96,7 @@ function RankingCards({ data, roster }: { data: CompetitionData; roster: RosterD
   );
 }
 
-function TeamsTable({ data, roster }: { data: CompetitionData; roster: RosterData }) {
+function TeamsTable({ data, roster, detailed }: { data: CompetitionData; roster: RosterData; detailed: boolean }) {
   const { teamName } = useNames(roster, data.stats);
   const teams = Object.values(data.stats.teams).sort(
     (a, b) => b.wins - a.wins || a.losses - b.losses || b.points_for - b.points_against - (a.points_for - a.points_against),
@@ -97,35 +104,48 @@ function TeamsTable({ data, roster }: { data: CompetitionData; roster: RosterDat
   const showReception = teams.some((t) => t.reception.positive.den > 0);
   const rows: StatRow<TeamAggregate>[] = teams.map((t) => ({
     key: t.pair_key,
+    name: teamName(t.pair_key),
     line: t,
     label: <EntityLink href={teamHref(t.pair_key)}>{teamName(t.pair_key)}</EntityLink>,
   }));
   return (
     <StatTable
       firstHeader={data.tournament.modality === "beach" ? "Dupla" : "Time"}
-      columns={tableColumns(teamColumns({ modality: data.tournament.modality, showReception }))}
+      columns={tableColumns(teamColumns({ modality: data.tournament.modality, showReception }), { detailed })}
       rows={rows}
-      minWidth={1000}
+      minWidth={detailed ? 1600 : 1000}
+      drill={(row) => ({ facts: factsIn(data.facts, { pair_key: row.key }), matchLabel: matchLabelOf(data), athleteLabel: (id) => roster.athleteById.get(id)?.name ?? id.slice(0, 6) })}
     />
   );
 }
 
-function AthletesTable({ data, roster }: { data: CompetitionData; roster: RosterData }) {
+/** Rótulo da partida no drill-down: "Dupla A × Dupla B". */
+function matchLabelOf(data: CompetitionData) {
+  const byId = new Map(data.matches.map((m) => [m.match.id, m.match]));
+  return (id: string) => {
+    const m = byId.get(id);
+    return m ? `${m.team_a.name} × ${m.team_b.name}` : id.slice(0, 6);
+  };
+}
+
+function AthletesTable({ data, roster, detailed }: { data: CompetitionData; roster: RosterData; detailed: boolean }) {
   const { athleteName } = useNames(roster, data.stats);
   const athletes = Object.values(data.stats.athletes).sort((a, b) => b.points - a.points || athleteName(a.athlete_id).localeCompare(athleteName(b.athlete_id)));
   // Passe na mão só com recepções avaliadas (o modo rápido não avalia o passe).
   const showReception = athletes.some((a) => a.reception.positive.den > 0);
   const rows: StatRow<PlayerLine>[] = athletes.map((a) => ({
     key: a.athlete_id,
+    name: athleteName(a.athlete_id),
     line: a,
     label: <EntityLink href={athleteHref(a.athlete_id)}>{athleteName(a.athlete_id)}</EntityLink>,
   }));
   return (
     <StatTable
       firstHeader="Atleta"
-      columns={tableColumns(athleteColumns({ modality: data.tournament.modality, aggregated: true, showReception }))}
+      columns={tableColumns(athleteColumns({ modality: data.tournament.modality, aggregated: true, showReception }), { detailed })}
       rows={rows}
-      minWidth={1000}
+      minWidth={detailed ? 2400 : 1000}
+      drill={(row) => ({ facts: factsIn(data.facts, { athlete_id: row.key }), matchLabel: matchLabelOf(data) })}
     />
   );
 }
@@ -228,8 +248,11 @@ function Dashboard({ tournamentId }: { tournamentId: string }) {
   const roster = useRosterData();
   const [phase, setPhase] = useState<PhaseFilter>("all");
   const data = useCompetitionData(tournamentId, roster?.aliases, phase);
-  const [tab, setTab] = useState<Tab>("ranking");
+  const params = useSearchParams();
+  const staff = useStaffMode();
+  const [tab, setTab] = useState<Tab>(() => (TABS.some(([t]) => t === params.get("tab")) ? (params.get("tab") as Tab) : "report"));
   const [editing, setEditing] = useState(false);
+  const [detailed, setDetailed] = useState(false);
 
   if (data === null) {
     return (
@@ -269,22 +292,28 @@ function Dashboard({ tournamentId }: { tournamentId: string }) {
             {stats.totals.matches} jogos ({stats.totals.finished} encerrados) · {stats.totals.sets} sets · {stats.totals.rallies} ralis
           </p>
         </div>
-        <div className="flex gap-2">
-          <button type="button" onClick={() => setEditing(true)} className="min-h-12 rounded-xl bg-zinc-800 px-4 font-semibold">
-            Editar
-          </button>
+        <div className="flex flex-wrap gap-2" data-print="hide">
+          <StaffHidden>
+            <button type="button" onClick={() => setEditing(true)} className="min-h-12 rounded-xl bg-zinc-800 px-4 font-semibold">
+              Editar
+            </button>
+          </StaffHidden>
+          <PrintButton />
           <button type="button" onClick={exportCsv} className="min-h-12 rounded-xl bg-emerald-200 px-4 font-semibold text-emerald-950">
             ⇩ CSV
           </button>
-          <HardLink href={`/new?tournament=${encodeURIComponent(tournament.id)}`} className="min-h-12 rounded-xl bg-amber-400 px-4 py-3 font-bold text-zinc-950">
-            + Partida
-          </HardLink>
+          <StaffHidden>
+            <HardLink href={`/new?tournament=${encodeURIComponent(tournament.id)}`} className="min-h-12 rounded-xl bg-amber-400 px-4 py-3 font-bold text-zinc-950">
+              + Partida
+            </HardLink>
+          </StaffHidden>
         </div>
       </header>
       {editing && <TournamentEditSheet tournament={tournament} matches={data.matches.length} onClose={() => setEditing(false)} />}
 
-      <nav role="tablist" className="flex gap-1 rounded-2xl bg-zinc-900 p-1">
-        {TABS.map(([id, label]) => (
+      <PrintHeader subtitle={`${TABS.find(([t]) => t === tab)?.[1] ?? ""}${phase !== "all" ? ` · fase: ${phase}` : ""}`} />
+      <nav role="tablist" data-print="hide" className="flex gap-1 rounded-2xl bg-zinc-900 p-1">
+        {TABS.filter(([id]) => !staff || id !== "matches").map(([id, label]) => (
           <button
             key={id}
             type="button"
@@ -299,7 +328,7 @@ function Dashboard({ tournamentId }: { tournamentId: string }) {
       </nav>
 
       {tab !== "matches" && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2" data-print="hide">
           <label htmlFor="phase-filter" className="text-sm text-zinc-400">
             Fase:
           </label>
@@ -324,10 +353,17 @@ function Dashboard({ tournamentId }: { tournamentId: string }) {
         </div>
       )}
 
+      {(tab === "teams" || tab === "athletes") && (
+        <label className="flex min-h-11 items-center gap-2 self-start text-sm text-zinc-300" data-print="hide">
+          <input type="checkbox" checked={detailed} onChange={(e) => setDetailed(e.target.checked)} className="size-5" />
+          Ver todas as métricas (toque num número para detalhar)
+        </label>
+      )}
+      {tab === "report" && <TournamentReport data={data} roster={roster} />}
       {tab === "ranking" && <RankingCards data={data} roster={roster} />}
-      {tab === "teams" && <TeamsTable data={data} roster={roster} />}
-      {tab === "athletes" && <AthletesTable data={data} roster={roster} />}
-      {tab === "matches" && <MatchesTab data={data} roster={roster} />}
+      {tab === "teams" && <TeamsTable data={data} roster={roster} detailed={detailed} />}
+      {tab === "athletes" && <AthletesTable data={data} roster={roster} detailed={detailed} />}
+      {tab === "matches" && !staff && <MatchesTab data={data} roster={roster} />}
     </div>
   );
 }

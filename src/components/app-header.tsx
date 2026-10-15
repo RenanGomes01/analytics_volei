@@ -6,6 +6,7 @@ import { HardLink } from "@/components/hard-link";
 import { useOnline } from "@/features/network/use-network";
 import { SYNC_MODE } from "@/features/sync/sync-config";
 import { useSyncStatus } from "@/features/sync/use-sync-status";
+import { useStaffMode, writeStaffMode } from "@/features/staff/staff-mode";
 
 const LINKS: { href: string; label: string; match: (path: string) => boolean }[] = [
   { href: "/", label: "Partidas", match: (p) => p === "/" || p.startsWith("/tournament") || p.startsWith("/new") },
@@ -13,6 +14,12 @@ const LINKS: { href: string; label: string; match: (path: string) => boolean }[]
   { href: "/roster", label: "Atletas e duplas", match: (p) => p.startsWith("/roster") },
   { href: "/account", label: "Nuvem", match: (p) => p.startsWith("/account") },
   { href: "/import", label: "Importar", match: (p) => p.startsWith("/import") },
+];
+
+/** Modo comissão técnica: só análise (sem scout, cadastro, importação nem nuvem). */
+const STAFF_LINKS: typeof LINKS = [
+  { href: "/staff", label: "Comissão técnica", match: (p) => p.startsWith("/staff") || p.startsWith("/tournament") },
+  { href: "/rankings", label: "Rankings e relatórios", match: (p) => p.startsWith("/rankings") || p.startsWith("/athlete") || p.startsWith("/team") },
 ];
 
 type Dot = { tone: string; label: string } | null;
@@ -29,9 +36,10 @@ function useCloudDot(): Dot {
 }
 
 function NavLinks({ path, dot, vertical }: { path: string; dot: Dot; vertical?: boolean }) {
+  const staff = useStaffMode();
   return (
     <>
-      {LINKS.map(({ href, label, match }) => {
+      {(staff ? STAFF_LINKS : LINKS).map(({ href, label, match }) => {
         const active = match(path);
         return (
           <HardLink
@@ -56,6 +64,7 @@ export function AppHeader() {
   const path = usePathname();
   const dot = useCloudDot();
   const [open, setOpen] = useState(false);
+  const staff = useStaffMode();
 
   useEffect(() => {
     if (!open) return;
@@ -65,18 +74,24 @@ export function AppHeader() {
   }, [open]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur">
+    <header data-print="hide" className="sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur">
       <div className="mx-auto flex w-full max-w-5xl items-center gap-2 px-4 py-2">
-        <HardLink href="/" className="mr-2 min-h-12 content-center text-xl font-bold tracking-tight">
+        <HardLink href={staff ? "/staff" : "/"} className="mr-2 min-h-12 content-center text-xl font-bold tracking-tight">
           🏐 Scout Vôlei
         </HardLink>
         <nav aria-label="Principal" className="hidden flex-1 items-center gap-1 md:flex">
           <NavLinks path={path} dot={dot} />
         </nav>
         <span className="flex-1 md:hidden" />
-        <HardLink href="/new" className="min-h-12 content-center rounded-xl bg-amber-400 px-4 font-bold text-zinc-950">
-          + Nova partida
-        </HardLink>
+        {staff ? (
+          <button type="button" onClick={() => writeStaffMode(false)} className="min-h-12 rounded-xl bg-zinc-800 px-4 font-semibold text-zinc-200">
+            Sair do modo comissão
+          </button>
+        ) : (
+          <HardLink href="/new" className="min-h-12 content-center rounded-xl bg-amber-400 px-4 font-bold text-zinc-950">
+            + Nova partida
+          </HardLink>
+        )}
         <button
           type="button"
           onClick={() => setOpen(true)}

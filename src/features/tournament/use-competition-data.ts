@@ -6,6 +6,7 @@ import { getDB } from "@/db/client";
 import { replayMatch, type MatchState } from "@/domain/rally/replay";
 import { rulesFor } from "@/domain/rules/modality";
 import { aggregateCompetition, type CompetitionStats } from "@/domain/stats/aggregate";
+import { buildFacts, type TouchFact } from "@/domain/stats/facts";
 import { matchesPhase, type PhaseFilter, type TournamentPhase } from "@/domain/roster/types";
 import type { Match, RallyEvent } from "@/domain/types";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
@@ -18,6 +19,8 @@ export interface CompetitionData {
   matches: { match: Match; events: RallyEvent[]; state: MatchState; entry_id: string; phase?: TournamentPhase }[];
   /** Agregação só das partidas da fase escolhida. */
   stats: CompetitionStats;
+  /** Lances com contexto das mesmas partidas (drill-down e relatório, Fase 15). */
+  facts: TouchFact[];
 }
 
 /**
@@ -52,6 +55,11 @@ export function useCompetitionData(tournamentId: string, aliases: ReadonlyMap<st
       state: replayMatch(m.events, { rules: rulesFor(m.match.modality), first_server: m.match.first_server }),
     }));
     const selected = loaded.filter((m) => matchesPhase(m.phase, phase));
-    return { tournament, matches, stats: aggregateCompetition(selected, { aliases }) };
-  }, [tournament, loaded, aliases, phase]);
+    return {
+      tournament,
+      matches,
+      stats: aggregateCompetition(selected, { aliases }),
+      facts: buildFacts(selected.map((m) => ({ ...m, tournament_id: tournamentId })), aliases),
+    };
+  }, [tournament, loaded, aliases, phase, tournamentId]);
 }

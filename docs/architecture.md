@@ -66,3 +66,10 @@
 - **Sem sync na tela de scout** (`syncAllowedOn`): o SyncAgent não monta timers nem envia/baixa em `/match`. O outbox acumula e sobe ao sair (navegação completa).
 - **Abas ocultas não reexecutam consultas pesadas** (`useVisibleLiveQuery`): a primeira leitura roda sempre; depois, oculta, a aba mantém o último resultado.
 - **Abertura que não termina vira diagnóstico:** Error Boundary + timeout de 8 s em `/match` mostram o erro real, se o banco está bloqueado por outra aba (`db.on("blocked")`), contagens com prazo próprio e o espaço usado. "Recarregar banco de dados local" fecha a conexão e recarrega — nunca apaga dados.
+
+## Motor de analytics e relatórios (Fase 15)
+- **Fatos** (`domain/stats/facts.ts`): uma linha por lance a partir de `replayMatch`, com a contribuição `touchDelta` (a mesma das tabelas), posição na posse, K1/K2, placar antes do rali, momento e clutch. O drill-down (`drill.ts`) só filtra e agrupa: cada coluna de `stat-columns.ts` tem `drill(delta)`, então a soma do detalhamento é o número da tabela (teste com ledgers aleatórios).
+- **Micro-métricas** são contadores novos em `TouchCounters` (somáveis); as linhas de atleta/equipe carregam `counters`. Contadores que dependem do rali inteiro (`serves_faced`, `blocks_exploited`) são somados em `tallyRallies`.
+- **Relatório** (`report.ts`), **origem dos pontos** (`point-sources.ts`) e **ordenação** (`sort.ts`) são puros. Telas calculam fatos uma vez por recorte (`useMemo`); 200 partidas ≈ 0,6 s no Node em modo econômico.
+- **PDF** = `window.print()` + `@media print` (A4, claro, sem menus/botões, gráficos com texto preto). Sem biblioteca, offline.
+- **Modo comissão** (`features/staff`): `localStorage` do aparelho; `StaffHidden`/`StaffGuard` escondem scout e CRUD. Os dados continuam vindo do Dexie local (nuvem via pull).

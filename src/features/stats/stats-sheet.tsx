@@ -4,7 +4,13 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { replayMatch } from "@/domain/rally/replay";
 import type { ModalityRules } from "@/domain/rules/modality";
+import { factsIn } from "@/domain/stats/drill";
+import { buildFacts } from "@/domain/stats/facts";
 import type { AthleteStats, StatsFilter } from "@/domain/stats/types";
+import { ErrorSourcesCard } from "@/features/analytics/drill/error-sources-card";
+import { PointSourcesCard } from "@/features/analytics/drill/point-sources-card";
+import { PrintButton } from "@/features/print/print-button";
+import { PrintHeader } from "@/features/print/print-header";
 import type { Athlete, Match, RallyEvent, TeamSide } from "@/domain/types";
 import { CsvExportButton } from "@/features/export/csv-export-button";
 import { ExportButton } from "@/features/export/export-button";
@@ -37,6 +43,7 @@ const ALL: StatsFilter = { set: "all" };
 export function StatsSheet({ match, rules, events, athletes, sides, onClose }: Props) {
   const [filter, setFilter] = useState<StatsFilter>(ALL);
   const [view, setView] = useState<StatsView>({ kind: "all" });
+  const [detailed, setDetailed] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
   const box = useBoxScore(events, match, rules, filter);
 
@@ -57,6 +64,11 @@ export function StatsSheet({ match, rules, events, athletes, sides, onClose }: P
     const all = replayMatch(events, { rules, first_server: match.first_server }).rallies;
     return filter.set === "all" ? all : all.filter((r) => r.set_number === filter.set);
   }, [events, rules, match.first_server, filter]);
+  // Lances com contexto (drill-down): mesmos ralis e mesma contribuição do Box Score.
+  const facts = useMemo(() => {
+    const all = buildFacts([{ match, events }]);
+    return filter.set === "all" ? all : all.filter((f) => f.set_number === filter.set);
+  }, [match, events, filter]);
   // Passe na mão só aparece quando alguém avaliou recepções (o modo rápido não avalia).
   const showReception = box.teams.A.reception.positive.den + box.teams.B.reception.positive.den > 0;
   const teamsShown = view.kind === "all" ? sides : [view.team];
@@ -89,6 +101,7 @@ export function StatsSheet({ match, rules, events, athletes, sides, onClose }: P
           <SyncBadge />
         </span>
         <SetFilter sets={box.sets_available} value={filter} onChange={setFilter} />
+        <PrintButton />
         <CsvExportButton box={box} match={match} athletes={athletes} filter={filter} />
         <ExportButton matchId={match.id} />
         <button
@@ -103,7 +116,11 @@ export function StatsSheet({ match, rules, events, athletes, sides, onClose }: P
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
-        <div role="radiogroup" aria-label="Visão das estatísticas" className="mb-4 flex gap-2 overflow-x-auto pb-1">
+        <PrintHeader
+          title={`${teamName("A")} × ${teamName("B")}`}
+          subtitle={`Estatísticas da partida${filter.set === "all" ? "" : ` · set ${filter.set}`}${view.kind === "athlete" ? ` · ${athleteName(view.athlete_id)}` : view.kind === "team" ? ` · ${teamName(view.team)}` : ""}`}
+        />
+        <div role="radiogroup" data-print="hide" aria-label="Visão das estatísticas" className="mb-4 flex gap-2 overflow-x-auto pb-1">
           {chip("all", "Geral", { kind: "all" })}
           {sides.map((t) => chip(`team:${t}`, teamName(t), { kind: "team", team: t }))}
           <span aria-hidden className="mx-1 w-px shrink-0 bg-zinc-700" />
@@ -111,13 +128,33 @@ export function StatsSheet({ match, rules, events, athletes, sides, onClose }: P
         </div>
 
         {view.kind === "athlete" ? (
-          <AthleteHeader stats={box.athletes[view.athlete_id]} name={athleteName(view.athlete_id)} team={teamName(view.team)} />
+          <>
+            <AthleteHeader stats={box.athletes[view.athlete_id]} name={athleteName(view.athlete_id)} team={teamName(view.team)} />
+            {box.athletes[view.athlete_id] && (
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <PointSourcesCard
+                  points={{ kills: box.athletes[view.athlete_id].attack.kills, aces: box.athletes[view.athlete_id].serve.aces, blocks: box.athletes[view.athlete_id].blocks }}
+                />
+                <ErrorSourcesCard facts={factsIn(facts, { athlete_id: view.athlete_id })} />
+              </div>
+            )}
+          </>
         ) : (
-          <div className={`grid gap-3 ${teamsShown.length > 1 ? "md:grid-cols-2" : ""}`}>
-            {teamsShown.map((t) => (
-              <TeamSummary key={t} modality={match.modality} name={teamName(t)} stats={box.teams[t]} showReception={showReception} />
-            ))}
-          </div>
+          <>
+            <div className={`grid gap-3 ${teamsShown.length > 1 ? "md:grid-cols-2" : ""}`}>
+              {teamsShown.map((t) => (
+                <TeamSummary key={t} modality={match.modality} name={teamName(t)} stats={box.teams[t]} showReception={showReception} />
+              ))}
+            </div>
+            <div className={`mt-3 grid gap-3 ${teamsShown.length > 1 ? "md:grid-cols-2" : ""}`}>
+              {teamsShown.map((t) => (
+                <PointSourcesCard key={t} title={`Origem dos pontos — ${teamName(t)}`} points={box.teams[t].points} />
+              ))}
+              {teamsShown.map((t) => (
+                <ErrorSourcesCard key={`e${t}`} title={`De onde vieram os erros — ${teamName(t)}`} facts={facts.filter((f) => f.team === t)} />
+              ))}
+            </div>
+          </>
         )}
 
         <div className="mt-4">
@@ -126,6 +163,10 @@ export function StatsSheet({ match, rules, events, athletes, sides, onClose }: P
 
         {view.kind !== "athlete" && (
           <div className="mt-6 flex flex-col gap-6">
+            <label className="flex min-h-11 items-center gap-2 self-start text-sm text-zinc-300" data-print="hide">
+              <input type="checkbox" checked={detailed} onChange={(e) => setDetailed(e.target.checked)} className="size-5" />
+              Ver todas as métricas (toque num número para detalhar)
+            </label>
             {teamsShown.map((t) => (
               <AthleteTable
                 key={t}
@@ -137,6 +178,8 @@ export function StatsSheet({ match, rules, events, athletes, sides, onClose }: P
                 stats={box.athletes}
                 team={box.teams[t]}
                 showReception={showReception}
+                facts={facts}
+                detailed={detailed}
               />
             ))}
           </div>

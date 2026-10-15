@@ -115,6 +115,13 @@
 - **Sem sync em `/match`** (`syncAllowedOn` em `sync-config.ts`). Consulta ao vivo pesada em tela de análise/conta usa `useVisibleLiveQuery` (`src/lib/`), não `useLiveQuery`.
 - `/match` nunca fica em "Carregando…" para sempre: `ScoutErrorBoundary` + timeout de 8 s → `LoadFailure` com diagnóstico (`load-diagnostics.ts`). "Recarregar banco de dados local" (`reopenDB`) nunca apaga dados.
 
+## Analytics, drill-down e relatórios (Fase 15)
+- **Métrica nova = contador em `TouchCounters`/`touchDelta`** (somável) + coluna em `stat-columns.ts` com `drill(delta)`. Nunca calcule número de tabela fora desse caminho: a invariante "soma do drill = coluna" é testada (`analytics.test.ts`).
+- Micro-métrica leva `detail: true` (fora das tabelas compactas; aparece em "todas as métricas", no Construtor e no CSV).
+- Drill, relatório e construtor partem de `buildFacts` (`domain/stats/facts.ts`), calculado uma vez por recorte (`useMemo`); nada de nova consulta ao banco.
+- **PDF** = `PrintButton` (`window.print()`) + `@media print` em `globals.css`. Elemento só de tela: `data-print="hide"`; só de papel: `PrintHeader`/`print:block`.
+- **Modo comissão técnica** (`src/features/staff/`): `StaffHidden` em botões de scout/CRUD, `StaffGuard` em telas de edição. É foco de interface, não segurança. A tela Nuvem fica acessível (a comissão entra na conta para receber dados).
+
 ## Dados de teste (`/dev/seed`)
 - Gerador puro em `src/domain/dev/rally-generator.ts` (semente fixa, modo detalhado, fim do rali sempre por `impliedPoint`); serviço em `src/services/dev/seed-service.ts`, gravando pelos services reais (`appendRallies` = vários ralis numa transação).
 - Os ids criados ficam em `meta["dev_seed"]`. `removeDemoData` apaga **só** esses ids (exceção deliberada ao append-only, restrita a dados sintéticos).

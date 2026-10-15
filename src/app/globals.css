@@ -24,3 +24,139 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/*
+ * Exportar PDF (Fase 15): o papel é sempre A4 claro, sem menus nem botões. As telas são escuras
+ * (zinc-9xx); aqui tudo vira texto preto em fundo branco, com bordas finas no lugar dos cartões.
+ */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    height: auto !important;
+    overflow: visible !important;
+    font-size: 11px;
+  }
+  *,
+  *::before,
+  *::after {
+    color: #000 !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  [data-print="hide"],
+  [data-print="hide"] *,
+  nav,
+  button:not([data-print="show"]),
+  select,
+  input[type="checkbox"] {
+    display: none !important;
+  }
+  /* Valores clicáveis (drill) continuam visíveis como texto. */
+  td button,
+  li button[data-print="show"] {
+    display: inline !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+  }
+  a {
+    text-decoration: none !important;
+  }
+  /* Diálogos e áreas com rolagem (ex.: Estatísticas da partida) viram página corrida. */
+  [role="dialog"],
+  .fixed {
+    position: static !important;
+    inset: auto !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .overflow-hidden,
+  .h-dvh {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+  table {
+    min-width: 0 !important;
+    width: 100% !important;
+    font-size: 9px;
+    border-collapse: collapse !important;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  th,
+  td {
+    border: 1px solid #bbb !important;
+    padding: 2px 3px !important;
+    position: static !important;
+  }
+  section,
+  .print-card {
+    break-inside: avoid;
+    border: 1px solid #999 !important;
+    border-radius: 6px !important;
+  }
+  details > :not(summary) {
+    display: block !important;
+  }
+  details > summary {
+    list-style: none;
+  }
+  .recharts-wrapper {
+    break-inside: avoid;
+  }
+  /* Gráficos: os textos e a grade são atributos SVG (fill/stroke), que o `color` não alcança. */
+  .recharts-text,
+  .recharts-label-list text,
+  .recharts-cartesian-axis-tick-value {
+    fill: #000 !important;
+  }
+  .recharts-cartesian-grid line,
+  .recharts-cartesian-axis-line {
+    stroke: #ccc !important;
+  }
+  .recharts-rectangle,
+  .recharts-sector {
+    stroke: #fff !important;
+  }
+  .recharts-tooltip-wrapper {
+    display: none !important;
+  }
+  /* Barras do drill-down e da origem dos pontos: cor de fundo é o próprio dado. */
+  .print-track {
+    display: block !important;
+    height: 8px !important;
+    background-color: #e5e5e5 !important;
+    border: 0 !important;
+  }
+  .print-bar,
+  .print-bar-strong {
+    display: block !important;
+    height: 100% !important;
+  }
+  .print-bar {
+    background-color: #555 !important;
+  }
+  .print-bar-strong {
+    background-color: #000 !important;
+  }
+  .print-track,
+  .print-bar,
+  .print-bar-strong {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

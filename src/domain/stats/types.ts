@@ -1,4 +1,5 @@
 import type { TeamSide } from "../types";
+import type { TouchCounters } from "./touch-lines";
 
 /** Razão com numerador e denominador visíveis. `pct` é null quando o denominador é 0. */
 export interface Rate {
@@ -52,6 +53,8 @@ export interface AthleteStats {
   digs: number;
   /** Erros cometidos: lances `=` e ataques bloqueados. */
   errors: number;
+  /** Contadores brutos (Fase 15): base das micro-métricas e do drill-down. */
+  counters: TouchCounters;
 }
 
 export interface PointsBreakdown {
@@ -76,6 +79,8 @@ export interface TeamStats {
   side_out: Rate;
   /** K2: ralis ganhos sacando / saques realizados. */
   break_point: Rate;
+  /** Contadores brutos da equipe (Fase 15). */
+  counters: TouchCounters;
 }
 
 export interface BoxScore {

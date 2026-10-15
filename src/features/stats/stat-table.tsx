@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { sortByColumn, type SortDir } from "@/domain/stats/sort";
 import { GROUP_LABEL, groupSpans, type StatColumn } from "@/domain/stats/stat-columns";
 import type { Rate } from "@/domain/stats/types";
+import { DrillPanel, type DrillContext } from "@/features/analytics/drill/drill-panel";
 import { pct } from "./format";
 
 export interface StatRow<L> {
@@ -10,6 +12,8 @@ export interface StatRow<L> {
   label: ReactNode;
   /** Linha secundária sob o nome (ex.: a dupla daquele torneio). */
   sub?: ReactNode;
+  /** Nome em texto (título do drill-down e desempate da ordenação). */
+  name?: string;
   line: L;
 }
 
@@ -21,6 +25,11 @@ interface Props<L> {
   firstHeader: string;
   caption?: ReactNode;
   minWidth?: number;
+  /** Drill-down (Fase 15): os lances da linha. Sem isto, as células não abrem. */
+  drill?: (row: StatRow<L>) => DrillContext | null;
+  /** Ordenação por coluna (construtor de relatórios). O clique no cabeçalho ordena. */
+  sort?: { key: string; dir: SortDir };
+  onSort?: (key: string) => void;
 }
 
 export function formatStat<L>(col: StatColumn<L>, line: L): string {
@@ -36,9 +45,18 @@ type Tip = { key: string; full: string; hint: string; x: number; y: number; pinn
  * Tabela de estatísticas com cabeçalho por fundamento, colunas de total destacadas e o significado
  * de cada sigla no mouse (dica) ou no toque (abre/fecha). Siglas e textos vêm de stat-columns.ts.
  */
-export function StatTable<L>({ columns, rows, total, firstHeader, caption, minWidth = 720 }: Props<L>) {
+export function StatTable<L>({ columns, rows, total, firstHeader, caption, minWidth = 720, drill, sort, onSort }: Props<L>) {
   const [tip, setTip] = useState<Tip | null>(null);
   const [legend, setLegend] = useState(false);
+  const [open, setOpen] = useState<{ row: StatRow<L>; col: StatColumn<L> } | null>(null);
+  const sortCol = sort ? columns.find((c) => c.key === sort.key) : undefined;
+  const shown = useMemo(() => {
+    if (!sort || !sortCol) return rows;
+    const byLine = sortByColumn(rows.map((r) => r.line), sortCol, sort.dir);
+    const order = new Map(byLine.map((l, i) => [l, i]));
+    return [...rows].sort((a, b) => order.get(a.line)! - order.get(b.line)! || (a.name ?? "").localeCompare(b.name ?? "", "pt-BR"));
+  }, [rows, sort, sortCol]);
+  const openContext = open ? drill?.(open.row) : null;
 
   // Toque fora (ou rolar a tabela) fecha a dica fixada.
   useEffect(() => {
@@ -67,11 +85,26 @@ export function StatTable<L>({ columns, rows, total, firstHeader, caption, minWi
         {row.label}
         {row.sub && <span className="block text-xs font-normal text-zinc-400">{row.sub}</span>}
       </th>
-      {columns.map((c) => (
-        <td key={c.key} className={`px-2 py-2.5 ${cell(c)}`}>
-          {formatStat(c, row.line)}
-        </td>
-      ))}
+      {columns.map((c) => {
+        const text = formatStat(c, row.line);
+        const canDrill = !!drill && !!c.drill && text !== "–" && text !== "0";
+        return (
+          <td key={c.key} className={`px-1 py-1 ${cell(c)}`}>
+            {canDrill ? (
+              <button
+                type="button"
+                onClick={() => setOpen({ row, col: c })}
+                aria-label={`${text} — detalhar ${c.full}`}
+                className="min-h-11 min-w-11 rounded-lg px-1 underline decoration-amber-400/40 decoration-dotted underline-offset-4 hover:bg-zinc-800 print:no-underline"
+              >
+                {text}
+              </button>
+            ) : (
+              <span className="inline-block min-h-11 content-center px-1">{text}</span>
+            )}
+          </td>
+        );
+      })}
     </tr>
   );
 
@@ -102,25 +135,37 @@ export function StatTable<L>({ columns, rows, total, firstHeader, caption, minWi
                     aria-label={`${c.short}: ${c.full}`}
                     onMouseEnter={(e) => !tip?.pinned && show(c, e.currentTarget, false)}
                     onMouseLeave={() => !tip?.pinned && setTip(null)}
-                    onClick={(e) => (tip?.key === c.key && tip.pinned ? setTip(null) : show(c, e.currentTarget, true))}
+                    onClick={(e) => (onSort ? onSort(c.key) : tip?.key === c.key && tip.pinned ? setTip(null) : show(c, e.currentTarget, true))}
+                    aria-sort={sort?.key === c.key ? (sort.dir === "desc" ? "descending" : "ascending") : undefined}
                     className="min-h-11 min-w-11 cursor-help rounded-lg px-1 underline decoration-dotted decoration-zinc-600 underline-offset-4 hover:text-zinc-100"
                   >
                     <abbr title={c.full} className="no-underline">
                       {c.short}
                     </abbr>
+                    {sort?.key === c.key && <span aria-hidden="true">{sort.dir === "desc" ? " ↓" : " ↑"}</span>}
                   </button>
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => bodyRow(r))}
+            {shown.map((r) => bodyRow(r))}
             {total && bodyRow(total, true)}
           </tbody>
         </table>
       </div>
 
-      <button type="button" aria-expanded={legend} onClick={() => setLegend(!legend)} className="min-h-11 self-start rounded-xl px-2 text-sm text-zinc-400 underline-offset-4 hover:underline">
+      {open && openContext && (
+        <DrillPanel
+          title={open.row.name ?? ""}
+          column={open.col}
+          value={formatStat(open.col, open.row.line)}
+          context={openContext}
+          onClose={() => setOpen(null)}
+        />
+      )}
+
+      <button type="button" aria-expanded={legend} onClick={() => setLegend(!legend)} data-print="hide" className="min-h-11 self-start rounded-xl px-2 text-sm text-zinc-400 underline-offset-4 hover:underline">
         📖 {legend ? "Ocultar legenda" : "Legenda das siglas"}
       </button>
       {legend && (

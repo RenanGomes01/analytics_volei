@@ -29,6 +29,12 @@ import { EmptyState } from "@/components/empty-state";
 import { athleteColumns, tableColumns } from "@/domain/stats/stat-columns";
 import { StatTable } from "@/features/stats/stat-table";
 import { replaceQuery, useSeasonData } from "./use-season-data";
+import { buildFacts } from "@/domain/stats/facts";
+import { ErrorSourcesCard } from "./drill/error-sources-card";
+import { PointSourcesCard } from "./drill/point-sources-card";
+import { PrintButton } from "@/features/print/print-button";
+import { PrintHeader } from "@/features/print/print-header";
+import { StaffHidden } from "@/features/staff/staff-hidden";
 
 const MIN_ATTACKS = 10;
 const MIN_RECEPTIONS = 10;
@@ -65,14 +71,21 @@ export function AthleteProfile() {
         (a) => resolveAthlete(season.aliases, a) === id,
       ),
     );
+    // Lances dela com contexto: drill-down e fontes de erro (o mesmo cálculo da tabela).
+    const facts = buildFacts(
+      mine.map((m) => ({ match: m.match, events: m.events, tournament_id: m.tournament?.id ?? null })),
+      season.aliases,
+    ).filter((f) => f.athlete_id === id);
     return {
       mine,
+      facts,
       me: seasonStats(mine, season.aliases).athletes[id],
       series: athleteSeries(mine, id, season.aliases),
       partners: athletePartners(mine, id, season.aliases),
       byCompetition: athleteByCompetition(mine, id, season.aliases),
     };
   }, [season, id, yearParam, phase]);
+  const [detailed, setDetailed] = useState(false);
 
   if (!season || !computed)
     return <p className="p-8 text-center text-zinc-400">Carregando atleta…</p>;
@@ -104,13 +117,17 @@ export function AthleteProfile() {
               ? "Masculino"
               : "Gênero não informado"}
         </span>
-        <HardLink
-          href="/rankings"
-          className="ml-auto text-sm text-zinc-400 underline"
-        >
-          Rankings
-        </HardLink>
+        <span className="ml-auto flex items-center gap-3" data-print="hide">
+          <HardLink href="/rankings" className="text-sm text-zinc-400 underline">
+            Rankings
+          </HardLink>
+          <PrintButton />
+        </span>
       </header>
+      <PrintHeader
+        subtitle={`Perfil da atleta · ${yearParam === "all" ? "todas as temporadas" : `temporada ${yearParam}`}${phase !== "all" ? ` · fase: ${phase}` : ""}`}
+      />
+      <div className="flex flex-col gap-4" data-print="hide">
 
       <Segmented
         label="Temporada"
@@ -137,6 +154,7 @@ export function AthleteProfile() {
           replaceQuery({ phase: v === "all" ? undefined : v });
         }}
       />
+      </div>
 
       {!me ? (
         <EmptyState
@@ -189,6 +207,11 @@ export function AthleteProfile() {
             )}
           </div>
 
+          <div className="grid gap-3 lg:grid-cols-2">
+            <PointSourcesCard points={{ kills: me.attack.kills, aces: me.serve.aces, blocks: me.blocks }} />
+            <ErrorSourcesCard facts={computed.facts} />
+          </div>
+
           <div className={`grid gap-3 ${showReception ? "lg:grid-cols-2" : ""}`}>
             <Card
               title="Eficiência de ataque por torneio"
@@ -227,17 +250,29 @@ export function AthleteProfile() {
             title="Números por torneio"
             note="O histórico segue a atleta: cada linha soma os jogos dela naquele torneio, com a dupla que for; a última é o total do recorte"
           >
+            <label className="flex min-h-11 items-center gap-2 self-start text-sm text-zinc-300" data-print="hide">
+              <input type="checkbox" checked={detailed} onChange={(e) => setDetailed(e.target.checked)} className="size-5" />
+              Ver todas as métricas (toque num número para detalhar)
+            </label>
             <StatTable
               firstHeader="Torneio"
-              columns={tableColumns(athleteColumns({ modality: computed.mine[0]?.match.modality ?? "beach", aggregated: true, showReception }))}
+              columns={tableColumns(athleteColumns({ modality: computed.mine[0]?.match.modality ?? "beach", aggregated: true, showReception }), { detailed })}
+              drill={(row) => ({
+                facts: row.key === "total" ? computed.facts : computed.facts.filter((f) => (f.tournament_id ?? "friendly") === row.key),
+                matchLabel: (mid) => {
+                  const m = mine.find((x) => x.match.id === mid)?.match;
+                  return m ? `${m.team_a.name} × ${m.team_b.name}` : mid.slice(0, 6);
+                },
+              })}
               rows={computed.byCompetition.map((c) => ({
                 key: c.key,
+                name: c.label,
                 label: c.label,
                 sub: c.stats.team_keys.map((k) => season.teamName(k)).join(" · "),
                 line: c.stats,
               }))}
               total={{ key: "total", label: yearParam === "all" ? "Todas as temporadas" : `Temporada ${yearParam}`, line: me }}
-              minWidth={1000}
+              minWidth={detailed ? 2400 : 1000}
             />
           </Card>
 
@@ -293,6 +328,7 @@ export function AthleteProfile() {
             </div>
           </Card>
 
+          <StaffHidden>
           <Card title="Partidas">
             <ul className="flex flex-col gap-1">
               {[...mine].reverse().map(({ match, events, tournament }) => {
@@ -323,6 +359,7 @@ export function AthleteProfile() {
               })}
             </ul>
           </Card>
+          </StaffHidden>
         </>
       )}
     </div>

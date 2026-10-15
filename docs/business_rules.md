@@ -117,3 +117,18 @@ Em cada fundamento: **total → acertos → erros → continuidade → índice**
 - **Recepção:** TR total de recepções · Na mão (beach) / #+ (indoor) sobre as avaliadas · ER erros de recepção (aces sofridos).
 - **Outros:** Pts (ataque + ace + bloqueio) · Blq pontos de bloqueio · Def total de defesas · J jogos. Duplas: V, D, Sets, Saldo, K1 virada de bola, K2 quebra de saque, EAdv pontos por erro do adversário.
 - O histórico individual segue a atleta em qualquer dupla; o perfil mostra os números por torneio com a dupla de cada um.
+
+## Micro-métricas, drill-down e relatórios (Fase 15)
+Tudo é recalculado do ledger (nada persistido) e cada métrica é um contador bruto somado por atleta canônica. As micro-métricas ficam fora das tabelas compactas e aparecem em "Ver todas as métricas", no Construtor de relatórios e no CSV.
+- **Posição na posse:** sequência de toques seguidos da mesma equipe (1º, 2º, 3º…). Tipo de ataque = detalhe × posição: "Ataque de primeira", "Ataque/Largada de segunda", "Ataque (3º toque)", "Explorando o bloqueio".
+- **Ataque:** Bloq. ataques bloqueados (dentro do EA) · %PA e %EA sobre TA · Efic. K1 (ataques recebendo o saque, `phase = side_out`) e Efic. K2 (transição) · 1ª, 3º, Larg. (largada/shot) · ExpB pontos explorando o bloqueio.
+- **Saque:** %Ace, %ES · **Pressão** = recepções adversárias `-`, `/` ou `=` logo após o saque ÷ saques cuja recepção foi avaliada · **Quebra** = ralis ganhos com o saque dela ÷ saques dela.
+- **Recepção:** **Alvo** = recepções dela ÷ saques que chegaram à equipe (saques que não foram erro): quem o adversário escolheu sacar · %ER · K1 rec. = ralis ganhos quando ela recebeu ÷ recepções.
+- **Bloqueio:** TB toques de bloqueio · Blq pontos · EB erros (`=`) · duplas: **bloqueios explorados** = pontos adversários com block-out contra a dupla.
+- **Defesa:** Def+ defesas `#`/`+` · ED erros · K2 def. = ralis ganhos depois da defesa dela ÷ defesas.
+- **Levantamento:** TL total, EL erros. **Erros:** Err total · **PE pontos entregues** (lance `=` ou ataque bloqueado num rali perdido) · Faltas (sem contato).
+- **Momento do set** (pelo placar antes do rali): início (até ⅓ do alvo), meio, reta final (último ⅓); **clutch** = as duas equipes a 3 pontos ou menos do fim do set (21, 25 ou 15).
+- **Drill-down:** todo número com volume abre de onde veio (tipo, resultado, set, momento, K1/K2, toque na posse, partida) e em que lances. Em contagens a soma do detalhamento é o número; em porcentagens, o detalhamento é a base do cálculo.
+- **Origem dos pontos:** ataque, ace, bloqueio (e erro do adversário nas duplas); a soma é o total de pontos (= placar nas duplas), com o fundamento dominante destacado.
+- **Relatório de torneio:** seções Feminino, Masculino, Misto (duplas mistas) e "sem gênero". Destaques com volume mínimo: eficiência de ataque (10 ataques), pressão de saque (10 saques avaliados), passe (10 recepções avaliadas), K2 de ataque (10); duplas K1/K2 (20 saques). Maior fonte de erros = pontos entregues por tipo, com quem mais cometeu cada um.
+- **Modo comissão técnica:** preferência do aparelho que esconde scout e edição. Não é controle de acesso.

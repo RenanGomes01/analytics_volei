@@ -69,10 +69,33 @@ export function tallyRallies(rallies: readonly RallyResult[], roster: Roster, fi
       }
       addCounters(entry.counters, delta);
       addCounters(teamTouches[team], delta);
+      // Ataque que explorou o bloqueio: conta contra a equipe que bloqueou.
+      if (delta.attack_block_out_kills) teamTouches[team === "A" ? "B" : "A"].blocks_exploited += delta.attack_block_out_kills;
     });
+    tallyServeFaced(rally, roster, athletes, teamTouches);
     tallyRally(rally, teamRallies);
   }
   return { athletes, teamTouches, teamRallies };
+}
+
+/**
+ * Saque que chegou à equipe (não foi erro): base do "alvo do saque". Conta para a equipe e para cada
+ * atleta do elenco dela — quem recebeu mais desses saques foi a mais sacada.
+ */
+function tallyServeFaced(
+  rally: RallyResult,
+  roster: Roster,
+  athletes: BoxScoreTally["athletes"],
+  teamTouches: BoxScoreTally["teamTouches"],
+): void {
+  const serve = rally.touches[0];
+  if (!serve || serve.skill !== "serve" || serve.quality === "=") return;
+  const receiving: TeamSide = serve.team === "A" ? "B" : "A";
+  teamTouches[receiving].serves_faced += 1;
+  for (const id of roster[receiving]) {
+    const entry = athletes.get(id);
+    if (entry) entry.counters.serves_faced += 1;
+  }
 }
 
 export type AthleteLines = Omit<AthleteStats, "athlete_id" | "team">;
@@ -87,6 +110,7 @@ export function athleteLines(c: TouchCounters): AthleteLines {
     blocks: c.blocks,
     digs: c.digs,
     errors: c.errors,
+    counters: { ...c },
   };
 }
 
@@ -108,6 +132,7 @@ export function finalizeTeam(c: TouchCounters, r: RallyCounters): TeamStats {
     errors: c.errors,
     side_out: rate(r.receiving.won, r.receiving.total),
     break_point: rate(r.serving.won, r.serving.total),
+    counters: { ...c },
   };
 }
 

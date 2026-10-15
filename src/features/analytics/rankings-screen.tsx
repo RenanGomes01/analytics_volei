@@ -20,10 +20,16 @@ import { PointsMixChart } from "@/features/charts/points-mix-chart";
 import { pct } from "@/features/charts/palette";
 import { deliverFile } from "@/features/export/deliver-file";
 import { EmptyState } from "@/components/empty-state";
+import { buildFacts } from "@/domain/stats/facts";
+import { ErrorSourcesCard } from "@/features/analytics/drill/error-sources-card";
+import { PrintButton } from "@/features/print/print-button";
+import { PrintHeader } from "@/features/print/print-header";
+import { ReportBuilder } from "./report-builder";
 import { athleteHref, Card, EntityLink, Segmented, teamHref } from "./ui";
 import { replaceQuery, useSeasonData } from "./use-season-data";
 
 type View = "athletes" | "teams";
+type Mode = "highlights" | "builder";
 type Category = TournamentCategory | "all";
 
 const GENDERS: [GenderFilter, string][] = [["all", "Todos"], ["F", "Feminino"], ["M", "Masculino"]];
@@ -34,6 +40,7 @@ export function RankingsScreen() {
   const params = useSearchParams();
   const season = useSeasonData();
   const [view, setView] = useState<View>(params.get("view") === "teams" ? "teams" : "athletes");
+  const [mode, setMode] = useState<Mode>(params.get("mode") === "builder" ? "builder" : "highlights");
   const [gender, setGender] = useState<GenderFilter>((params.get("gender") as GenderFilter) || "all");
   const [category, setCategory] = useState<Category>((params.get("category") as Category) || "all");
   const [friendlies, setFriendlies] = useState(params.get("friendlies") === "1");
@@ -47,9 +54,15 @@ export function RankingsScreen() {
     if (!season || year === undefined) return null;
     const matches = filterSeason(season.matches, { year, category, includeFriendlies: friendlies, phase });
     const stats = seasonStats(matches, season.aliases);
+    // Lances com contexto (drill-down, construtor e fontes de erro): uma passada pelo recorte.
+    const facts = buildFacts(
+      matches.map((m) => ({ match: m.match, events: m.events, tournament_id: m.tournament?.id ?? null })),
+      season.aliases,
+    );
     return {
       matches,
       stats,
+      facts,
       athletes: athletesByGender(stats, season.athletes, gender),
       teams: teamsByGender(stats, season.athletes, gender),
       kinds: pointKinds(matches, season.aliases),
@@ -107,12 +120,30 @@ export function RankingsScreen() {
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold">Rankings {year}</h1>
         </div>
-        <button type="button" onClick={exportCsv} className="min-h-12 rounded-xl bg-emerald-200 px-4 font-semibold text-emerald-950">
-          ⇩ CSV
-        </button>
+        <div className="flex gap-2" data-print="hide">
+          <PrintButton />
+          <button type="button" onClick={exportCsv} className="min-h-12 rounded-xl bg-emerald-200 px-4 font-semibold text-emerald-950">
+            ⇩ CSV
+          </button>
+        </div>
       </header>
+      <PrintHeader
+        subtitle={[mode === "builder" ? "Construtor de relatórios" : "Destaques", view === "teams" ? "Duplas" : "Atletas", GENDERS.find(([g]) => g === gender)?.[1], CATEGORIES.find(([c]) => c === category)?.[1], phase !== "all" ? `fase: ${phase}` : null, friendlies ? "com amistosos" : null]
+          .filter(Boolean)
+          .join(" · ")}
+      />
 
-      <div className="grid gap-2 md:grid-cols-2">
+      <Segmented
+        label="Modo"
+        value={mode}
+        options={[["highlights", "🏆 Destaques"], ["builder", "🧮 Construtor de relatórios"]]}
+        onChange={(v) => {
+          setMode(v);
+          update({ mode: v === "builder" ? "builder" : undefined });
+        }}
+      />
+
+      <div className="grid gap-2 md:grid-cols-2" data-print="hide">
         <Segmented
           label="Ano"
           value={String(year)}
@@ -206,7 +237,20 @@ export function RankingsScreen() {
         </EmptyState>
       )}
 
-      {empty ? null : view === "athletes" ? (
+      {empty ? null : mode === "builder" ? (
+        <ReportBuilder
+          view={view}
+          athletes={computed.athletes.included}
+          teams={computed.teams.included}
+          facts={computed.facts}
+          athleteName={athleteName}
+          teamName={teamName}
+          matchLabel={(id) => {
+            const m = computed.matches.find((x) => x.match.id === id)?.match;
+            return m ? `${m.team_a.name} × ${m.team_b.name}` : id.slice(0, 6);
+          }}
+        />
+      ) : view === "athletes" ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {rankingSpecs("beach")
             // Passe na mão só quando há recepções avaliadas no recorte (o modo rápido não avalia o passe).
@@ -273,7 +317,9 @@ export function RankingsScreen() {
         </div>
       )}
 
+      {!empty && mode === "highlights" && (
       <div className="grid gap-3 lg:grid-cols-2">
+        <ErrorSourcesCard title="Maior fonte de erros do recorte" facts={computed.facts} />
         <Card title={`Distribuição dos pontos — top 10 ${unit}`} note="Ataque, ace e bloqueio (e erro do adversário, para duplas)">
           <PointsMixChart
             data={
@@ -293,6 +339,7 @@ export function RankingsScreen() {
           <PointKindsChart data={computed.kinds} />
         </Card>
       </div>
+      )}
     </div>
   );
 }

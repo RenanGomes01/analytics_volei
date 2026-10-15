@@ -11,6 +11,11 @@ import { RatesChart } from "@/features/charts/rates-chart";
 import { athleteHref, Card, EntityLink, Segmented, Stat, teamHref } from "./ui";
 import { EmptyState } from "@/components/empty-state";
 import { replaceQuery, useSeasonData } from "./use-season-data";
+import { buildFacts } from "@/domain/stats/facts";
+import { ErrorSourcesCard } from "./drill/error-sources-card";
+import { PointSourcesCard } from "./drill/point-sources-card";
+import { PrintButton } from "@/features/print/print-button";
+import { PrintHeader } from "@/features/print/print-header";
 
 const GENDER_LABEL = { M: "Masculino", F: "Feminino", Mixed: "Misto" } as const;
 
@@ -26,7 +31,10 @@ export function TeamProfile() {
     if (!season) return null;
     const scope = filterSeason(season.matches, { year: yearParam === "all" ? undefined : Number(yearParam), includeFriendlies: true });
     const { series, opponents } = teamSeries(scope, key, season.aliases);
-    return { series, opponents, team: seasonStats(scope, season.aliases).teams[key], kinds: pointKinds(scope, season.aliases, key) };
+    const facts = buildFacts(scope.map((m) => ({ match: m.match, events: m.events, tournament_id: m.tournament?.id ?? null })), season.aliases).filter(
+      (f) => f.pair_key === key,
+    );
+    return { series, opponents, facts, team: seasonStats(scope, season.aliases).teams[key], kinds: pointKinds(scope, season.aliases, key) };
   }, [season, key, yearParam]);
 
   if (!season || !computed) return <p className="p-8 text-center text-zinc-400">Carregando dupla…</p>;
@@ -47,10 +55,14 @@ export function TeamProfile() {
       <header className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-bold">{season.teamName(key)}</h1>
         {gender && <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs">{GENDER_LABEL[gender]}</span>}
-        <HardLink href="/rankings?view=teams" className="ml-auto text-sm text-zinc-400 underline">
-          Rankings
-        </HardLink>
+        <span className="ml-auto flex items-center gap-3" data-print="hide">
+          <HardLink href="/rankings?view=teams" className="text-sm text-zinc-400 underline">
+            Rankings
+          </HardLink>
+          <PrintButton />
+        </span>
       </header>
+      <PrintHeader subtitle={`Perfil da dupla · ${yearParam === "all" ? "todas as temporadas" : `temporada ${yearParam}`}`} />
       <p className="text-sm">
         {ids.map((id, i) => (
           <span key={id}>
@@ -94,6 +106,11 @@ export function TeamProfile() {
             <Stat label="Sets" value={`${team.sets_won}-${team.sets_lost}`} detail={`saldo de pontos ${team.points_for - team.points_against > 0 ? "+" : ""}${team.points_for - team.points_against}`} />
             <Stat label="Virada de bola (K1)" value={pct(team.side_out.pct)} detail={`${team.side_out.num}/${team.side_out.den} ralis recebendo`} />
             <Stat label="Quebra de saque (K2)" value={pct(team.break_point.pct)} detail={`${team.break_point.num}/${team.break_point.den} ralis sacando`} />
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-2">
+            <PointSourcesCard points={team.points} />
+            <ErrorSourcesCard facts={computed.facts} />
           </div>
 
           <Card title="Virada de bola × quebra de saque por torneio" note="Soma dos ralis de cada torneio · passe o dedo/mouse para ver ganhos/total">
