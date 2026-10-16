@@ -6,7 +6,7 @@ import { useState } from "react";
 import { getDB } from "@/db/client";
 import { sameNameAthletes } from "@/domain/roster/identity";
 import type { Athlete, Gender } from "@/domain/types";
-import { inputClass, primaryButton, secondaryButton, segmentedClass } from "@/features/setup/form-styles";
+import { inputClass, numberInputClass, primaryButton, secondaryButton, segmentedClass } from "@/features/setup/form-styles";
 import { toast } from "@/features/toast/toast";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
 import { createAthlete } from "@/services/roster-service";
@@ -45,16 +45,23 @@ export function NewAthleteSheet({ athletes, onClose }: { athletes: Athlete[]; on
         className="flex max-h-full w-full max-w-lg flex-col gap-3 overflow-y-auto rounded-3xl bg-zinc-900 p-5"
       >
         <h2 className="text-xl font-bold">Cadastrar atleta</h2>
-        <div className="flex gap-2">
-          <input
-            className={`${inputClass} w-20 flex-none text-center`}
-            inputMode="numeric"
-            placeholder="nº"
-            aria-label="Número"
-            value={number}
-            onChange={(e) => setNumber(e.target.value.replace(/\D/g, "").slice(0, 2))}
-          />
-          <input className={inputClass} placeholder="Nome da atleta" aria-label="Nome" autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+        {/* Nome 70% · Nº 30% (grid: as larguras não dependem do conteúdo nem do autofill). */}
+        <div className="grid grid-cols-[minmax(0,7fr)_minmax(0,3fr)] gap-2">
+          <label className="flex min-w-0 flex-col gap-1">
+            <span className="text-xs uppercase tracking-wide text-zinc-400">Nome</span>
+            <input className={inputClass} placeholder="Ex.: Vinícius - RO" aria-label="Nome" autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+          <label className="flex min-w-0 flex-col gap-1">
+            <span className="text-xs uppercase tracking-wide text-zinc-400">Nº</span>
+            <input
+              className={numberInputClass}
+              inputMode="numeric"
+              placeholder="nº"
+              aria-label="Número"
+              value={number}
+              onChange={(e) => setNumber(e.target.value.replace(/\D/g, "").slice(0, 2))}
+            />
+          </label>
         </div>
         <div className="flex gap-2" role="radiogroup" aria-label="Gênero">
           {(["F", "M"] as const).map((g) => (
@@ -66,7 +73,7 @@ export function NewAthleteSheet({ athletes, onClose }: { athletes: Athlete[]; on
         <p className="text-xs text-zinc-500">O gênero é usado nos rankings masculino e feminino.</p>
         {twins.length > 0 && (
           <p role="status" className="rounded-xl bg-amber-900/50 px-3 py-2 text-sm text-amber-100">
-            Já existe {twins.map((a) => `${a.jersey_number ?? "–"} · ${a.name}`).join(", ")} no cadastro. Se for a mesma pessoa, não cadastre de novo
+            Já existe <span className="break-words">{twins.map((a) => `${a.jersey_number ?? "–"} · ${a.name}`).join(", ")}</span> no cadastro. Se for a mesma pessoa, não cadastre de novo
             (cadastro duplicado separa as estatísticas; dá para unir depois em “Unir”).
           </p>
         )}

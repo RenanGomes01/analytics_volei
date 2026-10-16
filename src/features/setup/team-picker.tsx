@@ -3,7 +3,7 @@
 import { toast } from "@/features/toast/toast";
 import { useSubmit } from "@/components/use-submit";
 import { SubmitButton } from "@/components/submit-button";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { getDB } from "@/db/client";
 import { matchesSearch, pairKey } from "@/domain/roster/identity";
 import type { Team } from "@/domain/roster/types";
@@ -29,6 +29,26 @@ interface Props {
 const teamLabel = (team: Team, roster: RosterData) =>
   team.athlete_ids.map((id) => roster.athleteById.get(id)?.name ?? "?").join(" / ");
 
+/** Sem busca, só as últimas usadas (compactas): com 30+ duplas a lista inteira não cabe na tela. */
+const RECENT_LIMIT = 3;
+const RESULT_LIMIT = 8;
+
+/** Duplas pela partida mais recente em que jogaram (ordem de uso, sem repetir). */
+function recentTeamIds(roster: RosterData): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const m of [...roster.matches].sort((a, b) => b.created_at - a.created_at)) {
+    for (const side of [m.team_a, m.team_b]) {
+      const team = roster.teamByKey.get(pairKey(side.athlete_ids, roster.aliases));
+      if (team && !seen.has(team.id)) {
+        seen.add(team.id);
+        ids.push(team.id);
+      }
+    }
+  }
+  return ids;
+}
+
 /** Escolhe uma dupla (ou time) do cadastro, ou monta uma nova a partir das atletas. */
 export function TeamPicker({ side, modality, roster, preferredTeamIds, blockedAthleteIds, value, onChange }: Props) {
   const [query, setQuery] = useState("");
@@ -37,26 +57,32 @@ export function TeamPicker({ side, modality, roster, preferredTeamIds, blockedAt
   const [indoorIds, setIndoorIds] = useState<string[]>([]);
   const { busy, error, run } = useSubmit();
   const title = modality === "beach" ? `Dupla ${side}` : `Time ${side}`;
+  const recentIds = useMemo(() => recentTeamIds(roster), [roster]);
 
   if (value) {
     return (
-      <div className="flex flex-col gap-1 rounded-2xl border-2 border-amber-400 bg-amber-400/5 p-3">
+      <div className="flex min-w-0 flex-col gap-1 rounded-2xl border-2 border-amber-400 bg-amber-400/5 p-3">
         <span className="text-xs uppercase tracking-wide text-zinc-400">{title}</span>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-lg font-bold">{value.name}</span>
-          <button type="button" onClick={() => onChange(null)} className={secondaryButton}>
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <span className="min-w-0 break-words text-lg font-bold line-clamp-2" title={value.name}>
+            {value.name}
+          </span>
+          <button type="button" onClick={() => onChange(null)} className={`${secondaryButton} shrink-0`}>
             Trocar
           </button>
         </div>
-        {value.name !== teamLabel(value, roster) && <span className="text-sm text-zinc-400">{teamLabel(value, roster)}</span>}
+        {value.name !== teamLabel(value, roster) && <span className="break-words text-sm text-zinc-400 line-clamp-2">{teamLabel(value, roster)}</span>}
       </div>
     );
   }
 
-  const teams = roster.teams
-    .filter((t) => t.modality === modality && !t.athlete_ids.some((id) => blockedAthleteIds.includes(id)))
+  const available = roster.teams.filter((t) => t.modality === modality && !t.athlete_ids.some((id) => blockedAthleteIds.includes(id)));
+  const searching = query.trim().length > 0;
+  const teams = available
     .filter((t) => matchesSearch(query, t.name, ...t.athlete_ids.map((id) => roster.athleteById.get(id)?.name ?? "")))
     .sort((a, b) => Number(preferredTeamIds.has(b.id)) - Number(preferredTeamIds.has(a.id)));
+  const byId = new Map(available.map((t) => [t.id, t]));
+  const recent = recentIds.flatMap((id) => byId.get(id) ?? []).slice(0, RECENT_LIMIT);
 
   // Trava no mesmo toque: tocar várias vezes em "Usar esta dupla" grava uma vez só.
   const create = (athleteIds: string[]) =>
@@ -73,7 +99,8 @@ export function TeamPicker({ side, modality, roster, preferredTeamIds, blockedAt
   const chosen = picked.filter((a): a is Athlete => !!a).map((a) => a.id);
 
   return (
-    <fieldset className="flex flex-col gap-2 rounded-2xl border-2 border-zinc-800 p-3">
+    // min-w-0: o fieldset tem largura mínima = conteúdo; sem isso um nome longo invade a outra coluna.
+    <fieldset className="flex min-w-0 flex-col gap-2 rounded-2xl border-2 border-zinc-800 p-3">
       <legend className="px-1 text-sm uppercase tracking-wide text-zinc-400">{title}</legend>
       {!building && (
         <>
@@ -84,17 +111,45 @@ export function TeamPicker({ side, modality, roster, preferredTeamIds, blockedAt
             onChange={(e) => setQuery(e.target.value)}
             aria-label={`${title}: buscar`}
           />
-          <ul className="flex max-h-56 flex-col gap-1 overflow-y-auto">
-            {teams.slice(0, 12).map((t) => (
-              <li key={t.id}>
-                <button type="button" onClick={() => onChange(t)} className={`${secondaryButton} flex w-full items-center justify-between text-left`}>
-                  <span className="truncate">{t.name}</span>
-                  {preferredTeamIds.has(t.id) && <span className="text-xs text-amber-300">neste torneio</span>}
-                </button>
-              </li>
-            ))}
-            {teams.length === 0 && <li className="px-1 text-sm text-zinc-500">Nenhuma {modality === "beach" ? "dupla" : "equipe"} encontrada.</li>}
-          </ul>
+          {searching ? (
+            <ul className="flex max-h-56 flex-col gap-1 overflow-y-auto" aria-label="Resultados da busca">
+              {teams.slice(0, RESULT_LIMIT).map((t) => (
+                <li key={t.id}>
+                  <button type="button" onClick={() => onChange(t)} title={t.name} className={`${secondaryButton} flex w-full min-w-0 items-center justify-between gap-2 py-1.5 text-left`}>
+                    {/* Até 2 linhas: o fim do nome ("- RO", a parceira) é o que separa homônimos. */}
+                    <span className="min-w-0 break-words line-clamp-2">{t.name}</span>
+                    {preferredTeamIds.has(t.id) && <span className="shrink-0 text-xs text-amber-300">neste torneio</span>}
+                  </button>
+                </li>
+              ))}
+              {teams.length > RESULT_LIMIT && (
+                <li className="px-1 text-xs text-zinc-500">
+                  +{teams.length - RESULT_LIMIT} {teams.length - RESULT_LIMIT === 1 ? "outra" : "outras"}: continue digitando para filtrar.
+                </li>
+              )}
+              {teams.length === 0 && <li className="px-1 text-sm text-zinc-500">Nenhuma {modality === "beach" ? "dupla" : "equipe"} encontrada.</li>}
+            </ul>
+          ) : recent.length > 0 ? (
+            <div className="flex flex-col gap-1">
+              <span className="px-1 text-xs uppercase tracking-wide text-zinc-500">Últimas usadas</span>
+              <ul className="flex flex-wrap gap-1.5" aria-label="Últimas usadas">
+                {recent.map((t) => (
+                  <li key={t.id} className="min-w-0 max-w-full">
+                    <button
+                      type="button"
+                      onClick={() => onChange(t)}
+                      title={t.name}
+                      className="block min-h-12 max-w-full truncate rounded-full bg-zinc-800 px-4 text-sm font-semibold text-zinc-200 active:bg-zinc-700"
+                    >
+                      {t.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            available.length > 0 && <p className="px-1 text-sm text-zinc-500">Digite o nome da {modality === "beach" ? "dupla" : "equipe"} ou de uma atleta.</p>
+          )}
           <button
             type="button"
             onClick={() => setBuilding(true)}

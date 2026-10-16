@@ -34,7 +34,7 @@ export function PointSheet({ winner, options, teamName, roster, athletes, saving
     roster(team).map((id) => {
       const a = athletes.get(id);
       return (
-        <button key={id} type="button" disabled={saving} onClick={() => pick(id)} className={`${big} min-h-20 bg-zinc-200 px-4 text-xl text-zinc-950`}>
+        <button key={id} type="button" disabled={saving} onClick={() => pick(id)} className={`${big} min-h-20 min-w-0 truncate bg-zinc-200 px-4 text-xl text-zinc-950`} title={a?.name}>
           {a?.jersey_number ?? ""} {a?.name ?? id.slice(0, 6)}
         </button>
       );

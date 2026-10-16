@@ -28,7 +28,8 @@ export function AthleteButton({ athlete, athleteId, emphasis, selected, onPick }
       className={`${base} ${tone} ${emphasis === "primary" || selected ? "" : "opacity-50"} disabled:opacity-25`}
     >
       <span className="text-3xl font-bold tabular-nums">{athlete?.jersey_number ?? "–"}</span>
-      <span className="truncate text-lg font-medium">{athlete?.name ?? athleteId.slice(0, 6)}</span>
+      {/* Até 2 linhas: o sufixo de homônimo ("- RO") continua visível. */}
+      <span className="min-w-0 break-words text-lg font-medium leading-tight line-clamp-2">{athlete?.name ?? athleteId.slice(0, 6)}</span>
     </button>
   );
 }

@@ -100,6 +100,7 @@
 ## UX guiada (Fase 11)
 - **Lista vazia nunca é rua sem saída:** use `EmptyState` (`src/components/empty-state.tsx`) com o próximo passo como botão (ex.: "+ Cadastrar atleta", "+ Iniciar nova partida").
 - **Todo CRUD confirma com toast** (`toast.success` de `src/features/toast/toast.ts`), disparado na interface, não no serviço. Antes de navegar com `window.location`, use `{ afterNavigation: true }` (vai pelo sessionStorage). Exclusão reversível oferece `action: Desfazer`. Erro de formulário continua no formulário.
+- **Nomes longos** (homônimos como "Vinícius - RO"): trilha de grid com `minmax(0,…)` (nunca `1fr` puro), `min-w-0` em `fieldset`/itens flex e `truncate` ou `line-clamp-2` no nome. Escolha de dupla em `/new` é busca primeiro (só 3 "Últimas usadas" sem digitar).
 - Rede: `useOnline()` (`src/features/network/use-network.ts`); a decisão da faixa é pura (`connection-banner.ts`, testada). Nada de rede/sync aparece no scout.
 
 ## Performance no tablet (Fase 13)

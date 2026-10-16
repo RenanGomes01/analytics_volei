@@ -27,8 +27,8 @@ export function TeamPanel({ team, name, athleteIds, athletes, emphasis, serving,
       }`}
     >
       <header className="flex items-center justify-between px-2 text-sm font-semibold uppercase tracking-wide">
-        <span className="truncate">{name}</span>
-        {serving && <span className="rounded-full bg-amber-400 px-2 py-0.5 text-xs text-zinc-950">saque</span>}
+        <span className="min-w-0 truncate">{name}</span>
+        {serving && <span className="shrink-0 rounded-full bg-amber-400 px-2 py-0.5 text-xs text-zinc-950">saque</span>}
       </header>
       <div className={`min-h-0 flex-1 gap-2 ${layout}`}>
         {athleteIds.map((id) => (

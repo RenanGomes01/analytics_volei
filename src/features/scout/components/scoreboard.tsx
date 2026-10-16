@@ -53,7 +53,7 @@ export function Scoreboard({ match, state, next, rules, sides, onFinish, onExit 
   const score = state.sets.at(-1)!.score;
 
   return (
-    <header className="grid grid-cols-[auto_1fr_auto_1fr] items-center gap-4 border-b border-zinc-800 px-4 py-2">
+    <header className="grid grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 border-b border-zinc-800 px-4 py-2">
       {/* Saída do scout: tudo já está salvo no aparelho (inclusive o rali em andamento). */}
       <HardLink
         href="/"

@@ -47,8 +47,8 @@ export function QuickBoard({ scope, exec, match, state, next, athletes, sides, o
     return (
       <section key={team} aria-label={`Time ${team}`} className="flex min-h-0 flex-col gap-2">
         <header className="flex items-center justify-between px-1 text-sm font-semibold uppercase tracking-wide">
-          <span className="truncate">{teamName(team)}</span>
-          {state.serving_team === team && !over && <span className="rounded-full bg-amber-400 px-2 text-xs text-zinc-950">saque</span>}
+          <span className="min-w-0 truncate">{teamName(team)}</span>
+          {state.serving_team === team && !over && <span className="shrink-0 rounded-full bg-amber-400 px-2 text-xs text-zinc-950">saque</span>}
         </header>
         <div className={`grid min-h-0 flex-1 gap-2 ${ids.length > 2 ? "grid-cols-2 auto-rows-fr" : "grid-rows-2"}`}>
           {ids.map((id) => {
@@ -61,7 +61,7 @@ export function QuickBoard({ scope, exec, match, state, next, athletes, sides, o
                 type="button"
                 disabled={over || servingBlocked}
                 onClick={() => quick.tapAthlete(team, id)}
-                className={`${big} flex min-h-20 items-center gap-3 border-2 px-4 text-left ${
+                className={`${big} flex min-h-20 min-w-0 items-center gap-3 border-2 px-4 text-left ${
                   isLast
                     ? "border-amber-300 bg-amber-400 text-zinc-950"
                     : isServer
@@ -70,8 +70,8 @@ export function QuickBoard({ scope, exec, match, state, next, athletes, sides, o
                 }`}
               >
                 <span className="text-4xl tabular-nums">{a?.jersey_number ?? "–"}</span>
-                <span className="truncate text-xl font-semibold">{a?.name ?? id.slice(0, 6)}</span>
-                {isServer && <span className="ml-auto text-xs font-semibold uppercase text-amber-300">saca</span>}
+                <span className="min-w-0 break-words text-xl font-semibold leading-tight line-clamp-2">{a?.name ?? id.slice(0, 6)}</span>
+                {isServer && <span className="ml-auto shrink-0 text-xs font-semibold uppercase text-amber-300">saca</span>}
               </button>
             );
           })}
@@ -80,7 +80,8 @@ export function QuickBoard({ scope, exec, match, state, next, athletes, sides, o
           type="button"
           disabled={over}
           onClick={() => quick.openPoint(team)}
-          className={`${big} min-h-20 bg-emerald-600 text-2xl text-white`}
+          className={`${big} min-h-20 min-w-0 truncate bg-emerald-600 px-3 text-2xl text-white`}
+          title={`Ponto ${teamName(team)}`}
         >
           PONTO {teamName(team)}
         </button>
@@ -90,7 +91,7 @@ export function QuickBoard({ scope, exec, match, state, next, athletes, sides, o
 
   return (
     <>
-      <main className="grid min-h-0 grid-cols-[1fr_1.2fr_1fr] gap-2 p-2 portrait:grid-cols-1 portrait:grid-rows-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+      <main className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)] gap-2 p-2 portrait:grid-cols-1 portrait:grid-rows-[minmax(0,1fr)_auto_minmax(0,1fr)]">
         {column(sides[0])}
         <section aria-label="Rali" className="flex min-h-0 flex-col gap-2">
           {over ? (
@@ -98,7 +99,7 @@ export function QuickBoard({ scope, exec, match, state, next, athletes, sides, o
           ) : (
             <>
               {waitingServe && <ServeChooser exec={exec} match={match} state={state} sides={sides} />}
-              <p className="text-center text-lg font-semibold">
+              <p className="break-words text-center text-lg font-semibold">
                 {waitingServe
                   ? quick.suggestedServer
                     ? "Toque em quem recebeu (o saque entra junto)"
@@ -106,13 +107,13 @@ export function QuickBoard({ scope, exec, match, state, next, athletes, sides, o
                   : "Toque em quem tocou na bola…"}
               </p>
               {lastPoint?.point_to && waitingServe && (
-                <p className="text-center text-sm text-zinc-400">
+                <p className="break-words text-center text-sm text-zinc-400">
                   Último ponto: {teamName(lastPoint.point_to)} — {reasonLabel(lastPoint)}
                 </p>
               )}
               <ol aria-label="Toques do rali" className="flex min-h-0 flex-1 flex-wrap content-start gap-1.5 overflow-hidden rounded-2xl bg-zinc-900 p-3">
                 {touches.map((t, i) => (
-                  <li key={i} className={`rounded-lg px-2 py-1 text-sm ${t.team === sides[0] ? "bg-sky-900/70" : "bg-fuchsia-900/60"}`}>
+                  <li key={i} className={`max-w-full truncate rounded-lg px-2 py-1 text-sm ${t.team === sides[0] ? "bg-sky-900/70" : "bg-fuchsia-900/60"}`}>
                     <span className="font-semibold">{SKILL_LABEL[t.skill]}</span> {athletes.get(t.athlete_id)?.name ?? ""}
                   </li>
                 ))}

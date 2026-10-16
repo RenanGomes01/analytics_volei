@@ -37,7 +37,7 @@ export function ServeChooser({ exec, match, state, sides }: Props) {
                 setError(e instanceof Error ? e.message : String(e));
               }
             }}
-            className={`min-h-12 flex-1 truncate rounded-xl px-3 font-semibold ${
+            className={`min-h-12 min-w-0 flex-1 truncate rounded-xl px-3 font-semibold ${
               state.serving_team === t ? "bg-amber-400 text-zinc-950" : "bg-zinc-800 text-zinc-300"
             }`}
           >

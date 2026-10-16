@@ -9,7 +9,7 @@ import { useSubmit } from "@/components/use-submit";
 import { toast } from "@/features/toast/toast";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
 import { createAthlete } from "@/services/roster-service";
-import { inputClass, primaryButton, secondaryButton, segmentedClass } from "./form-styles";
+import { inputClass, numberInputClass, primaryButton, secondaryButton, segmentedClass } from "./form-styles";
 
 interface Props {
   label: string;
@@ -33,11 +33,11 @@ export function AthletePicker({ label: title, athletes, exclude, value, onChange
   if (value) {
     return (
       <div className="flex min-h-12 items-center justify-between gap-2 rounded-xl bg-zinc-800 px-3">
-        <span className="truncate">
+        <span className="min-w-0 break-words py-1 line-clamp-2" title={value.name}>
           <span className="text-xs text-zinc-400">{title}: </span>
           {label(value)}
         </span>
-        <button type="button" onClick={() => onChange(null)} className="min-h-10 rounded-lg px-2 text-sm text-zinc-300">
+        <button type="button" onClick={() => onChange(null)} className="min-h-10 shrink-0 rounded-lg px-2 text-sm text-zinc-300">
           Trocar
         </button>
       </div>
@@ -77,14 +77,14 @@ export function AthletePicker({ label: title, athletes, exclude, value, onChange
         <ul className="flex max-h-40 flex-col gap-1 overflow-y-auto">
           {options.slice(0, 8).map((a) => (
             <li key={a.id}>
-              <button type="button" onClick={() => onChange(a)} className={`${secondaryButton} w-full text-left`}>
+              <button type="button" onClick={() => onChange(a)} title={a.name} className={`${secondaryButton} w-full break-words py-1.5 text-left line-clamp-2`}>
                 {label(a)}
               </button>
             </li>
           ))}
           {!creating ? (
             <li>
-              <button type="button" onClick={() => setCreating(true)} className="min-h-12 w-full rounded-xl border-2 border-dashed border-zinc-700 text-zinc-300">
+              <button type="button" onClick={() => setCreating(true)} className="min-h-12 w-full truncate rounded-xl border-2 border-dashed border-zinc-700 px-3 text-zinc-300">
                 + Nova atleta “{query.trim()}”
               </button>
             </li>
@@ -94,13 +94,13 @@ export function AthletePicker({ label: title, athletes, exclude, value, onChange
                 <div className="flex flex-col gap-2 rounded-xl bg-amber-900/50 p-2 text-sm text-amber-100">
                   <span>Já existe {twins.map((a) => label(a)).join(", ")}. É a mesma pessoa?</span>
                   <button type="button" onClick={() => onChange(twins[0])} className={`${primaryButton} w-full`}>
-                    Usar {twins[0].name} (já cadastrada)
+                    <span className="block truncate">Usar {twins[0].name} (já cadastrada)</span>
                   </button>
                 </div>
               )}
               <div className="flex gap-2">
                 <input
-                  className={`${inputClass} w-24 text-center`}
+                  className={`${numberInputClass} w-20 flex-none`}
                   inputMode="numeric"
                   placeholder="nº"
                   aria-label="Número da nova atleta"

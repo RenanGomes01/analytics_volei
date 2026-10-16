@@ -6,7 +6,7 @@ import { getDB } from "@/db/client";
 import { matchesSearch } from "@/domain/roster/identity";
 import type { Athlete, Gender } from "@/domain/types";
 import { athleteHref, teamHref } from "@/features/analytics/ui";
-import { inputClass, primaryButton, secondaryButton, segmentedClass } from "@/features/setup/form-styles";
+import { inputClass, numberInputClass, primaryButton, secondaryButton, segmentedClass } from "@/features/setup/form-styles";
 import { ConfirmSheet } from "@/components/confirm-sheet";
 import { EmptyState } from "@/components/empty-state";
 import { runOnce } from "@/components/use-submit";
@@ -63,23 +63,25 @@ function AthleteRow({
         <div className="flex items-center gap-3">
           <input type="checkbox" checked={selected} onChange={onToggle} aria-label={`Selecionar ${athlete.name} para unir`} className="size-6" />
           <span className="w-8 text-right text-xl font-bold tabular-nums">{athlete.jersey_number ?? "–"}</span>
-          <HardLink href={athleteHref(athlete.id)} className="flex-1 truncate text-lg underline-offset-4 hover:underline">
+          <HardLink href={athleteHref(athlete.id)} className="min-w-0 flex-1 truncate text-lg underline-offset-4 hover:underline" title={athlete.name}>
             {athlete.name}
           </HardLink>
           {athlete.gender ? (
-            <span className="text-sm text-zinc-400">{athlete.gender}</span>
+            <span className="shrink-0 text-sm text-zinc-400">{athlete.gender}</span>
           ) : (
-            <span className="text-xs text-amber-300" title="Gênero não informado">sem gênero</span>
+            <span className="shrink-0 text-xs text-amber-300" title="Gênero não informado">sem gênero</span>
           )}
-          <span className="text-sm text-zinc-400">{plural(roster.matchCount.get(athlete.id) ?? 0, "jogo", "jogos")}</span>
-          <button type="button" onClick={() => setEditing(true)} className={secondaryButton}>
+          <span className="shrink-0 text-sm text-zinc-400">{plural(roster.matchCount.get(athlete.id) ?? 0, "jogo", "jogos")}</span>
+          <button type="button" onClick={() => setEditing(true)} className={`${secondaryButton} shrink-0`}>
             Editar
           </button>
         </div>
       ) : (
         <div className="flex flex-wrap gap-2">
-          <input className={`${inputClass} w-20 text-center`} inputMode="numeric" value={number} aria-label="Número" onChange={(e) => setNumber(e.target.value.replace(/\D/g, "").slice(0, 2))} />
-          <input className={`${inputClass} min-w-0 flex-1`} value={name} aria-label="Nome" onChange={(e) => setName(e.target.value)} />
+          <div className="grid w-full grid-cols-[minmax(0,7fr)_minmax(0,3fr)] gap-2">
+            <input className={inputClass} value={name} aria-label="Nome" onChange={(e) => setName(e.target.value)} />
+            <input className={numberInputClass} inputMode="numeric" placeholder="nº" value={number} aria-label="Número" onChange={(e) => setNumber(e.target.value.replace(/\D/g, "").slice(0, 2))} />
+          </div>
           {(["F", "M"] as const).map((g) => (
             <button
               key={g}
@@ -186,13 +188,13 @@ function TeamRow({ team, roster }: { team: RosterData["teams"][number]; roster: 
         </>
       ) : (
         <>
-              <span className="flex-1">
-                <HardLink href={teamHref(team.pair_key)} className="block text-lg font-semibold underline-offset-4 hover:underline">
+              <span className="min-w-0 flex-1">
+                <HardLink href={teamHref(team.pair_key)} title={team.name} className="block truncate text-lg font-semibold underline-offset-4 hover:underline">
                   {team.name}
                 </HardLink>
-                {team.name !== members && <span className="text-sm text-zinc-400">{members}</span>}
+                {team.name !== members && <span className="block truncate text-sm text-zinc-400">{members}</span>}
               </span>
-              <span className="text-xs uppercase text-zinc-500">{team.modality === "beach" ? "Beach" : "Indoor"}</span>
+              <span className="shrink-0 text-xs uppercase text-zinc-500">{team.modality === "beach" ? "Beach" : "Indoor"}</span>
               <button type="button" onClick={() => setEditing(true)} className={secondaryButton}>
                 Editar
               </button>

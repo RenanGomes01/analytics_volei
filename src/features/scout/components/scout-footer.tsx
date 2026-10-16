@@ -41,7 +41,7 @@ export function ScoutFooter({
   const button = "min-h-16 rounded-2xl px-4 text-lg font-semibold active:scale-[0.98] disabled:opacity-30";
 
   return (
-    <footer className="grid grid-cols-[minmax(0,1.6fr)_1fr_1fr_auto_auto_auto] gap-2 border-t border-zinc-800 p-2">
+    <footer className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)_auto_auto_auto] gap-2 border-t border-zinc-800 p-2">
       <button
         type="button"
         onClick={onUndo}

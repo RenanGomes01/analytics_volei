@@ -142,7 +142,7 @@ function ScoutBoard({ matchId }: { matchId: string }) {
   );
 
   return (
-    <div className="relative grid h-dvh touch-manipulation select-none grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden overscroll-none bg-zinc-950 text-zinc-100">
+    <div className="relative grid h-dvh touch-manipulation select-none grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden overscroll-none bg-zinc-950 text-zinc-100">
       <Scoreboard match={match} state={state} next={next} rules={rules} sides={sides} onFinish={() => setFinishOpen(true)} onExit={onExit} />
 
       {mode === "quick" ? (
@@ -160,7 +160,7 @@ function ScoutBoard({ matchId }: { matchId: string }) {
         />
       ) : (
         <>
-          <main className="grid min-h-0 grid-cols-[1fr_1.4fr_1fr] gap-2 p-2 portrait:grid-cols-1 portrait:grid-rows-[minmax(0,0.8fr)_minmax(0,1.6fr)_minmax(0,0.8fr)]">
+          <main className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)] gap-2 p-2 portrait:grid-cols-1 portrait:grid-rows-[minmax(0,0.8fr)_minmax(0,1.6fr)_minmax(0,0.8fr)]">
             {panel(sides[0])}
             <section aria-label="Lance" className="flex min-h-0 flex-col gap-2">
               <ServeChooser exec={exec} match={match} state={state} sides={sides} />
