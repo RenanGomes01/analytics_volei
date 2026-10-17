@@ -1,12 +1,10 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { HardLink } from "@/components/hard-link";
-import { replayMatch } from "@/domain/rally/replay";
 import { resolveAthlete } from "@/domain/roster/identity";
 import type { PhaseFilter } from "@/domain/roster/types";
-import { rulesFor } from "@/domain/rules/modality";
 import {
   athleteByCompetition,
   athletePartners,
@@ -38,7 +36,8 @@ import { ConcededCard } from "./drill/conceded-card";
 import { PointSourcesCard } from "./drill/point-sources-card";
 import { PrintButton } from "@/features/print/print-button";
 import { PrintHeader } from "@/features/print/print-header";
-import { StaffHidden } from "@/features/staff/staff-hidden";
+import { ProfileMatches } from "./profile-matches";
+import type { SeasonMatch } from "@/domain/stats/season";
 
 const MIN_ATTACKS = 10;
 const MIN_RECEPTIONS = 10;
@@ -92,6 +91,15 @@ export function AthleteProfile() {
       byCompetition: athleteByCompetition(mine, id, season.aliases),
     };
   }, [season, id, yearParam, phase]);
+  const sideOf = useCallback(
+    ({ match }: SeasonMatch) =>
+      season && match.team_a.athlete_ids.some((a) => resolveAthlete(season.aliases, a) === id)
+        ? ("A" as const)
+        : season && match.team_b.athlete_ids.some((a) => resolveAthlete(season.aliases, a) === id)
+          ? ("B" as const)
+          : null,
+    [season, id],
+  );
   const [detailed, setDetailed] = useState(false);
   /** Ponto do gráfico por torneio aberto no detalhamento por partida. */
   const [trendDrill, setTrendDrill] = useState<{ point: TrendPoint; column: "atk_eff" | "rec_positive" } | null>(null);
@@ -384,38 +392,7 @@ export function AthleteProfile() {
             </div>
           </Card>
 
-          <StaffHidden>
-          <Card title="Partidas">
-            <ul className="flex flex-col gap-1">
-              {[...mine].reverse().map(({ match, events, tournament }) => {
-                const state = replayMatch(events, {
-                  rules: rulesFor(match.modality),
-                  first_server: match.first_server,
-                });
-                const score = state.sets
-                  .filter((s) => s.score.A + s.score.B > 0)
-                  .map((s) => `${s.score.A}×${s.score.B}`)
-                  .join(" · ");
-                return (
-                  <li key={match.id}>
-                    <HardLink
-                      href={`/match?id=${encodeURIComponent(match.id)}`}
-                      className="flex min-h-12 items-center justify-between gap-3 rounded-xl px-2 hover:bg-zinc-800"
-                    >
-                      <span className="truncate">
-                        {match.team_a.name} × {match.team_b.name}
-                      </span>
-                      <span className="shrink-0 text-sm text-zinc-400">
-                        {score || "sem pontos"} ·{" "}
-                        {tournament?.name ?? "Amistoso"}
-                      </span>
-                    </HardLink>
-                  </li>
-                );
-              })}
-            </ul>
-          </Card>
-          </StaffHidden>
+          <ProfileMatches matches={mine} season={season} sideOf={sideOf} />
         </>
       )}
     </div>

@@ -2,7 +2,7 @@
 
 import { athleteHref, EntityLink, teamHref } from "@/features/analytics/ui";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { TournamentEditSheet } from "./tournament-edit";
 import { athleteColumns, tableColumns, teamColumns, type PlayerLine } from "@/domain/stats/stat-columns";
 import { StatTable, type StatRow } from "@/features/stats/stat-table";
@@ -12,6 +12,7 @@ import { HardLink } from "@/components/hard-link";
 import { getDB } from "@/db/client";
 import { competitionCsvFilename, competitionToCsv } from "@/domain/export/competition-csv";
 import { pairKey } from "@/domain/roster/identity";
+import { athleteNameResolver, matchSearchText } from "@/domain/roster/match-search";
 import { PHASE_LABEL, TOURNAMENT_PHASES, type PhaseFilter, type TournamentPhase } from "@/domain/roster/types";
 import type { AthleteAggregate, TeamAggregate } from "@/domain/stats/aggregate";
 import { rankAthletes, rankingSpecs, type RankingSpec } from "@/domain/stats/rankings";
@@ -28,6 +29,9 @@ import { PrintButton } from "@/features/print/print-button";
 import { PrintHeader } from "@/features/print/print-header";
 import { StaffHidden } from "@/features/staff/staff-hidden";
 import { useStaffMode } from "@/features/staff/staff-mode";
+import { MatchSearchInput, NoMatchFound } from "@/features/matches/match-search-input";
+import { TeamNames } from "@/features/matches/team-names";
+import { useMatchSearch } from "@/features/matches/use-match-search";
 
 type Tab = "report" | "ranking" | "teams" | "athletes" | "matches";
 const TABS: [Tab, string][] = [
@@ -155,6 +159,12 @@ function MatchesTab({ data, roster }: { data: CompetitionData; roster: RosterDat
   const [error, setError] = useState<string | null>(null);
   const { teamName } = useNames(roster, data.stats);
   const candidates = roster.matches.filter((m) => m.modality === data.tournament.modality && !roster.tournamentOfMatch.has(m.id));
+  const nameOf = athleteNameResolver(roster.athleteById, roster.aliases);
+  const textOf = useCallback(
+    (m: CompetitionData["matches"][number]) => matchSearchText(m.match, athleteNameResolver(roster.athleteById, roster.aliases)),
+    [roster],
+  );
+  const search = useMatchSearch(data.matches, textOf);
 
   async function run(action: () => Promise<unknown>, done: string) {
     setError(null);
@@ -169,20 +179,31 @@ function MatchesTab({ data, roster }: { data: CompetitionData; roster: RosterDat
 
   return (
     <div className="flex flex-col gap-3">
+      {data.matches.length > 0 && <MatchSearchInput query={search.query} onChange={search.setQuery} shown={search.results.length} total={search.total} />}
+      {search.searching && search.results.length === 0 && <NoMatchFound query={search.query} onClear={() => search.setQuery("")} />}
       <ul className="flex flex-col gap-2">
-        {data.matches.map(({ match, state, entry_id, phase }) => {
+        {search.results.map(({ match, state, entry_id, phase }) => {
           const names = [match.team_a, match.team_b].map((t) => teamName(pairKey(t.athlete_ids, roster.aliases)));
           const score = state.sets.filter((s) => s.score.A + s.score.B > 0).map((s) => `${s.score.A}×${s.score.B}`).join(" · ");
           return (
-            <li key={match.id} className="flex items-center gap-2 rounded-2xl bg-zinc-900 pr-2">
-              <HardLink href={`/match?id=${encodeURIComponent(match.id)}`} className="flex min-h-16 min-w-0 flex-1 flex-col justify-center px-4">
-                <span className="truncate font-semibold">
-                  {names[0]} × {names[1]}
+            // Stretched link: o scout cobre o cartão; nomes, fase e "Remover" ficam por cima (z-10).
+            <li key={match.id} className="relative flex items-center gap-2 rounded-2xl bg-zinc-900 pr-2">
+              <div className="flex min-h-16 min-w-0 flex-1 flex-col justify-center px-4">
+                <span className="flex min-w-0 flex-col font-semibold leading-snug">
+                  <TeamNames side={match.team_a} nameOf={nameOf} aliases={roster.aliases} />
+                  <span className="flex min-w-0 gap-1.5">
+                    <span className="shrink-0 text-zinc-500">×</span>
+                    <TeamNames side={match.team_b} nameOf={nameOf} aliases={roster.aliases} />
+                  </span>
                 </span>
-                <span className="text-sm text-zinc-400">
+                <HardLink
+                  href={`/match?id=${encodeURIComponent(match.id)}`}
+                  aria-label={`Abrir ${names[0]} × ${names[1]}`}
+                  className="text-sm text-zinc-400 after:absolute after:inset-0 after:rounded-2xl"
+                >
                   {score || "sem pontos"} · {state.winner ? `vitória ${names[state.winner === "A" ? 0 : 1]}` : "em andamento"}
-                </span>
-              </HardLink>
+                </HardLink>
+              </div>
               <select
                 value={phase ?? ""}
                 onChange={(e) =>
@@ -192,7 +213,7 @@ function MatchesTab({ data, roster }: { data: CompetitionData; roster: RosterDat
                   )
                 }
                 aria-label="Fase da partida"
-                className="min-h-12 max-w-40 rounded-xl border-2 border-zinc-700 bg-zinc-950 px-2 text-sm"
+                className="relative z-10 min-h-12 max-w-40 rounded-xl border-2 border-zinc-700 bg-zinc-950 px-2 text-sm"
               >
                 <option value="">Fase não informada</option>
                 {TOURNAMENT_PHASES.map((p) => (
@@ -201,7 +222,7 @@ function MatchesTab({ data, roster }: { data: CompetitionData; roster: RosterDat
                   </option>
                 ))}
               </select>
-              <button type="button" onClick={() => run(() => removeMatchFromTournament(getDB(), LOCAL_TENANT_ID, entry_id), "Partida tirada do torneio (virou amistoso).")} className="min-h-12 rounded-xl px-3 text-sm text-zinc-400" title="Tirar a partida deste torneio (a partida não é apagada)">
+              <button type="button" onClick={() => run(() => removeMatchFromTournament(getDB(), LOCAL_TENANT_ID, entry_id), "Partida tirada do torneio (virou amistoso).")} className="relative z-10 min-h-12 rounded-xl px-3 text-sm text-zinc-400" title="Tirar a partida deste torneio (a partida não é apagada)">
                 Remover
               </button>
             </li>

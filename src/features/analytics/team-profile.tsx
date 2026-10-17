@@ -1,10 +1,10 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { HardLink } from "@/components/hard-link";
-import { teamGender } from "@/domain/roster/identity";
-import { availableYears, filterSeason, pointKinds, seasonStats, teamSeries } from "@/domain/stats/season";
+import { pairKey, teamGender } from "@/domain/roster/identity";
+import { availableYears, filterSeason, pointKinds, seasonStats, teamSeries, type SeasonMatch } from "@/domain/stats/season";
 import { PointKindsChart } from "@/features/charts/point-kinds-chart";
 import { pct } from "@/features/charts/palette";
 import { RatesChart } from "@/features/charts/rates-chart";
@@ -18,6 +18,7 @@ import { ConcededCard } from "./drill/conceded-card";
 import { PointSourcesCard } from "./drill/point-sources-card";
 import { PrintButton } from "@/features/print/print-button";
 import { PrintHeader } from "@/features/print/print-header";
+import { ProfileMatches } from "./profile-matches";
 
 const GENDER_LABEL = { M: "Masculino", F: "Feminino", Mixed: "Misto" } as const;
 
@@ -34,8 +35,15 @@ export function TeamProfile() {
     const scope = filterSeason(season.matches, { year: yearParam === "all" ? undefined : Number(yearParam), includeFriendlies: true });
     const { series, opponents } = teamSeries(scope, key, season.aliases);
     const { rallies } = buildAnalytics(scope.map((m) => ({ match: m.match, events: m.events, tournament_id: m.tournament?.id ?? null })), season.aliases);
-    return { series, opponents, won: pointsWon(rallies, { pair_key: key }), conceded: pointsConceded(rallies, { pair_key: key }), team: seasonStats(scope, season.aliases).teams[key], kinds: pointKinds(scope, season.aliases, key) };
+    const mine = scope.filter(({ match }) => [match.team_a, match.team_b].some((t) => pairKey(t.athlete_ids, season.aliases) === key));
+    return { mine, series, opponents, won: pointsWon(rallies, { pair_key: key }), conceded: pointsConceded(rallies, { pair_key: key }), team: seasonStats(scope, season.aliases).teams[key], kinds: pointKinds(scope, season.aliases, key) };
   }, [season, key, yearParam]);
+
+  const sideOf = useCallback(
+    ({ match }: SeasonMatch) =>
+      !season ? null : pairKey(match.team_a.athlete_ids, season.aliases) === key ? ("A" as const) : pairKey(match.team_b.athlete_ids, season.aliases) === key ? ("B" as const) : null,
+    [season, key],
+  );
 
   if (!season || !computed) return <p className="p-8 text-center text-zinc-400">Carregando dupla…</p>;
   const ids = key.split("|").filter(Boolean);
@@ -134,6 +142,8 @@ export function TeamProfile() {
               </ul>
             </Card>
           </div>
+
+          <ProfileMatches matches={computed.mine} season={season} sideOf={sideOf} />
         </>
       )}
     </div>

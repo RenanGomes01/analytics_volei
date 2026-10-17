@@ -1,10 +1,11 @@
 "use client";
 
 import { useVisibleLiveQuery } from "@/lib/use-visible-live-query";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { HardLink } from "@/components/hard-link";
 import { getDB } from "@/db/client";
+import { athleteNameResolver, matchSearchText } from "@/domain/roster/match-search";
 import { PHASE_LABEL } from "@/domain/roster/types";
 import { ExportButton } from "@/features/export/export-button";
 import { useRosterData } from "@/features/roster/use-roster-data";
@@ -13,6 +14,9 @@ import { listDeletedMatches, listMatches, restoreMatch } from "@/services/match-
 import type { Match } from "@/domain/types";
 import { toast } from "@/features/toast/toast";
 import { EditMatchSheet } from "./edit-match-sheet";
+import { MatchSearchInput, NoMatchFound } from "./match-search-input";
+import { TeamNames } from "./team-names";
+import { useMatchSearch } from "./use-match-search";
 
 const dateFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" });
 
@@ -21,6 +25,12 @@ export function MatchList() {
   const deleted = useVisibleLiveQuery(() => listDeletedMatches(getDB(), LOCAL_TENANT_ID), []);
   const roster = useRosterData();
   const [editing, setEditing] = useState<Match | null>(null);
+  const nameOf = roster ? athleteNameResolver(roster.athleteById, roster.aliases) : () => undefined;
+  const textOf = useCallback(
+    (m: Match) => matchSearchText(m, roster ? athleteNameResolver(roster.athleteById, roster.aliases) : () => undefined),
+    [roster],
+  );
+  const search = useMatchSearch(matches, textOf);
 
   if (!matches) return null;
   if (matches.length === 0) {
@@ -49,33 +59,52 @@ export function MatchList() {
 
   return (
     <>
+      <MatchSearchInput query={search.query} onChange={search.setQuery} shown={search.results.length} total={search.total} />
+      {search.searching && search.results.length === 0 && <NoMatchFound query={search.query} onClear={() => search.setQuery("")} />}
       <ul className="flex flex-col gap-2">
-        {matches.map((m) => (
-          <li key={m.id} className="flex items-center gap-2 rounded-2xl bg-zinc-900 pr-2">
-            <HardLink
-              href={`/match?id=${encodeURIComponent(m.id)}`}
-              className="flex min-h-16 min-w-0 flex-1 items-center justify-between gap-4 rounded-2xl px-4 active:bg-zinc-800"
-            >
-              <span className="truncate text-lg font-semibold">
-                {m.team_a.name} × {m.team_b.name}
+        {search.results.map((m) => (
+          // Stretched link: o link do scout cobre o cartão (after:inset-0) e os nomes ficam por cima (z-10).
+          <li key={m.id} className="relative flex items-center gap-2 rounded-2xl bg-zinc-900 pr-2 has-[a.card-link:active]:bg-zinc-800">
+            <div className="flex min-h-16 min-w-0 flex-1 items-center justify-between gap-4 px-4">
+              {/* Uma dupla por linha: nomes longos ("Vinícius - RO") não somem no "…". */}
+              <span className="flex min-w-0 flex-col py-1 text-lg font-semibold leading-snug">
+                {roster ? (
+                  <>
+                    <TeamNames side={m.team_a} nameOf={nameOf} aliases={roster.aliases} />
+                    <span className="flex min-w-0 gap-1.5">
+                      <span className="shrink-0 text-zinc-500">×</span>
+                      <TeamNames side={m.team_b} nameOf={nameOf} aliases={roster.aliases} />
+                    </span>
+                  </>
+                ) : (
+                  <span className="truncate">
+                    {m.team_a.name} × {m.team_b.name}
+                  </span>
+                )}
               </span>
-              <span className="shrink-0 text-right text-sm text-zinc-400">
+              <HardLink
+                href={`/match?id=${encodeURIComponent(m.id)}`}
+                aria-label={`Abrir ${m.team_a.name} × ${m.team_b.name}`}
+                className="card-link shrink-0 text-right text-sm text-zinc-400 after:absolute after:inset-0 after:rounded-2xl"
+              >
                 {m.modality === "beach" ? "Beach" : "Indoor"} · {dateFormat.format(m.created_at)}
                 <span className="block text-xs text-zinc-500">{competitionLabel(m.id)}</span>
-              </span>
-            </HardLink>
-            <ExportButton matchId={m.id} compact />
-            {roster && (
-              <button
-                type="button"
-                onClick={() => setEditing(m)}
-                aria-label={`Editar ou excluir ${m.team_a.name} × ${m.team_b.name}`}
-                title="Editar torneio, fase ou excluir"
-                className="min-h-12 min-w-12 rounded-xl bg-zinc-800 px-3 text-xl font-bold"
-              >
-                ⋯
-              </button>
-            )}
+              </HardLink>
+            </div>
+            <span className="relative z-10 flex items-center gap-2">
+              <ExportButton matchId={m.id} compact />
+              {roster && (
+                <button
+                  type="button"
+                  onClick={() => setEditing(m)}
+                  aria-label={`Editar ou excluir ${m.team_a.name} × ${m.team_b.name}`}
+                  title="Editar torneio, fase ou excluir"
+                  className="min-h-12 min-w-12 rounded-xl bg-zinc-800 px-3 text-xl font-bold"
+                >
+                  ⋯
+                </button>
+              )}
+            </span>
           </li>
         ))}
       </ul>

@@ -78,3 +78,8 @@
 - `buildAnalytics` faz UMA passada (um replay por partida) e devolve `touches` (fatos de lance, agora com `opponent_id`) e `rallies` (`RallyFact`: causa com `merit`/`conceded`, `fault`, `scorer`, `culprit`). O espelho não junta listas: o mesmo fato é lido por quem ganhou e por quem perdeu (`pointsWon`/`pointsConceded`). Invariantes testadas: espelho por causa, cedidos = placar do adversário, grupos = origem dos pontos, atletas + "sem atleta" = dupla.
 - `pointKindLabel` (gráficos) usa o mesmo classificador (`classifyRally`): não há dois textos para o mesmo ponto.
 - `match-story.ts` (puro) alimenta os marcadores do `ScoreProgressionChart` e as frases embaixo do gráfico.
+
+## Busca e perfis conectados (Fase 17)
+- **Busca em memória:** home e aba Partidas do torneio filtram a lista já carregada pelo `useLiveQuery`. `matchSearchText` monta, uma vez por mudança de dados, um texto normalizado (retrato das duplas + nomes atuais das atletas, via aliases); cada tecla só roda `matchesQuery` (todas as palavras, sem acento). `useDeferredValue` mantém a digitação fluida no tablet. A busca fica em `?q=`.
+- **Navegação:** nomes nos cartões são links para `/athlete?id=` (canônico); o resto do cartão continua abrindo o scout (stretched link, sem link aninhado).
+- **Perfis:** atleta e dupla têm o card "Partidas" (`ProfileMatches`), com V/D do ponto de vista do perfil e filtro por torneio (`?t=`), calculado dos dados da temporada já carregados.

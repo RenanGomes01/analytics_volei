@@ -129,6 +129,13 @@
 - Duelo (`opponent_id` em `TouchFact`) só vem do ledger; sem toque do outro lado, sem nome.
 - Textos de métrica para o técnico: `src/features/stats/explain.ts` (plural e base 0). Resumo com pílulas, nunca "a · b · c / d".
 
+## Busca e perfis conectados (Fase 17)
+- Busca de partidas = `useMatchSearch` (`src/features/matches/`) sobre dados **já em memória**: índice de texto (`matchSearchText`, `src/domain/roster/match-search.ts`) num `useMemo` por mudança de dados, filtro por tecla com `useDeferredValue`. Nunca consulte o banco por tecla. `textOf` passado ao hook precisa ser estável (`useCallback`).
+- Busca acha pelo retrato da partida **e** pelo nome atual da atleta (alias → canônica). Todas as palavras precisam aparecer.
+- Nome clicável de atleta em cartão de partida = só `TeamNames` (link para o perfil canônico). Cartão que abre o scout usa **stretched link** (`after:absolute after:inset-0` no link, `relative` no `<li>`, `relative z-10` em nomes/botões por cima): nunca `<a>` dentro de `<a>`.
+- Jogos nos perfis = `ProfileMatches` (`src/features/analytics/profile-matches.tsx`), a partir dos `SeasonMatch` do perfil; V/D e placar do ponto de vista do perfil. Modo comissão vê a lista, sem link para o scout.
+- Parâmetros `?q=` (busca) e `?t=` (torneio no perfil) estão em `ignoreURLParametersMatching`; leia com `readQueryParam` no inicializador do `useState` (as listas só aparecem depois do banco local).
+
 ## Dados de teste (`/dev/seed`)
 - Gerador puro em `src/domain/dev/rally-generator.ts` (semente fixa, modo detalhado, fim do rali sempre por `impliedPoint`); serviço em `src/services/dev/seed-service.ts`, gravando pelos services reais (`appendRallies` = vários ralis numa transação).
 - Os ids criados ficam em `meta["dev_seed"]`. `removeDemoData` apaga **só** esses ids (exceção deliberada ao append-only, restrita a dados sintéticos).

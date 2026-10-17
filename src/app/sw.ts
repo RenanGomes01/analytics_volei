@@ -14,7 +14,7 @@ const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   // /match?id=…, /team?key=…, /rankings?year=… devem casar com a página pré-cacheada (os filtros são lidos no cliente).
   precacheOptions: {
-    ignoreURLParametersMatching: [/^id$/, /^key$/, /^year$/, /^gender$/, /^view$/, /^category$/, /^friendlies$/, /^phase$/, /^tab$/, /^mode$/, /^ids$/, /^sort$/, /^dir$/, /^cols$/, /^min$/, /^utm_/, /^fbclid$/],
+    ignoreURLParametersMatching: [/^id$/, /^key$/, /^year$/, /^gender$/, /^view$/, /^category$/, /^friendlies$/, /^phase$/, /^tab$/, /^mode$/, /^ids$/, /^sort$/, /^dir$/, /^cols$/, /^min$/, /^q$/, /^t$/, /^utm_/, /^fbclid$/],
   },
   skipWaiting: true,
   clientsClaim: true,
