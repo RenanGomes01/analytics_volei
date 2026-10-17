@@ -10,10 +10,11 @@ import { PHASE_LABEL, TOURNAMENT_PHASES, type TournamentPhase } from "@/domain/r
 import type { Match } from "@/domain/types";
 import type { RosterData } from "@/features/roster/use-roster-data";
 import { inputClass, primaryButton, secondaryButton, segmentedClass } from "@/features/setup/form-styles";
+import { TournamentPicker } from "@/features/setup/tournament-picker";
 import { toast } from "@/features/toast/toast";
 import { LOCAL_TENANT_ID } from "@/lib/tenant";
 import { countScoutedEvents, deleteMatch, restoreMatch, updateMatchTeams } from "@/services/match-service";
-import { addMatchToTournament, removeMatchFromTournament, setMatchPhase } from "@/services/tournament-service";
+import { setMatchCompetition } from "@/services/tournament-service";
 
 interface Props {
   match: Match;
@@ -53,13 +54,8 @@ export function EditMatchSheet({ match, roster, onClose }: Props) {
       if (!locked && (!sameTeam(team_a, match.team_a) || !sameTeam(team_b, match.team_b))) {
         await updateMatchTeams(getDB(), LOCAL_TENANT_ID, match.id, { team_a, team_b });
       }
-      let entryId = entry?.id ?? null;
-      if ((entry?.tournament_id ?? "") !== tournamentId) {
-        if (entry) await removeMatchFromTournament(getDB(), LOCAL_TENANT_ID, entry.id);
-        entryId = tournamentId ? (await addMatchToTournament(getDB(), LOCAL_TENANT_ID, { tournament_id: tournamentId, match_id: match.id })).id : null;
-      }
-      const currentPhase = entryId === entry?.id ? (entry?.phase ?? null) : null;
-      if (entryId && phase !== currentPhase) await setMatchPhase(getDB(), LOCAL_TENANT_ID, entryId, phase);
+      // Torneio e fase numa transação só: nunca fica "meio amistoso" se algo falhar no meio.
+      await setMatchCompetition(getDB(), LOCAL_TENANT_ID, match.id, { tournament_id: tournamentId || null, phase: tournamentId ? phase : null });
       toast.success("Partida salva.");
       onClose();
     });
@@ -112,6 +108,7 @@ export function EditMatchSheet({ match, roster, onClose }: Props) {
     <div role="dialog" aria-modal="true" aria-label="Editar partida" className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="flex max-h-full w-full max-w-lg flex-col gap-3 overflow-y-auto rounded-3xl bg-zinc-900 p-5 text-zinc-100">
         <h2 className="text-xl font-bold">Editar partida</h2>
+        <p className="text-sm text-zinc-400">Torneio e fase podem ser corrigidos a qualquer momento, sem mexer nos lances.</p>
         {teamSelect("Dupla A", teamA, setTeamA)}
         {teamSelect("Dupla B", teamB, setTeamB)}
         {locked && (
@@ -119,24 +116,15 @@ export function EditMatchSheet({ match, roster, onClose }: Props) {
             Já tem lances: as duplas não mudam. Nome errado? Corrija no cadastro (Atletas e duplas) ou use “Unir atletas”.
           </p>
         )}
-        <label className="flex flex-col gap-1 text-sm text-zinc-400">
-          Torneio
-          <select
-            className={inputClass}
-            value={tournamentId}
-            onChange={(e) => {
-              setTournamentId(e.target.value);
-              setPhase(e.target.value ? (phase ?? "group") : null);
-            }}
-          >
-            <option value="">Amistoso (sem torneio)</option>
-            {tournaments.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <TournamentPicker
+          tournaments={tournaments}
+          value={tournamentId}
+          modality={match.modality}
+          onChange={(id) => {
+            setTournamentId(id);
+            setPhase(id ? (phase ?? "group") : null);
+          }}
+        />
         {tournamentId && (
           <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Fase">
             {TOURNAMENT_PHASES.map((p) => (

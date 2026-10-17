@@ -18,7 +18,10 @@ import {
   listTournamentMatches,
   listTournaments,
   removeMatchFromTournament,
+  setMatchCompetition,
+  setMatchPhase,
 } from "@/services/tournament-service";
+import { appendTouch } from "@/services/rally-ledger-service";
 
 const T = "local";
 let db: ScoutDB;
@@ -183,5 +186,87 @@ describe("torneios e partidas", () => {
 
     await removeMatchFromTournament(db, T, entry.id);
     expect(await listTournamentMatches(db, T, tournament.id)).toEqual([]);
+  });
+
+  describe("setMatchCompetition (edição da partida)", () => {
+    async function friendly() {
+      const { teamA, teamB, tournament } = await setup();
+      const match = await createMatchFromTeams(db, { tenant_id: T, team_a_id: teamA.id, team_b_id: teamB.id, first_server: "A" });
+      await appendTouch(db, { tenant_id: T, match_id: match.id }, { team: "A", athlete_id: teamA.athlete_ids[0], skill: "serve", quality: "+" });
+      return { match, tournament, teamA, teamB };
+    }
+    const snapshot = async (match_id: string) => ({
+      match: await db.matches.get(match_id),
+      events: await db.rally_events.where("match_id").equals(match_id).toArray(),
+    });
+
+    it("amistoso com lances vai para o torneio já nas oitavas: 1 vínculo, 1 mutação, lances intocados", async () => {
+      const { match, tournament } = await friendly();
+      const before = await snapshot(match.id);
+      const outboxBefore = (await outbox()).length;
+
+      const entry = await setMatchCompetition(db, T, match.id, { tournament_id: tournament.id, phase: "round_of_16" });
+
+      expect(entry).toMatchObject({ id: `${tournament.id}:${match.id}`, tournament_id: tournament.id, phase: "round_of_16" });
+      const added = (await outbox()).slice(outboxBefore);
+      expect(added.map((e) => [e.entity, e.op, (e.payload as { phase?: string }).phase])).toEqual([["tournament_entry", "insert", "round_of_16"]]);
+      expect(await snapshot(match.id)).toEqual(before);
+    });
+
+    it("fase de grupos → oitavas no mesmo torneio é um upsert do mesmo vínculo; sem mudança não grava", async () => {
+      const { match, tournament } = await friendly();
+      const entry = await setMatchCompetition(db, T, match.id, { tournament_id: tournament.id, phase: "group" });
+      const outboxBefore = (await outbox()).length;
+
+      const fixed = await setMatchCompetition(db, T, match.id, { tournament_id: tournament.id, phase: "round_of_16" });
+      expect(fixed?.id).toBe(entry?.id);
+      expect((await outbox()).slice(outboxBefore).map((e) => [e.op, (e.payload as { phase?: string }).phase])).toEqual([["upsert", "round_of_16"]]);
+
+      await setMatchCompetition(db, T, match.id, { tournament_id: tournament.id, phase: "round_of_16" });
+      expect((await outbox()).length).toBe(outboxBefore + 1);
+    });
+
+    it("troca de torneio e volta a amistoso: lápide do vínculo antigo, sem mexer na partida", async () => {
+      const { match, tournament } = await friendly();
+      const other = await createTournament(db, T, { name: "Campeonato Estadual", start_date: "2026-10-17", modality: "beach" });
+      await setMatchCompetition(db, T, match.id, { tournament_id: tournament.id, phase: "group" });
+      const before = await snapshot(match.id);
+      const outboxBefore = (await outbox()).length;
+
+      await setMatchCompetition(db, T, match.id, { tournament_id: other.id, phase: "quarterfinal" });
+      expect(await db.tournament_entries.where("match_id").equals(match.id).toArray()).toMatchObject([{ tournament_id: other.id, phase: "quarterfinal" }]);
+      expect((await outbox()).slice(outboxBefore).map((e) => [e.op, e.entity_id])).toEqual([
+        ["delete", `${tournament.id}:${match.id}`],
+        ["insert", `${other.id}:${match.id}`],
+      ]);
+
+      expect(await setMatchCompetition(db, T, match.id, { tournament_id: null, phase: "final" })).toBeNull();
+      expect(await db.tournament_entries.where("match_id").equals(match.id).count()).toBe(0);
+      expect(await snapshot(match.id)).toEqual(before);
+    });
+
+    it("recusa torneio de outra modalidade e desfaz tudo se o novo vínculo falhar", async () => {
+      const { match, tournament } = await friendly();
+      const indoor = await createTournament(db, T, { name: "Liga", start_date: "2026-10-10", modality: "indoor" });
+      await expect(setMatchCompetition(db, T, match.id, { tournament_id: indoor.id, phase: null })).rejects.toThrow(/modalidade/);
+
+      await setMatchCompetition(db, T, match.id, { tournament_id: tournament.id, phase: "group" });
+      const other = await createTournament(db, T, { name: "Outra", start_date: "2026-11-01", modality: "beach" });
+      const outboxBefore = (await outbox()).length;
+      vi.spyOn(db.tournament_entries, "add").mockRejectedValueOnce(new Error("falhou"));
+      await expect(setMatchCompetition(db, T, match.id, { tournament_id: other.id, phase: "final" })).rejects.toThrow("falhou");
+      expect(await db.tournament_entries.where("match_id").equals(match.id).toArray()).toMatchObject([{ tournament_id: tournament.id, phase: "group" }]);
+      expect((await outbox()).length).toBe(outboxBefore);
+    });
+
+    it("vínculo de dado local_only continua local_only", async () => {
+      const { match, tournament } = await friendly();
+      const entry = await setMatchCompetition(db, T, match.id, { tournament_id: tournament.id, phase: "group" });
+      await db.outbox.where("entity_id").equals(entry!.id).modify({ status: "local_only" });
+      await setMatchPhase(db, T, entry!.id, "semifinal");
+      await setMatchCompetition(db, T, match.id, { tournament_id: tournament.id, phase: "final" });
+      const statuses = (await db.outbox.where("entity_id").equals(entry!.id).toArray()).map((e) => e.status);
+      expect(new Set(statuses)).toEqual(new Set(["local_only"]));
+    });
   });
 });

@@ -70,6 +70,7 @@ export function MatchList() {
                 type="button"
                 onClick={() => setEditing(m)}
                 aria-label={`Editar ou excluir ${m.team_a.name} × ${m.team_b.name}`}
+                title="Editar torneio, fase ou excluir"
                 className="min-h-12 min-w-12 rounded-xl bg-zinc-800 px-3 text-xl font-bold"
               >
                 ⋯

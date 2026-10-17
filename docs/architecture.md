@@ -33,7 +33,7 @@
 - **Sem nova versão do Dexie.** `match_end` é mais um tipo de evento do ledger (append-only, rally_id próprio, anulável por `void`); `TournamentEntry.phase` é opcional e sem índice. O envelope de exportação continua v1 (o validador aceita `match_end`).
 - `finishMatch()` (`rally-ledger-service.ts`) grava o encerramento; `replayMatch` descarta o rali aberto, marca o set `interrupted` e expõe `state.end`.
 - `appendRallies()` grava vários ralis numa transação (gerador de dados de teste).
-- `setMatchPhase()` reclassifica a fase (upsert no outbox). `filterSeason({ phase })` e `useCompetitionData(…, phase)` filtram por fase.
+- `setMatchPhase()` reclassifica a fase (upsert no outbox). Na edição da partida, `setMatchCompetition()` troca torneio e fase numa transação só (amistoso → torneio, troca de torneio, correção de fase; lápide do vínculo antigo + vínculo novo; sem mudança não grava; nunca toca os lances). `filterSeason({ phase })` e `useCompetitionData(…, phase)` filtram por fase.
 - **Estatísticas in-game:** `src/domain/stats/match-insights.ts` (evolução do placar, maiores sequências, desfecho de ataques e saques, "como os pontos aconteceram"). Os gráficos (`src/features/stats/match-charts.tsx`) entram por `next/dynamic` só quando a aba abre; o chunk fica no pré-cache.
 
 ## Cloud sync com Supabase (Fase 8)

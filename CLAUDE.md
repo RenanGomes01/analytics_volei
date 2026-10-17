@@ -74,7 +74,7 @@
 - "Como foi o ponto?" (`quick-rally.ts`) **sempre** termina com "Não vi como foi" (`unseen`): nenhuma sequência de toques pode deixar o analista sem saída (há teste exaustivo).
 - Bola de primeira/segunda: `as_attack` converte o último toque em ataque. A estatística "2ª" é deduzida pela ordem dos toques (`touch-lines.ts`), sem campo novo.
 - Encerramento manual = evento `match_end` (`finishMatch`); nunca altere a partida nem apague eventos para encerrar. Desfazer reabre.
-- Fase da partida mora em `TournamentEntry.phase` (`setMatchPhase`); amistoso = sem torneio.
+- Fase da partida mora em `TournamentEntry.phase` (`setMatchPhase`); amistoso = sem torneio. A edição da partida (`EditMatchSheet`, com `TournamentPicker` e "+ Novo torneio") grava torneio + fase por `setMatchCompetition` (uma transação).
 - Passe na mão só aparece com recepções avaliadas no recorte (`reception.positive.den > 0`).
 
 ## Cloud sync com Supabase (Fase 8)

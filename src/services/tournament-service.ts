@@ -123,6 +123,56 @@ export async function setMatchPhase(db: ScoutDB, tenant_id: string, entry_id: st
   });
 }
 
+/**
+ * Corrige torneio e fase da partida numa transação só (edição da partida): amistoso → torneio, troca de
+ * torneio ou de fase. `tournament_id: null` = amistoso. Sem mudança, não grava nada. Nunca toca os lances.
+ */
+export async function setMatchCompetition(
+  db: ScoutDB,
+  tenant_id: string,
+  match_id: string,
+  { tournament_id, phase }: { tournament_id: string | null; phase: TournamentPhase | null },
+  now = Date.now(),
+): Promise<TournamentEntry | null> {
+  return db.transaction("rw", [db.tournaments, db.matches, db.tournament_entries, db.outbox], async () => {
+    const match = await db.matches.get(match_id);
+    if (!match || match.tenant_id !== tenant_id || match.deleted_at) throw new Error("Partida não encontrada.");
+    if (tournament_id) {
+      const tournament = await db.tournaments.get(tournament_id);
+      if (!tournament || tournament.tenant_id !== tenant_id) throw new Error("Torneio não encontrado.");
+      if (match.modality !== tournament.modality) throw new Error("A partida é de outra modalidade.");
+    }
+
+    const current = await db.tournament_entries.where("match_id").equals(match_id).first();
+    if (current && current.tournament_id === tournament_id) {
+      if ((current.phase ?? null) === phase) return current;
+      const updated: TournamentEntry = { ...current };
+      if (phase) updated.phase = phase;
+      else delete updated.phase;
+      await db.tournament_entries.put(updated);
+      await enqueue(db, "tournament_entry", updated, "upsert");
+      return updated;
+    }
+
+    if (current) {
+      await db.tournament_entries.delete(current.id);
+      await enqueue(db, "tournament_entry", current, "delete");
+    }
+    if (!tournament_id) return null;
+    const entry: TournamentEntry = {
+      id: `${tournament_id}:${match_id}`,
+      tenant_id,
+      tournament_id,
+      match_id,
+      created_at: now,
+      ...(phase ? { phase } : {}),
+    };
+    await db.tournament_entries.add(entry);
+    await enqueue(db, "tournament_entry", entry);
+    return entry;
+  });
+}
+
 export async function removeMatchFromTournament(db: ScoutDB, tenant_id: string, entry_id: string): Promise<void> {
   await db.transaction("rw", db.tournament_entries, db.outbox, async () => {
     const entry = await db.tournament_entries.get(entry_id);

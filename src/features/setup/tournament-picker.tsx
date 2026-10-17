@@ -19,12 +19,14 @@ interface Props {
   tournaments: Tournament[];
   value: string;
   onChange: (tournamentId: string) => void;
+  /** Modalidade fixa (edição de partida existente): o torneio criado aqui nasce nela, sem escolha. */
+  modality?: Modality;
 }
 
 /** Escolhe o torneio da partida ("" = sem torneio) ou cria um novo na hora. */
-export function TournamentPicker({ tournaments, value, onChange }: Props) {
+export function TournamentPicker({ tournaments, value, onChange, modality }: Props) {
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ name: "", location: "", start_date: today(), modality: "beach" as Modality, category: undefined as TournamentCategory | undefined });
+  const [form, setForm] = useState({ name: "", location: "", start_date: today(), modality: modality ?? ("beach" as Modality), category: undefined as TournamentCategory | undefined });
   const { busy, error, run } = useSubmit();
 
   const create = () =>
@@ -64,13 +66,15 @@ export function TournamentPicker({ tournaments, value, onChange }: Props) {
             <input className={inputClass} placeholder="Local" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} aria-label="Local do torneio" />
             <input className={inputClass} type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} aria-label="Data de início" />
           </div>
-          <div className="flex gap-2">
-            {(["beach", "indoor"] as const).map((m) => (
-              <button key={m} type="button" className={segmentedClass(form.modality === m)} onClick={() => setForm({ ...form, modality: m })}>
-                {m === "beach" ? "Beach 2×2" : "Indoor 6×6"}
-              </button>
-            ))}
-          </div>
+          {!modality && (
+            <div className="flex gap-2">
+              {(["beach", "indoor"] as const).map((m) => (
+                <button key={m} type="button" className={segmentedClass(form.modality === m)} onClick={() => setForm({ ...form, modality: m })}>
+                  {m === "beach" ? "Beach 2×2" : "Indoor 6×6"}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label="Categoria do torneio">
             {CATEGORIES.map(([c, text]) => (
               <button
