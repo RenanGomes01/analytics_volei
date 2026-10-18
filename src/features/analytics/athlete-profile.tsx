@@ -37,10 +37,15 @@ import { PointSourcesCard } from "./drill/point-sources-card";
 import { PrintButton } from "@/features/print/print-button";
 import { PrintHeader } from "@/features/print/print-header";
 import { ProfileMatches } from "./profile-matches";
+import { athleteDashboard, athleteMatchSeries } from "@/domain/stats/athlete-dashboard";
+import { CompareRatesChart, MatchBalanceChart } from "@/features/charts/athlete-charts";
+import { readQueryParam } from "@/features/matches/use-match-search";
+import { AttackIdentityWidget, BalanceWidget, MIN_VOLUME, ServeTargetWidget, SideOutWidget, WallWidget } from "./athlete-widgets";
 import type { SeasonMatch } from "@/domain/stats/season";
 
 const MIN_ATTACKS = 10;
 const MIN_RECEPTIONS = 10;
+const FRIENDLIES = "amistosos";
 
 /** Perfil do atleta: atravessa parcerias (no vôlei de praia a dupla muda; o atleta não). */
 export function AthleteProfile() {
@@ -53,6 +58,13 @@ export function AthleteProfile() {
     params.get("phase") === "group" || params.get("phase") === "knockout" ? (params.get("phase") as PhaseFilter) : "all",
   );
 
+  /** Recorte do painel: "" = temporada inteira, id do torneio ou "amistosos" (`?t=`, o mesmo da lista de partidas). */
+  const [scope, setScopeState] = useState(() => readQueryParam("t"));
+  const setScope = (t: string) => {
+    setScopeState(t);
+    replaceQuery({ t: t || undefined });
+  };
+
   // Um cadastro antigo (alias) abre o perfil do atleta canônico.
   useEffect(() => {
     if (season && id !== requested) replaceQuery({ id });
@@ -64,16 +76,19 @@ export function AthleteProfile() {
   );
   const computed = useMemo(() => {
     if (!season) return null;
-    const scope = filterSeason(season.matches, {
+    const inSeason = filterSeason(season.matches, {
       year: yearParam === "all" ? undefined : Number(yearParam),
       includeFriendlies: true,
       phase,
     });
-    const mine = scope.filter(({ match }) =>
+    const allMine = inSeason.filter(({ match }) =>
       [...match.team_a.athlete_ids, ...match.team_b.athlete_ids].some(
         (a) => resolveAthlete(season.aliases, a) === id,
       ),
     );
+    const mine = !scope ? allMine : allMine.filter((m) => (scope === FRIENDLIES ? !m.tournament : m.tournament?.id === scope));
+    const tournaments = [...new Map(allMine.flatMap((m) => (m.tournament ? [[m.tournament.id, m.tournament.name] as const] : []))).entries()];
+    const seasonMe = seasonStats(allMine, season.aliases).athletes[id];
     // Lances dela com contexto: drill-down e fontes de erro (o mesmo cálculo da tabela).
     const analytics = buildAnalytics(
       mine.map((m) => ({ match: m.match, events: m.events, tournament_id: m.tournament?.id ?? null })),
@@ -81,16 +96,23 @@ export function AthleteProfile() {
     );
     const facts = analytics.touches.filter((f) => f.athlete_id === id);
     const conceded = analytics.rallies.filter((f) => f.culprit === id);
+    const me = seasonStats(mine, season.aliases).athletes[id];
     return {
       mine,
+      allMine,
+      tournaments,
+      hasFriendlies: allMine.some((m) => !m.tournament),
+      dashboard: me ? athleteDashboard(me) : null,
+      seasonDashboard: seasonMe ? athleteDashboard(seasonMe) : null,
+      evolution: athleteMatchSeries(mine, id, season.aliases),
       facts,
       conceded,
-      me: seasonStats(mine, season.aliases).athletes[id],
+      me,
       series: athleteSeries(mine, id, season.aliases),
       partners: athletePartners(mine, id, season.aliases),
       byCompetition: athleteByCompetition(mine, id, season.aliases),
     };
-  }, [season, id, yearParam, phase]);
+  }, [season, id, yearParam, phase, scope]);
   const sideOf = useCallback(
     ({ match }: SeasonMatch) =>
       season && match.team_a.athlete_ids.some((a) => resolveAthlete(season.aliases, a) === id)
@@ -129,6 +151,7 @@ export function AthleteProfile() {
   const losses = partners.reduce((s, p) => s + p.losses, 0);
   // Passe na mão só com recepções avaliadas (o modo rápido não avalia o passe).
   const showReception = !!me && me.reception.positive.den > 0;
+  const scopeLabel = scope === FRIENDLIES ? "Amistosos" : (computed.tournaments.find(([tid]) => tid === scope)?.[1] ?? "Recorte");
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
@@ -183,6 +206,24 @@ export function AthleteProfile() {
           replaceQuery({ phase: v === "all" ? undefined : v });
         }}
       />
+      {(computed.tournaments.length > 1 || (computed.tournaments.length > 0 && computed.hasFriendlies)) && (
+        <label className="flex flex-wrap items-center gap-2 text-sm text-zinc-400">
+          Recorte
+          <select
+            value={scope}
+            onChange={(e) => setScope(e.target.value)}
+            className="min-h-12 min-w-0 flex-1 rounded-xl border-2 border-zinc-700 bg-zinc-950 px-3 text-base text-zinc-100"
+          >
+            <option value="">Temporada inteira</option>
+            {computed.tournaments.map(([tid, name]) => (
+              <option key={tid} value={tid}>
+                {name}
+              </option>
+            ))}
+            {computed.hasFriendlies && <option value={FRIENDLIES}>Amistosos</option>}
+          </select>
+        </label>
+      )}
       </div>
 
       {!me ? (
@@ -235,6 +276,52 @@ export function AthleteProfile() {
               />
             )}
           </div>
+
+          {computed.dashboard && (
+            <>
+              <div className="grid gap-3 lg:grid-cols-2">
+                <BalanceWidget balance={computed.dashboard.balance} />
+                <SideOutWidget sideOut={computed.dashboard.sideOut} />
+              </div>
+              {computed.evolution.length > 1 && (
+                <div className="grid gap-3 lg:grid-cols-2">
+                  <Card title="Evolução jogo a jogo: acertos × erros" note="Uma partida por grupo de barras, em ordem de data">
+                    <MatchBalanceChart data={computed.evolution} />
+                  </Card>
+                  <Card title="Evolução jogo a jogo: eficiência de ataque" note={`(PA − E) / TA em cada partida · pontos claros = menos de ${MIN_VOLUME} ataques`}>
+                    <TrendChart
+                      name="Eficiência de ataque"
+                      data={computed.evolution.map((p) => ({
+                        key: p.match_id,
+                        label: p.label,
+                        value: p.attackEfficiency,
+                        detail: `${p.attackAttempts} ataques`,
+                        lowVolume: p.attackAttempts < MIN_VOLUME,
+                      }))}
+                    />
+                  </Card>
+                </div>
+              )}
+              <div className="grid gap-3 md:grid-cols-3">
+                <ServeTargetWidget target={computed.dashboard.serveTarget} name={athlete.name} />
+                <AttackIdentityWidget attack={computed.dashboard.attack} />
+                <WallWidget wall={computed.dashboard.wall} />
+              </div>
+              {scope && computed.seasonDashboard && (
+                <Card title={`Resumo: ${scopeLabel} × temporada`} note="Mesmas métricas no recorte e na temporada inteira · barras claras = pouco volume">
+                  <CompareRatesChart
+                    scopeLabel={scopeLabel}
+                    data={[
+                      { label: "Alvo do saque", scope: computed.dashboard.serveTarget, season: computed.seasonDashboard.serveTarget },
+                      { label: "Virada de bola", scope: computed.dashboard.sideOut.total, season: computed.seasonDashboard.sideOut.total },
+                      { label: "Virada de primeira", scope: computed.dashboard.sideOut.firstBall, season: computed.seasonDashboard.sideOut.firstBall },
+                      { label: "Ataques da dupla", scope: computed.dashboard.attack.share, season: computed.seasonDashboard.attack.share },
+                    ]}
+                  />
+                </Card>
+              )}
+            </>
+          )}
 
           <div className="grid gap-3 lg:grid-cols-2">
             <PointSourcesCard points={{ kills: me.attack.kills, aces: me.serve.aces, blocks: me.blocks }} rows={scoredBreakdown(computed.facts).rows} />
@@ -392,7 +479,7 @@ export function AthleteProfile() {
             </div>
           </Card>
 
-          <ProfileMatches matches={mine} season={season} sideOf={sideOf} />
+          <ProfileMatches matches={mine} season={season} sideOf={sideOf} showFilter={false} />
         </>
       )}
     </div>

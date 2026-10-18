@@ -3,7 +3,7 @@ import { pairKey, resolveAthlete, type AliasMap } from "../roster/identity";
 import { rulesFor, setTarget } from "../rules/modality";
 import type { Match, PointDetail, Quality, RallyEvent, RallyPhase, Skill, TeamSide, TouchEvent } from "../types";
 import { classifyRally, type RallyFact } from "./rally-facts";
-import { tallyTouches, type TouchDelta } from "./touch-lines";
+import { pressureByRally, tallyTouches, type TouchDelta } from "./touch-lines";
 
 /**
  * Motor de fatos (Fase 15): uma linha por lance, com o contexto do rali. Parte dos MESMOS ralis do
@@ -99,8 +99,9 @@ export function buildAnalytics(matches: readonly FactsMatch[], aliases: AliasMap
     const { rallies } = replayMatch(events, { rules, first_server: match.first_server });
     const keys: Record<TeamSide, string> = { A: pairKey(match.team_a.athlete_ids, aliases), B: pairKey(match.team_b.athlete_ids, aliases) };
     const score: Record<TeamSide, number> = { A: 0, B: 0 };
+    const pressure = pressureByRally(rallies);
     let set = 0;
-    for (const rally of rallies) {
+    for (const [r, rally] of rallies.entries()) {
       if (rally.set_number !== set) {
         set = rally.set_number;
         score.A = 0;
@@ -134,7 +135,7 @@ export function buildAnalytics(matches: readonly FactsMatch[], aliases: AliasMap
           delta,
           ...(opponent ? { opponent_id: resolveAthlete(aliases, opponent.athlete_id), opponent_skill: opponent.skill } : {}),
         });
-      });
+      }, pressure[r]);
       const cause = classifyRally(rally);
       if (cause && rally.point_to) {
         const w = rally.point_to;

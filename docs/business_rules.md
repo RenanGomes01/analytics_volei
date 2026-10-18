@@ -154,3 +154,13 @@ Tudo é recalculado do ledger (nada persistido) e cada métrica é um contador b
 - **Drill por grupo:** em "Partida", "Set", "Momento", "K1/K2" e "Adversário", cada linha mostra a própria taxa da métrica (ex.: eficiência daquele jogo) e o **pico** fica destacado.
 - **Toque decisivo (hotfix):** num ponto de ataque/bloqueio, a causa vem do último toque de quem GANHOU — não do último toque do rali. "Ataque # → defesa = do adversário → ponto" é ponto da atacante ("Ataque (3º toque)") e cedido pela defensora ("… não defendido").
 - **"Como cada ponto saiu" da atleta** usa os mesmos contadores dos Pts (ataque # + ace + bloqueio # de cada lance): a soma das barras é sempre os pontos dela e a % é sobre esse total.
+
+## Painel da atleta e virada de bola em detalhe (Fase 18)
+- **Balanço:** acertos = pontos dela (ataque `#` com rali ganho + ace + bloqueio `#` com rali ganho); erros = pontos que ela entregou (`points_given`). Saldo = acertos − erros.
+- **Alvo do saque:** recepções dela ÷ saques que chegaram à dupla (saque errado não conta).
+- **Identidade ofensiva:** ataques no 1º, 2º (bola de segunda) e 3º toque da posse; **participação no ataque** = ataques dela ÷ ataques da dupla nas partidas em que ela estava no elenco.
+- **Paredão:** pontos de bloqueio, toques de bloqueio, erros de bloqueio e **bloqueio explorado**: ataque adversário com detalhe *block-out* logo antes do toque de bloqueio dela, num rali que ela perdeu. Sem o toque de bloqueio registrado, conta só para a dupla (nunca se inventa quem bloqueou).
+- **Virada de primeira:** recepção dela em que a equipe ganhou o rali sem precisar de uma segunda posse (o primeiro ataque decidiu, inclusive quando o adversário errou a devolução) ÷ recepções dela.
+- **Virada no rali longo:** recepções dela em que a equipe teve 2+ posses no rali; ganhos ÷ esses ralis.
+- **Virada sob pressão:** recepções dela com a equipe vindo de 2+ pontos perdidos seguidos no mesmo set; ganhos ÷ essas recepções. A sequência é contada na partida inteira (antes de qualquer filtro de set).
+- Proporções aparecem como barra 100% (nunca pizza), sempre com o volume; menos de 5 lances = esmaecido.

@@ -23,6 +23,8 @@ interface Props {
   season: SeasonView;
   /** Lado do perfil (atleta ou dupla) na partida. */
   sideOf: (m: SeasonMatch) => TeamSide | null;
+  /** false = o recorte por torneio é feito pela tela (perfil da atleta, Fase 18): sem select próprio. */
+  showFilter?: boolean;
 }
 
 /**
@@ -30,9 +32,10 @@ interface Props {
  * e fase, e nomes clicáveis. Filtro por torneio na URL (`?t=`). Parte dos dados já carregados do perfil.
  * Modo comissão: a lista aparece, só sem o link para o scout.
  */
-export function ProfileMatches({ matches, season, sideOf }: Props) {
+export function ProfileMatches({ matches, season, sideOf, showFilter = true }: Props) {
   const staff = useStaffMode();
-  const [tournament, setTournamentState] = useState(() => readQueryParam("t"));
+  const [chosen, setTournamentState] = useState(() => readQueryParam("t"));
+  const tournament = showFilter ? chosen : "";
   const setTournament = (t: string) => {
     setTournamentState(t);
     replaceQuery({ t: t || undefined });
@@ -59,7 +62,7 @@ export function ProfileMatches({ matches, season, sideOf }: Props) {
 
   return (
     <Card title="Partidas" note={`${rows.length} ${rows.length === 1 ? "jogo" : "jogos"} · ${wins} V · ${losses} D`}>
-      {(options.length > 1 || (options.length > 0 && hasFriendlies)) && (
+      {showFilter && (options.length > 1 || (options.length > 0 && hasFriendlies)) && (
         <select
           value={tournament}
           onChange={(e) => setTournament(e.target.value)}

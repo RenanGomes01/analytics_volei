@@ -136,6 +136,13 @@
 - Jogos nos perfis = `ProfileMatches` (`src/features/analytics/profile-matches.tsx`), a partir dos `SeasonMatch` do perfil; V/D e placar do ponto de vista do perfil. Modo comissão vê a lista, sem link para o scout.
 - Parâmetros `?q=` (busca) e `?t=` (torneio no perfil) estão em `ignoreURLParametersMatching`; leia com `readQueryParam` no inicializador do `useState` (as listas só aparecem depois do banco local).
 
+## Painel da atleta (Fase 18)
+- Widgets do perfil = `athleteDashboard(AthleteAggregate)` e `athleteMatchSeries` (`src/domain/stats/athlete-dashboard.ts`): só leem os contadores das tabelas. Métrica nova continua pela regra da Fase 15 (contador + coluna com `drill`).
+- Contexto do rali que o `touchDelta` não enxerga (posses da equipe, pressão, lance anterior) entra pelo `tallyTouches(rally, add, pressure)`; `pressureByRally` roda sobre a partida inteira, antes do filtro de set, nos DOIS caminhos (`tallyRallies` e `buildAnalytics`).
+- Bases por equipe (como `serves_faced` e `team_attack_attempts`) são somadas em `tallyRallies` para todo o elenco; não têm drill.
+- Widgets de proporção são nativos (`athlete-widgets.tsx`, barra 100%, nunca pizza); gráficos com eixo em `src/features/charts/athlete-charts.tsx`. Cores só de `SERIES` (validadas com o `validate_palette.js` da skill dataviz).
+- O recorte do perfil (`?t=`: temporada, torneio ou "amistosos") vale para o painel inteiro e para o card "Partidas" (`showFilter={false}`).
+
 ## Dados de teste (`/dev/seed`)
 - Gerador puro em `src/domain/dev/rally-generator.ts` (semente fixa, modo detalhado, fim do rali sempre por `impliedPoint`); serviço em `src/services/dev/seed-service.ts`, gravando pelos services reais (`appendRallies` = vários ralis numa transação).
 - Os ids criados ficam em `meta["dev_seed"]`. `removeDemoData` apaga **só** esses ids (exceção deliberada ao append-only, restrita a dados sintéticos).

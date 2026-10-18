@@ -64,6 +64,20 @@ export interface TouchCounters {
   faults: number;
   /** Erros que deram o ponto ao adversário (lance = ou ataque bloqueado, rali perdido). */
   points_given: number;
+
+  // ---- Fase 18: virada de bola em detalhe, participação no ataque e paredão ----
+  /** Recepção dela e a equipe fez o ponto ainda na primeira posse (virada de primeira). */
+  reception_first_ball_won: number;
+  /** Recepção dela e o rali voltou para a equipe (o primeiro ataque não decidiu): rali longo. */
+  reception_long_rally: number;
+  reception_long_rally_won: number;
+  /** Recepção dela com a equipe vindo de 2+ pontos perdidos seguidos (sob pressão). */
+  reception_pressure: number;
+  reception_pressure_won: number;
+  /** Ataques da equipe nas partidas em que ela estava no elenco (base da participação no ataque). */
+  team_attack_attempts: number;
+  /** Bloqueio dela que o atacante explorou para ponto (block-out logo antes do toque dela). */
+  block_exploited: number;
 }
 
 export const emptyTouchCounters = (): TouchCounters => ({
@@ -110,6 +124,13 @@ export const emptyTouchCounters = (): TouchCounters => ({
   set_errors: 0,
   faults: 0,
   points_given: 0,
+  reception_first_ball_won: 0,
+  reception_long_rally: 0,
+  reception_long_rally_won: 0,
+  reception_pressure: 0,
+  reception_pressure_won: 0,
+  team_attack_attempts: 0,
+  block_exploited: 0,
 });
 
 export type TouchDelta = Partial<TouchCounters>;
@@ -128,6 +149,12 @@ export interface TouchOutcome {
   second_touch?: boolean;
   /** Posição do lance na posse da equipe: 1º, 2º, 3º… (sequência de toques seguidos do mesmo lado). */
   touch_in_possession?: number;
+  /** Quantas posses a equipe do lance teve no rali (1 = o rali acabou na primeira posse dela). */
+  team_possessions?: number;
+  /** A equipe do lance vinha de 2+ pontos perdidos seguidos no set (ver `pressureByRally`). */
+  under_pressure?: boolean;
+  /** Lance anterior do rali (o ataque que explorou o bloqueio, por exemplo). */
+  prev?: TouchEvent;
 }
 
 const BAD_RECEPTION = new Set(["-", "/", "="]);
@@ -136,7 +163,7 @@ const BAD_RECEPTION = new Set(["-", "/", "="]);
 export function touchDelta(
   touch: TouchEvent,
   next: TouchEvent | undefined,
-  { won, reason, second_touch, touch_in_possession = 0 }: TouchOutcome,
+  { won, reason, second_touch, touch_in_possession = 0, team_possessions = 1, under_pressure = false, prev }: TouchOutcome,
 ): TouchDelta {
   const isError = touch.quality === "=";
   const lost = (failed: boolean) => (failed && !won ? 1 : 0);
@@ -191,6 +218,11 @@ export function touchDelta(
         reception_positive: touch.quality === "#" || touch.quality === "+" ? 1 : 0,
         reception_errors: isError ? 1 : 0,
         reception_won: won ? 1 : 0,
+        reception_first_ball_won: won && team_possessions === 1 ? 1 : 0,
+        reception_long_rally: team_possessions >= 2 ? 1 : 0,
+        reception_long_rally_won: team_possessions >= 2 && won ? 1 : 0,
+        reception_pressure: under_pressure ? 1 : 0,
+        reception_pressure_won: under_pressure && won ? 1 : 0,
         errors: isError ? 1 : 0,
         points_given: lost(isError),
       };
@@ -199,6 +231,8 @@ export function touchDelta(
         blocks: touch.quality === "#" && won ? 1 : 0,
         block_touches: 1,
         block_errors: isError ? 1 : 0,
+        // O ataque logo antes usou o bloqueio dela (block-out) e o rali foi do atacante.
+        block_exploited: !won && prev && prev.team !== touch.team && prev.skill === "attack" && prev.detail === "block_out" ? 1 : 0,
         errors: isError ? 1 : 0,
         points_given: lost(isError),
       };
@@ -227,17 +261,57 @@ export function possessionPositions(touches: readonly TouchEvent[]): number[] {
   return out;
 }
 
+/** Pontos seguidos perdidos que contam como "sob pressão". */
+export const PRESSURE_RUN = 2;
+
+/**
+ * Para cada rali (na ordem do replay), que equipes vinham de `PRESSURE_RUN`+ pontos perdidos seguidos
+ * no set. Contexto do rali, calculado sobre a partida inteira (antes de qualquer filtro de set).
+ */
+export function pressureByRally(rallies: readonly RallyResult[]): Record<TeamSide, boolean>[] {
+  const lost: Record<TeamSide, number> = { A: 0, B: 0 };
+  let set = 0;
+  return rallies.map((rally) => {
+    if (rally.set_number !== set) {
+      set = rally.set_number;
+      lost.A = 0;
+      lost.B = 0;
+    }
+    const now = { A: lost.A >= PRESSURE_RUN, B: lost.B >= PRESSURE_RUN };
+    if (rally.point_to) {
+      lost[rally.point_to] = 0;
+      lost[rally.point_to === "A" ? "B" : "A"] += 1;
+    }
+    return now;
+  });
+}
+
+const NO_PRESSURE: Record<TeamSide, boolean> = { A: false, B: false };
+
 /** Percorre os toques de um rali chamando `add` com a contribuição de cada lance. */
 export function tallyTouches(
   rally: RallyResult,
   add: (team: TeamSide, athlete_id: string, delta: TouchDelta, index: number) => void,
+  pressure: Record<TeamSide, boolean> = NO_PRESSURE,
 ): void {
   const positions = possessionPositions(rally.touches);
+  const possessions: Record<TeamSide, number> = { A: 0, B: 0 };
+  positions.forEach((p, i) => {
+    if (p === 1) possessions[rally.touches[i].team] += 1;
+  });
   rally.touches.forEach((touch, i) => {
     const prev = rally.touches[i - 1];
     // 2º toque da posse: o anterior é da mesma equipe (e não o saque) e o antes dele é do outro lado.
     const second_touch = i >= 2 && positions[i] === 2 && prev.skill !== "serve";
-    const outcome = { won: rally.point_to === touch.team, reason: rally.reason, second_touch, touch_in_possession: positions[i] };
+    const outcome: TouchOutcome = {
+      won: rally.point_to === touch.team,
+      reason: rally.reason,
+      second_touch,
+      touch_in_possession: positions[i],
+      team_possessions: possessions[touch.team],
+      under_pressure: pressure[touch.team],
+      prev,
+    };
     add(touch.team, touch.athlete_id, touchDelta(touch, rally.touches[i + 1], outcome), i);
   });
 }

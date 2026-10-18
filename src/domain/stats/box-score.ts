@@ -3,7 +3,7 @@ import type { ModalityRules } from "../rules/modality";
 import type { RallyEvent, TeamSide } from "../types";
 import { efficiency, rate } from "./rate";
 import { emptyRallyCounters, tallyRally, type RallyCounters } from "./rally-lines";
-import { addCounters, emptyTouchCounters, tallyTouches, type TouchCounters } from "./touch-lines";
+import { addCounters, emptyTouchCounters, pressureByRally, tallyTouches, type TouchCounters } from "./touch-lines";
 import type { AthleteStats, AttackLine, BoxScore, ReceptionLine, ServeLine, StatsFilter, TeamStats } from "./types";
 
 export type Roster = Record<TeamSide, string[]>;
@@ -59,8 +59,10 @@ export function tallyRallies(rallies: readonly RallyResult[], roster: Roster, fi
   const teamTouches: Record<TeamSide, TouchCounters> = { A: emptyTouchCounters(), B: emptyTouchCounters() };
   const teamRallies: Record<TeamSide, RallyCounters> = { A: emptyRallyCounters(), B: emptyRallyCounters() };
 
-  const selected = filter.set === "all" ? rallies : rallies.filter((r) => r.set_number === filter.set);
-  for (const rally of selected) {
+  // Pressão é contexto da partida inteira: calculada antes do filtro de set.
+  const pressure = pressureByRally(rallies);
+  for (const [i, rally] of rallies.entries()) {
+    if (filter.set !== "all" && rally.set_number !== filter.set) continue;
     tallyTouches(rally, (team, athlete_id, delta) => {
       let entry = athletes.get(athlete_id);
       if (!entry) {
@@ -71,7 +73,14 @@ export function tallyRallies(rallies: readonly RallyResult[], roster: Roster, fi
       addCounters(teamTouches[team], delta);
       // Ataque que explorou o bloqueio: conta contra a equipe que bloqueou.
       if (delta.attack_block_out_kills) teamTouches[team === "A" ? "B" : "A"].blocks_exploited += delta.attack_block_out_kills;
-    });
+      // Base da participação no ataque: cada ataque da equipe conta para todas do elenco dela.
+      if (delta.attack_attempts) {
+        for (const id of roster[team]) {
+          const mate = athletes.get(id);
+          if (mate) mate.counters.team_attack_attempts += delta.attack_attempts;
+        }
+      }
+    }, pressure[i]);
     tallyServeFaced(rally, roster, athletes, teamTouches);
     tallyRally(rally, teamRallies);
   }
