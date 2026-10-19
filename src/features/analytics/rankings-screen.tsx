@@ -22,6 +22,8 @@ import { deliverFile } from "@/features/export/deliver-file";
 import { EmptyState } from "@/components/empty-state";
 import { buildAnalytics } from "@/domain/stats/facts";
 import { ConcededCard } from "@/features/analytics/drill/conceded-card";
+import { matchTitles, OccurrencesSheet } from "@/features/analytics/drill/occurrences-sheet";
+import { rallyOccurrences, type Occurrence } from "@/domain/stats/occurrences";
 import { PrintButton } from "@/features/print/print-button";
 import { PrintHeader } from "@/features/print/print-header";
 import { ReportBuilder } from "./report-builder";
@@ -46,6 +48,8 @@ export function RankingsScreen() {
   const [friendlies, setFriendlies] = useState(params.get("friendlies") === "1");
   const [phase, setPhase] = useState<PhaseFilter>(params.get("phase") === "group" || params.get("phase") === "knockout" ? (params.get("phase") as PhaseFilter) : "all");
   const [yearParam, setYear] = useState<number | null>(params.get("year") ? Number(params.get("year")) : null);
+  /** Lances de uma causa de "Pontos cedidos", por jogo e placar (Fase 19). */
+  const [sheet, setSheet] = useState<{ title: string; occurrences: Occurrence[] } | null>(null);
 
   const years = useMemo(() => (season ? availableYears(season.matches) : []), [season]);
   const year = yearParam && years.includes(yearParam) ? yearParam : (years.find((y) => y === new Date().getFullYear()) ?? years[0]);
@@ -70,6 +74,7 @@ export function RankingsScreen() {
       kinds: pointKinds(matches, season.aliases),
     };
   }, [season, year, category, friendlies, gender, phase]);
+  const titles = useMemo(() => matchTitles(computed?.matches ?? []), [computed]);
 
   if (!season) return <p className="p-8 text-center text-zinc-400">Carregando temporada…</p>;
   if (year === undefined || !computed) {
@@ -321,7 +326,15 @@ export function RankingsScreen() {
 
       {!empty && mode === "highlights" && (
       <div className="grid gap-3 lg:grid-cols-2">
-        <ConcededCard title="Pontos cedidos no recorte: de onde vieram" rallies={computed.rallies} nameOf={athleteName} />
+        <ConcededCard
+          title="Pontos cedidos no recorte: de onde vieram"
+          rallies={computed.rallies}
+          nameOf={athleteName}
+          onSelectRow={(row) => {
+            const rallies = computed.rallies.filter((f) => f.code === row.key);
+            setSheet({ title: rallies[0]?.conceded ?? row.label, occurrences: rallyOccurrences(rallies, "conceded") });
+          }}
+        />
         <Card title={`Distribuição dos pontos — top 10 ${unit}`} note="Ataque, ace e bloqueio (e erro do adversário, para duplas)">
           <PointsMixChart
             data={
@@ -341,6 +354,18 @@ export function RankingsScreen() {
           <PointKindsChart data={computed.kinds} />
         </Card>
       </div>
+      )}
+      {sheet && (
+        <OccurrencesSheet
+          title={sheet.title}
+          subtitle="Pontos cedidos no recorte"
+          occurrences={sheet.occurrences}
+          matchLabel={titles.label}
+          matchRank={titles.rank}
+          athleteLabel={athleteName}
+          showActor
+          onClose={() => setSheet(null)}
+        />
       )}
     </div>
   );

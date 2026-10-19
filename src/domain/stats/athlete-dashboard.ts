@@ -27,8 +27,6 @@ export interface AthleteDashboard {
     share: Rate;
     efficiency: number | null;
   };
-  /** Paredão: pontos de bloqueio, toques, erros e bloqueios explorados (block-out sobre ela). */
-  wall: { touches: number; points: number; errors: number; exploited: number };
   /** Virada de bola em detalhe (recepções dela). */
   sideOut: { total: Rate; firstBall: Rate; longRally: Rate; pressure: Rate };
 }
@@ -48,7 +46,6 @@ export function athleteDashboard(a: AthleteAggregate): AthleteDashboard {
       share: rate(a.attack.attempts, c.team_attack_attempts),
       efficiency: a.attack.efficiency,
     },
-    wall: { touches: c.block_touches, points: a.blocks, errors: c.block_errors, exploited: c.block_exploited },
     sideOut: {
       total: rate(c.reception_won, a.reception.attempts),
       firstBall: rate(c.reception_first_ball_won, a.reception.attempts),

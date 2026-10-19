@@ -86,8 +86,8 @@ describe("painel da atleta (Fase 18)", () => {
     expect(a1.attack.share).toMatchObject({ num: 3, den: 4 });
   });
 
-  it("paredão: o block-out sobre ela conta como bloqueio explorado dela", () => {
-    expect(a1.wall).toEqual({ touches: 1, points: 0, errors: 0, exploited: 1 });
+  it("block-out sobre ela conta como bloqueio explorado dela", () => {
+    expect(stats.athletes.A1.counters).toMatchObject({ block_touches: 1, block_errors: 0, block_exploited: 1 });
     expect(stats.teams["A1|A2"].counters.blocks_exploited).toBe(1);
   });
 

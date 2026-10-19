@@ -16,6 +16,8 @@ import { explainBreakPoint, explainSideOut } from "@/features/stats/explain";
 import { pointsConceded, pointsWon } from "@/domain/stats/rally-facts";
 import { ConcededCard } from "./drill/conceded-card";
 import { PointSourcesCard } from "./drill/point-sources-card";
+import { matchTitles, OccurrencesSheet } from "./drill/occurrences-sheet";
+import { rallyOccurrences, type Occurrence } from "@/domain/stats/occurrences";
 import { PrintButton } from "@/features/print/print-button";
 import { PrintHeader } from "@/features/print/print-header";
 import { ProfileMatches } from "./profile-matches";
@@ -38,6 +40,10 @@ export function TeamProfile() {
     const mine = scope.filter(({ match }) => [match.team_a, match.team_b].some((t) => pairKey(t.athlete_ids, season.aliases) === key));
     return { mine, series, opponents, won: pointsWon(rallies, { pair_key: key }), conceded: pointsConceded(rallies, { pair_key: key }), team: seasonStats(scope, season.aliases).teams[key], kinds: pointKinds(scope, season.aliases, key) };
   }, [season, key, yearParam]);
+
+  /** Lances de uma barra de "Origem dos pontos"/"Pontos cedidos", por jogo e placar (Fase 19). */
+  const [sheet, setSheet] = useState<{ title: string; occurrences: Occurrence[] } | null>(null);
+  const titles = useMemo(() => matchTitles(computed?.mine ?? []), [computed]);
 
   const sideOf = useCallback(
     ({ match }: SeasonMatch) =>
@@ -117,9 +123,35 @@ export function TeamProfile() {
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">
-            <PointSourcesCard points={team.points} rallies={computed.won} />
-            <ConcededCard rallies={computed.conceded} nameOf={season.athleteName} />
+            <PointSourcesCard
+              points={team.points}
+              rallies={computed.won}
+              onSelectRow={(row) => {
+                const rallies = computed.won.filter((f) => f.code === row.key);
+                setSheet({ title: rallies[0]?.merit ?? row.label, occurrences: rallyOccurrences(rallies, "merit") });
+              }}
+            />
+            <ConcededCard
+              rallies={computed.conceded}
+              nameOf={season.athleteName}
+              onSelectRow={(row) => {
+                const rallies = computed.conceded.filter((f) => f.code === row.key);
+                setSheet({ title: rallies[0]?.conceded ?? row.label, occurrences: rallyOccurrences(rallies, "conceded") });
+              }}
+            />
           </div>
+          {sheet && (
+            <OccurrencesSheet
+              title={sheet.title}
+              subtitle={season.teamName(key)}
+              occurrences={sheet.occurrences}
+              matchLabel={titles.label}
+              matchRank={titles.rank}
+              athleteLabel={season.athleteName}
+              showActor
+              onClose={() => setSheet(null)}
+            />
+          )}
 
           <Card title="Virada de bola × quebra de saque por torneio" note="Soma dos ralis de cada torneio · passe o dedo/mouse para ver ganhos/total">
             <RatesChart data={series.map((s) => ({ label: s.label, sideOut: s.side_out, breakPoint: s.break_point }))} />

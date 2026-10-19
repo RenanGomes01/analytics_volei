@@ -9,8 +9,40 @@ import { CHART, LOW_VOLUME_OPACITY, pct, SERIES } from "./palette";
 const HITS = SERIES[0];
 const ERRORS = SERIES[1];
 
-/** Acertos × erros jogo a jogo: barras agrupadas, uma escala (contagem). Eficiência fica em outro gráfico. */
-export function MatchBalanceChart({ data }: { data: MatchEvolutionPoint[] }) {
+type BalanceSeries = "hits" | "errors";
+
+/**
+ * Barra com alvo de toque na coluna inteira (Fase 19): no tablet, uma barra de 1 erro é fina demais
+ * para o dedo. O retângulo transparente cobre a faixa da barra (a `background` do Recharts).
+ */
+type Box = { x?: number | null; y?: number | null; width?: number | null; height?: number | null };
+
+function TapBar(props: Box & { fill?: string; background?: Box }) {
+  const { fill, background: bg } = props;
+  const x = props.x ?? 0;
+  const y = props.y ?? 0;
+  const width = props.width ?? 0;
+  const height = props.height ?? 0;
+  const background = bg && bg.x != null && bg.y != null && bg.width != null && bg.height != null ? { x: bg.x, y: bg.y, width: bg.width, height: bg.height } : null;
+  const r = Math.max(0, Math.min(4, width / 2, height));
+  return (
+    <g style={{ cursor: "pointer" }}>
+      {background && <rect x={background.x} y={background.y} width={background.width} height={background.height} fill="transparent" />}
+      {height > 0 && width > 0 && (
+        <path d={`M${x},${y + height} v${-(height - r)} a${r},${r} 0 0 1 ${r},${-r} h${width - 2 * r} a${r},${r} 0 0 1 ${r},${r} v${height - r} z`} fill={fill} />
+      )}
+    </g>
+  );
+}
+
+/**
+ * Acertos × erros jogo a jogo: barras agrupadas, uma escala (contagem). Eficiência fica em outro gráfico.
+ * Com `onSelect`, cada barra abre os lances daquele jogo (Fase 19).
+ */
+export function MatchBalanceChart({ data, onSelect }: { data: MatchEvolutionPoint[]; onSelect?: (match_id: string, series: BalanceSeries) => void }) {
+  const click = (series: BalanceSeries) =>
+    onSelect ? (item: { payload?: MatchEvolutionPoint }) => item.payload && onSelect(item.payload.match_id, series) : undefined;
+  const tap = onSelect ? { shape: TapBar, background: { fill: "transparent" } } : {};
   return (
     <div className="flex flex-col gap-2">
       <Legend items={[{ color: HITS, label: "Acertos" }, { color: ERRORS, label: "Erros" }]} />
@@ -38,8 +70,8 @@ export function MatchBalanceChart({ data }: { data: MatchEvolutionPoint[] }) {
                 );
               }}
             />
-            <Bar dataKey="hits" name="Acertos" fill={HITS} radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={false} />
-            <Bar dataKey="errors" name="Erros" fill={ERRORS} radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={false} />
+            <Bar dataKey="hits" name="Acertos" fill={HITS} radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={false} onClick={click("hits")} {...tap} />
+            <Bar dataKey="errors" name="Erros" fill={ERRORS} radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={false} onClick={click("errors")} {...tap} />
           </BarChart>
         </ResponsiveContainer>
       </div>

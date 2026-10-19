@@ -159,8 +159,16 @@ Tudo é recalculado do ledger (nada persistido) e cada métrica é um contador b
 - **Balanço:** acertos = pontos dela (ataque `#` com rali ganho + ace + bloqueio `#` com rali ganho); erros = pontos que ela entregou (`points_given`). Saldo = acertos − erros.
 - **Alvo do saque:** recepções dela ÷ saques que chegaram à dupla (saque errado não conta).
 - **Identidade ofensiva:** ataques no 1º, 2º (bola de segunda) e 3º toque da posse; **participação no ataque** = ataques dela ÷ ataques da dupla nas partidas em que ela estava no elenco.
-- **Paredão:** pontos de bloqueio, toques de bloqueio, erros de bloqueio e **bloqueio explorado**: ataque adversário com detalhe *block-out* logo antes do toque de bloqueio dela, num rali que ela perdeu. Sem o toque de bloqueio registrado, conta só para a dupla (nunca se inventa quem bloqueou).
+- **Bloqueio explorado** (micro-métrica "Blq expl."; o widget Paredão saiu na Fase 19): ataque adversário com detalhe *block-out* logo antes do toque de bloqueio dela, num rali que ela perdeu. Sem o toque de bloqueio registrado, conta só para a dupla (nunca se inventa quem bloqueou).
 - **Virada de primeira:** recepção dela em que a equipe ganhou o rali sem precisar de uma segunda posse (o primeiro ataque decidiu, inclusive quando o adversário errou a devolução) ÷ recepções dela.
 - **Virada no rali longo:** recepções dela em que a equipe teve 2+ posses no rali; ganhos ÷ esses ralis.
 - **Virada sob pressão:** recepções dela com a equipe vindo de 2+ pontos perdidos seguidos no mesmo set; ganhos ÷ essas recepções. A sequência é contada na partida inteira (antes de qualquer filtro de set).
 - Proporções aparecem como barra 100% (nunca pizza), sempre com o volume; menos de 5 lances = esmaecido.
+
+## Raio-X, maior arma e mapa de calor (Fase 19)
+- **Raio-X de deficiências:** os pontos cedidos em que ela é a culpada (`RallyFact.culprit`), agrupados como no card "Pontos cedidos" (`causeRows`). A maior fraqueza é a causa mais frequente. No empate, vence o erro próprio. "Sem detalhe" não concorre. Só é apontada com **3 ou mais** ocorrências.
+- **Maior arma:** a linha de "Como cada ponto saiu" (`scoredBreakdown`) com mais pontos, também com no mínimo 3. **Mais letal:** o tipo de ataque (tipo × toque da posse) com o maior aproveitamento (pontos ÷ ataques), com no mínimo **5 ataques**. No empate, ganha quem tem mais volume.
+- **Drill jogo a jogo:** a barra de acertos abre a coluna "Pts" daquela partida; a de erros abre "PE" (pontos entregues); o ponto de eficiência abre "Efic.". O número da barra é sempre o total do drill.
+- **Ocorrências:** toda barra de "Origem dos pontos", "Pontos cedidos", Raio-X e arma abre os lances agrupados por jogo, com o set e o placar **antes** do rali, do ponto de vista de quem está sendo analisado.
+- **Mapa de calor das tabelas de torneio:** cada coluna tem um tom em `stat-columns.ts` (`COLUMN_TONE`): good = quanto mais, melhor; bad = quanto mais, pior; colunas de volume ficam neutras. A cor vai do mínimo ao máximo do recorte, sem a linha de total. ★ marca o líder nas colunas good e ▲ o maior ofensor nas bad (até 2 empatadas). Porcentagem com base menor que 5 fica sem cor e sem selo. Os cartões de **Destaques** pedem base de 10 ou mais, como os rankings.
+- **Passe na mão** saiu do perfil da atleta (gráfico e tile). Nas tabelas e no ranking ele continua condicional, como na Fase 7.

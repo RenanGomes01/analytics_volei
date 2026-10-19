@@ -1,4 +1,6 @@
 import type { AthleteDashboard } from "@/domain/stats/athlete-dashboard";
+import { INSIGHT_MIN, LETHAL_MIN_ATTEMPTS, type Weapon, type Weaknesses, type WeaknessRow } from "@/domain/stats/athlete-insights";
+import { explainLethal, explainWeakness, explainWeapon } from "@/features/stats/explain";
 import type { Rate } from "@/domain/stats/types";
 import { LOW_VOLUME_OPACITY, pct, SERIES } from "@/features/charts/palette";
 import { Card } from "./ui";
@@ -141,23 +143,104 @@ export function AttackIdentityWidget({ attack }: { attack: AthleteDashboard["att
   );
 }
 
-export function WallWidget({ wall }: { wall: AthleteDashboard["wall"] }) {
-  const tiles: [string, number, string][] = [
-    ["Pontos de bloqueio", wall.points, "Bloqueio # que virou ponto"],
-    ["Toques de bloqueio", wall.touches, "Todas as vezes que subiu no bloqueio"],
-    ["Explorada", wall.exploited, "Atacante usou o bloqueio dela (block-out) para ponto"],
-    ["Erros de bloqueio", wall.errors, "Rede ou bola pra fora no bloqueio"],
-  ];
+interface InsightRow {
+  key: string;
+  label: string;
+  count: number;
+  share: number;
+  tag?: string;
+}
+
+/** Top causas/jogadas: cada linha é um botão que abre jogo e placar. */
+function InsightBars({ rows, color, onSelect }: { rows: InsightRow[]; color: string; onSelect?: (row: InsightRow) => void }) {
+  const max = Math.max(1, ...rows.map((r) => r.count));
   return (
-    <Card title="Paredão" note="“Explorada” só conta quando o toque de bloqueio dela foi registrado">
-      <dl className="grid grid-cols-2 gap-2">
-        {tiles.map(([label, value, hint]) => (
-          <div key={label} className="rounded-xl bg-zinc-950/50 px-3 py-2" title={hint}>
-            <dt className="text-xs text-zinc-400">{label}</dt>
-            <dd className="text-2xl font-black tabular-nums">{value}</dd>
-          </div>
-        ))}
-      </dl>
+    <ul className="flex flex-col gap-1">
+      {rows.map((r) => (
+        <li key={r.key}>
+          <button
+            type="button"
+            disabled={!onSelect}
+            onClick={() => onSelect?.(r)}
+            aria-label={`${r.label}: ${r.count} — ver em quais jogos e placares`}
+            className="grid min-h-11 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 rounded-lg px-1 text-left text-sm tabular-nums enabled:hover:bg-zinc-800/70"
+          >
+            <span className="min-w-0 truncate">
+              <span className="underline decoration-amber-400/40 decoration-dotted underline-offset-4 print:no-underline">{r.label}</span>
+              {r.tag && <span className="ml-1.5 text-xs text-zinc-500">{r.tag}</span>}
+            </span>
+            <span className="font-bold">
+              {r.count}
+              <span className="ml-1 text-xs font-normal text-zinc-400">{Math.round(r.share * 100)}%</span>
+            </span>
+            <span className="col-span-2 h-2 overflow-hidden rounded-full bg-zinc-800 print-track">
+              <span className="block h-full rounded-full print-bar" style={{ width: `${(r.count / max) * 100}%`, background: color }} />
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Manchete do painel: rótulo pequeno, frase grande, explicação. A cor fica só no marcador. */
+function Headline({ kicker, title, detail, color }: { kicker: string; title: string; detail: string; color: string }) {
+  return (
+    <div className="flex gap-3 rounded-xl bg-zinc-950/50 p-3">
+      <span aria-hidden className="w-1.5 shrink-0 rounded-full" style={{ background: color }} />
+      <div className="min-w-0">
+        <p className="text-xs uppercase tracking-wide text-zinc-400">{kicker}</p>
+        <p className="text-xl font-black leading-tight">{title}</p>
+        <p className="text-sm tabular-nums text-zinc-300">{detail}</p>
+      </div>
+    </div>
+  );
+}
+
+const FAULT_TAG = { own: "erro próprio", opponent: "mérito do adversário", none: "" } as const;
+
+export function WeaknessWidget({ data, onSelect }: { data: Weaknesses; onSelect?: (row: WeaknessRow) => void }) {
+  const rows = data.rows.map((r) => ({ ...r, tag: FAULT_TAG[r.fault] }));
+  return (
+    <Card title="Raio-X de deficiências" note={`Onde ela mais entrega pontos · ${data.own} de ${data.total} por erro próprio · toque para ver jogo e placar`}>
+      {data.main ? (
+        <Headline kicker="Maior fraqueza neste recorte" title={data.main.label} detail={explainWeakness(data.main, data.total)} color={SERIES[1]} />
+      ) : (
+        <p className="text-sm text-zinc-400">
+          {data.total === 0 ? "Nenhum ponto cedido por ela neste recorte." : `Pouco volume para apontar uma fraqueza (nenhuma jogada com ${INSIGHT_MIN} ou mais pontos cedidos).`}
+        </p>
+      )}
+      {rows.length > 0 && <InsightBars rows={rows} color={SERIES[1]} onSelect={onSelect ? (r) => onSelect(data.rows.find((x) => x.key === r.key)!) : undefined} />}
+    </Card>
+  );
+}
+
+export function WeaponWidget({ data, onSelect, onSelectLethal }: { data: Weapon; onSelect?: (label: string) => void; onSelectLethal?: () => void }) {
+  return (
+    <Card title="Maior arma" note="A jogada que mais pontua e a mais letal · toque para ver jogo e placar">
+      {data.main ? (
+        <Headline kicker="Mais pontuou com" title={data.main.label} detail={explainWeapon(data.main)} color={SERIES[0]} />
+      ) : (
+        <p className="text-sm text-zinc-400">
+          {data.total === 0 ? "Nenhum ponto dela neste recorte." : `Pouco volume para apontar uma arma (nenhuma jogada com ${INSIGHT_MIN} ou mais pontos).`}
+        </p>
+      )}
+      {data.rows.length > 0 && <InsightBars rows={data.rows} color={SERIES[0]} onSelect={onSelect ? (r) => onSelect(r.key) : undefined} />}
+      {data.lethal ? (
+        <button
+          type="button"
+          disabled={!onSelectLethal}
+          onClick={onSelectLethal}
+          className="flex min-h-11 flex-col rounded-xl bg-zinc-950/50 px-3 py-2 text-left enabled:hover:bg-zinc-800/70"
+          aria-label={`Mais letal: ${data.lethal.label} — ver os ataques`}
+        >
+          <span className="text-xs uppercase tracking-wide text-zinc-400">Mais letal (mín. {LETHAL_MIN_ATTEMPTS} ataques)</span>
+          <span className="font-bold underline decoration-amber-400/40 decoration-dotted underline-offset-4 print:no-underline">{data.lethal.label}</span>
+          <span className="text-sm tabular-nums text-zinc-300">{explainLethal(data.lethal)}</span>
+        </button>
+      ) : (
+        data.total > 0 && <p className="text-xs text-zinc-500">Mais letal: nenhum tipo de ataque com {LETHAL_MIN_ATTEMPTS}+ tentativas e ponto.</p>
+      )}
     </Card>
   );
 }

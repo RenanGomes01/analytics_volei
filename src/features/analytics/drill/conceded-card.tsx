@@ -1,4 +1,5 @@
 import { causeRows, concededByAthlete, type CauseRow, type RallyFact } from "@/domain/stats/rally-facts";
+import type { DrillRow } from "@/domain/stats/drill";
 import { DrillBars } from "./drill-bars";
 
 const rowsOf = (rows: CauseRow[], total: number, nameOf?: (id: string) => string) =>
@@ -20,6 +21,7 @@ export function ConcededCard({
   nameOf,
   athleteView = false,
   limit = 8,
+  onSelectRow,
 }: {
   /** Ralis perdidos (já recortados: a dupla, o lado da partida ou a atleta culpada). */
   rallies: readonly RallyFact[];
@@ -28,6 +30,8 @@ export function ConcededCard({
   /** Cartão de UMA atleta: os pontos em que ela foi a culpada (não mostra "da dupla"). */
   athleteView?: boolean;
   limit?: number;
+  /** Toque numa causa: abre jogo e placar de cada ponto cedido (Fase 19). A chave é o `RallyFact.code`. */
+  onSelectRow?: (row: DrillRow) => void;
 }) {
   const total = rallies.length;
   const own = rallies.filter((f) => f.fault === "own");
@@ -46,13 +50,13 @@ export function ConcededCard({
       {own.length > 0 && (
         <div className="flex flex-col gap-1">
           <h4 className="text-xs font-semibold uppercase tracking-wide text-red-300 print:text-black">Erros próprios</h4>
-          <DrillBars rows={rowsOf(causeRows(own, "conceded"), total, nameOf).slice(0, limit)} />
+          <DrillBars rows={rowsOf(causeRows(own, "conceded"), total, nameOf).slice(0, limit)} onSelect={onSelectRow} />
         </div>
       )}
       {merit.length > 0 && (
         <div className="flex flex-col gap-1">
           <h4 className="text-xs font-semibold uppercase tracking-wide text-sky-300 print:text-black">Mérito do adversário</h4>
-          <DrillBars rows={rowsOf(causeRows(merit, "conceded"), total, nameOf).slice(0, limit)} />
+          <DrillBars rows={rowsOf(causeRows(merit, "conceded"), total, nameOf).slice(0, limit)} onSelect={onSelectRow} />
         </div>
       )}
       {total === 0 && <p className="text-sm text-zinc-500">Nenhum ponto cedido neste recorte.</p>}

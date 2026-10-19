@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { sortByColumn, type SortDir } from "@/domain/stats/sort";
 import { GROUP_LABEL, groupSpans, type StatColumn } from "@/domain/stats/stat-columns";
+import { baseOf, columnScale, type ColumnScale } from "@/domain/stats/heat";
+import { SERIES } from "@/features/charts/palette";
 import type { Rate } from "@/domain/stats/types";
 import { DrillPanel, type DrillContext } from "@/features/analytics/drill/drill-panel";
 import { pct } from "./format";
@@ -30,7 +32,24 @@ interface Props<L> {
   /** Ordenação por coluna (construtor de relatórios). O clique no cabeçalho ordena. */
   sort?: { key: string; dir: SortDir };
   onSort?: (key: string) => void;
+  /** Mapa de calor (Fase 19): cor por desempenho, mini-barra e selos ★ (líder) / ▲ (mais erros). */
+  heat?: boolean;
+  /** Cartões de destaque acima da tabela (Fase 19): o topo de cada coluna, clicável (abre o drill). */
+  highlights?: readonly Highlight<L>[];
 }
+
+export interface Highlight<L> {
+  /** Ex.: "Mais eficiente", "Mais erros". */
+  label: string;
+  /** Pode ser uma coluna fora da tabela compacta (ex.: pontos entregues). */
+  column: StatColumn<L>;
+}
+
+/** Base mínima de uma % para colorir (célula) e para virar destaque (como nos rankings). */
+const HEAT_MIN = 5;
+const HIGHLIGHT_MIN = 10;
+const HEAT_COLOR = { good: SERIES[0], bad: SERIES[1] } as const;
+const BADGE = { good: { icon: "★", text: "Líder em" }, bad: { icon: "▲", text: "Mais" } } as const;
 
 export function formatStat<L>(col: StatColumn<L>, line: L): string {
   const v = col.value(line);
@@ -45,7 +64,7 @@ type Tip = { key: string; full: string; hint: string; x: number; y: number; pinn
  * Tabela de estatísticas com cabeçalho por fundamento, colunas de total destacadas e o significado
  * de cada sigla no mouse (dica) ou no toque (abre/fecha). Siglas e textos vêm de stat-columns.ts.
  */
-export function StatTable<L>({ columns, rows, total, firstHeader, caption, minWidth = 720, drill, sort, onSort }: Props<L>) {
+export function StatTable<L>({ columns, rows, total, firstHeader, caption, minWidth = 720, drill, sort, onSort, heat = false, highlights }: Props<L>) {
   const [tip, setTip] = useState<Tip | null>(null);
   const [legend, setLegend] = useState(false);
   const [open, setOpen] = useState<{ row: StatRow<L>; col: StatColumn<L> } | null>(null);
@@ -57,6 +76,21 @@ export function StatTable<L>({ columns, rows, total, firstHeader, caption, minWi
     return [...rows].sort((a, b) => order.get(a.line)! - order.get(b.line)! || (a.name ?? "").localeCompare(b.name ?? "", "pt-BR"));
   }, [rows, sort, sortCol]);
   const openContext = open ? drill?.(open.row) : null;
+  // Escalas sobre as linhas na ordem exibida (a linha de total nunca entra).
+  const scales = useMemo(() => {
+    if (!heat) return null;
+    const lines = shown.map((r) => r.line);
+    return new Map(columns.map((c) => [c.key, columnScale(lines, c, HEAT_MIN)] as const));
+  }, [heat, shown, columns]);
+  const tops = useMemo(
+    () =>
+      (highlights ?? []).flatMap((h) => {
+        const scale = columnScale(rows.map((r) => r.line), h.column, HIGHLIGHT_MIN);
+        const i = scale?.top[0];
+        return scale && i !== undefined ? [{ ...h, row: rows[i], ties: scale.top.length - 1, tone: scale.tone }] : [];
+      }),
+    [highlights, rows],
+  );
 
   // Toque fora (ou rolar a tabela) fecha a dica fixada.
   useEffect(() => {
@@ -80,7 +114,14 @@ export function StatTable<L>({ columns, rows, total, firstHeader, caption, minWi
   const cell = (col: StatColumn<L>) =>
     sort?.key === col.key && onSort ? "bg-sky-400/15 font-bold text-zinc-50" : col.total ? "bg-amber-400/10 font-bold text-zinc-50" : "";
 
-  const bodyRow = (row: StatRow<L>, isTotal = false) => (
+  const heatOf = (col: StatColumn<L>, index: number): { scale: ColumnScale; intensity: number; top: boolean } | null => {
+    const scale = index >= 0 ? scales?.get(col.key) : null;
+    const intensity = scale?.intensity[index];
+    if (!scale || intensity === null || intensity === undefined) return null;
+    return { scale, intensity, top: scale.top.includes(index) && scale.top.length <= 2 };
+  };
+
+  const bodyRow = (row: StatRow<L>, isTotal = false, index = -1) => (
     <tr key={row.key} className={isTotal ? "border-t-2 border-zinc-700 font-semibold" : "odd:bg-zinc-900/60"}>
       <th scope="row" className="sticky left-0 z-10 bg-zinc-950 py-2.5 pr-3 text-left font-medium">
         {row.label}
@@ -89,8 +130,25 @@ export function StatTable<L>({ columns, rows, total, firstHeader, caption, minWi
       {columns.map((c) => {
         const text = formatStat(c, row.line);
         const canDrill = !!drill && !!c.drill && text !== "–" && text !== "0";
+        const h = heatOf(c, index);
+        const color = h ? HEAT_COLOR[h.scale.tone] : null;
         return (
-          <td key={c.key} className={`px-1 py-1 ${cell(c)}`}>
+          <td
+            key={c.key}
+            className={`px-1 py-1 ${cell(c)} ${h ? "relative" : ""}`}
+            style={h && color && h.intensity > 0 ? { background: `color-mix(in srgb, ${color} ${Math.round(8 + h.intensity * 30)}%, transparent)` } : undefined}
+          >
+            {h?.top && (
+              <span
+                role="img"
+                aria-label={`${BADGE[h.scale.tone].text} ${c.full.toLowerCase()}`}
+                title={`${BADGE[h.scale.tone].text} ${c.full.toLowerCase()}`}
+                className="absolute right-0.5 top-0.5 text-[10px] leading-none"
+                style={{ color: color ?? undefined }}
+              >
+                {BADGE[h.scale.tone].icon}
+              </span>
+            )}
             {canDrill ? (
               <button
                 type="button"
@@ -103,6 +161,11 @@ export function StatTable<L>({ columns, rows, total, firstHeader, caption, minWi
             ) : (
               <span className="inline-block min-h-11 content-center px-1">{text}</span>
             )}
+            {h && color && c.format === "count" && (
+              <span aria-hidden className="-mt-1.5 ml-auto block h-[3px] rounded-full bg-zinc-800 print-track">
+                <span className="block h-full rounded-full print-bar" style={{ width: `${Math.max(4, h.intensity * 100)}%`, background: color }} />
+              </span>
+            )}
           </td>
         );
       })}
@@ -111,6 +174,60 @@ export function StatTable<L>({ columns, rows, total, firstHeader, caption, minWi
 
   return (
     <div className="flex flex-col gap-2">
+      {tops.length > 0 && (
+        <ul className="grid grid-cols-2 gap-2 lg:grid-cols-4" aria-label="Destaques">
+          {tops.map((t) => {
+            const base = baseOf(t.column, t.row.line);
+            const canDrill = !!drill && !!t.column.drill;
+            const body = (
+              <>
+                <span className="text-xs uppercase tracking-wide text-zinc-400">
+                  <span aria-hidden style={{ color: HEAT_COLOR[t.tone] }}>{BADGE[t.tone].icon} </span>
+                  {t.label}
+                </span>
+                <span className="line-clamp-2 font-semibold leading-snug">{t.row.name ?? t.row.key}</span>
+                <span className="flex items-baseline gap-1.5 tabular-nums">
+                  <strong className="text-2xl font-black">{formatStat(t.column, t.row.line)}</strong>
+                  <span className="text-xs text-zinc-400">
+                    {t.column.short}
+                    {base !== null && ` · base ${base}`}
+                    {t.ties > 0 && ` · empate com ${t.ties}`}
+                  </span>
+                </span>
+              </>
+            );
+            return (
+              <li key={t.column.key + t.label} className="min-w-0">
+                {canDrill ? (
+                  <button
+                    type="button"
+                    onClick={() => setOpen({ row: t.row, col: t.column })}
+                    aria-label={`${t.label}: ${t.row.name ?? ""} — detalhar`}
+                    className="flex h-full w-full min-w-0 flex-col gap-0.5 rounded-2xl bg-zinc-900 p-3 text-left hover:bg-zinc-800"
+                  >
+                    {body}
+                  </button>
+                ) : (
+                  <div className="flex h-full min-w-0 flex-col gap-0.5 rounded-2xl bg-zinc-900 p-3">{body}</div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {heat && (
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
+          <span className="flex items-center gap-1">
+            <span aria-hidden className="size-3 rounded-sm" style={{ background: `color-mix(in srgb, ${SERIES[0]} 38%, transparent)` }} /> mais forte = melhor
+          </span>
+          <span className="flex items-center gap-1">
+            <span aria-hidden className="size-3 rounded-sm" style={{ background: `color-mix(in srgb, ${SERIES[1]} 38%, transparent)` }} /> mais forte = mais erros
+          </span>
+          <span><span style={{ color: SERIES[0] }}>★</span> líder</span>
+          <span><span style={{ color: SERIES[1] }}>▲</span> mais erros</span>
+          <span>% com base menor que {HEAT_MIN} fica sem cor</span>
+        </p>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full border-separate border-spacing-0 text-right tabular-nums" style={{ minWidth }}>
           {caption && <caption className="pb-2 text-left text-sm font-semibold uppercase tracking-wide text-zinc-400">{caption}</caption>}
@@ -150,7 +267,7 @@ export function StatTable<L>({ columns, rows, total, firstHeader, caption, minWi
             </tr>
           </thead>
           <tbody>
-            {shown.map((r) => bodyRow(r))}
+            {shown.map((r, i) => bodyRow(r, false, i))}
             {total && bodyRow(total, true)}
           </tbody>
         </table>

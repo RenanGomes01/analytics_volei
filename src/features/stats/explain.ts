@@ -27,3 +27,22 @@ export function explainPass(r: Rate, beach: boolean): string {
   return `${plural(r.num, beach ? "passe na mão" : "passe bom", beach ? "passes na mão" : "passes bons")} em ${plural(r.den, "recepção avaliada", "recepções avaliadas")}`;
 }
 
+
+const share = (x: number) => `${Math.round(x * 100)}%`;
+const decimal = (x: number) => x.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+
+/** Raio-X (Fase 19): "6 de 15 pontos cedidos (40%) · 1,5 por jogo". */
+export function explainWeakness({ count, share: s, perMatch }: { count: number; share: number; perMatch: number | null }, total: number): string {
+  if (total === 0) return "nenhum ponto cedido ainda";
+  return `${count} de ${plural(total, "ponto cedido", "pontos cedidos")} (${share(s)})${perMatch !== null ? ` · ${decimal(perMatch)} por jogo` : ""}`;
+}
+
+/** Maior arma (Fase 19): "8 pontos — 30% dos pontos dela". */
+export function explainWeapon({ count, share: s }: { count: number; share: number }): string {
+  return `${plural(count, "ponto", "pontos")} · ${share(s)} dos pontos dela`;
+}
+
+/** Mais letal (Fase 19): "6 pontos em 10 ataques (60% de aproveitamento)". */
+export function explainLethal({ kills, attempts, killRate }: { kills: number; attempts: number; killRate: number }): string {
+  return `${plural(kills, "ponto", "pontos")} em ${plural(attempts, "ataque", "ataques")} (${share(killRate)} de aproveitamento)`;
+}

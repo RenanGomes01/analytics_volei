@@ -9,6 +9,7 @@ export function PointSourcesCard({
   points,
   rallies,
   rows,
+  onSelectRow,
 }: {
   title?: string;
   points: Partial<Record<PointSourceKey, number>>;
@@ -16,6 +17,8 @@ export function PointSourcesCard({
   rallies?: readonly RallyFact[];
   /** Atleta: linhas prontas da mesma fonte do total (`scoredBreakdown`), que somam os pontos dela. */
   rows?: readonly DrillRow[];
+  /** Toque numa linha de "Como cada ponto saiu": abre jogo e placar de cada ponto (Fase 19). */
+  onSelectRow?: (row: DrillRow) => void;
 }) {
   const ps = pointSources(points);
   const top = ps.sources.find((s) => s.key === ps.dominant);
@@ -50,7 +53,7 @@ export function PointSourcesCard({
             <summary className="min-h-10 cursor-pointer content-center text-sm font-semibold">
               Como cada ponto saiu <span className="font-normal text-zinc-400">({sum} {sum === 1 ? "ponto" : "pontos"})</span>
             </summary>
-            <DrillBars rows={detail} />
+            <DrillBars rows={detail} onSelect={onSelectRow} />
           </details>
         );
       })()}

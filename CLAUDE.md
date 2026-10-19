@@ -143,6 +143,14 @@
 - Widgets de proporção são nativos (`athlete-widgets.tsx`, barra 100%, nunca pizza); gráficos com eixo em `src/features/charts/athlete-charts.tsx`. Cores só de `SERIES` (validadas com o `validate_palette.js` da skill dataviz).
 - O recorte do perfil (`?t=`: temporada, torneio ou "amistosos") vale para o painel inteiro e para o card "Partidas" (`showFilter={false}`).
 
+## BI intuitivo e drill-down da evolução (Fase 19)
+- **Toda barra abre os lances:** `occurrences.ts` (`touchOccurrences` / `rallyOccurrences` / `groupByMatch`) + `OccurrencesSheet` (por jogo, set e placar, título do jogo via `matchTitles`). O filtro da linha usa a chave que já existe: `RallyFact.code` (causas) ou o rótulo de `scoredLabel` (pontos). Teste: a quantidade de ocorrências é igual ao `count` da linha.
+- `DrillBars`, `PointSourcesCard` e `ConcededCard` aceitam `onSelect`/`onSelectRow`. Sem o prop, o visual continua o mesmo. Gráfico jogo a jogo clicável abre o `DrillPanel` **com a coluna da tabela** ("Pts", "PE", "Efic.") recortada na partida (`subtitle`, `occurrencesOpen`). Nunca crie uma contagem paralela.
+- Barra do Recharts clicável: `onClick` + `TapBar` (alvo transparente na faixa inteira, via `background`), para dar para tocar no tablet.
+- **Raio-X/arma** = só `athlete-insights.ts` (lê `causeRows` e `scoredBreakdown`); o volume mínimo vem de `INSIGHT_MIN` e `LETHAL_MIN_ATTEMPTS`. Os textos ficam em `explain.ts`.
+- **Mapa de calor:** o tom da coluna fica em `COLUMN_TONE` (`stat-columns.ts`). Métrica nova de acerto/erro entra lá. A escala sai de `columnScale` (`heat.ts`, sem a linha de total) e a base de uma % sai de `baseOf` (`Rate.den` ou `drill(counters)`). `StatTable` tem `heat` e `highlights` (destaques clicáveis). Informação nunca só por cor: ★/▲ com `aria-label`.
+- Saíram do perfil: Paredão (`wall`) e Passe na mão (gráfico e tile). Não volte com eles sem o pedido do usuário.
+
 ## Dados de teste (`/dev/seed`)
 - Gerador puro em `src/domain/dev/rally-generator.ts` (semente fixa, modo detalhado, fim do rali sempre por `impliedPoint`); serviço em `src/services/dev/seed-service.ts`, gravando pelos services reais (`appendRallies` = vários ralis numa transação).
 - Os ids criados ficam em `meta["dev_seed"]`. `removeDemoData` apaga **só** esses ids (exceção deliberada ao append-only, restrita a dados sintéticos).

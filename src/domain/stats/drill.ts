@@ -169,7 +169,7 @@ export const ERROR_COLUMNS = new Set([
 ]);
 
 /** Como o lance pontuou, pelo mérito (o mesmo texto do espelho tático). */
-function scoredLabel(f: TouchFact): string {
+export function scoredLabel(f: TouchFact): string {
   if (f.delta.aces) return "Ace";
   if (f.delta.blocks) return "Ponto de bloqueio";
   if (f.detail === "block_out") return "Explorou o bloqueio";

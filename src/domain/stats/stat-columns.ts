@@ -54,6 +54,19 @@ export interface StatColumn<L> {
   drill?: (d: TouchDelta) => number;
 }
 
+/** Fase 19 — mapa de calor: "quanto mais, melhor" (good) ou "quanto mais, pior" (bad). Volume fica neutro. */
+export type StatTone = "good" | "bad";
+
+const GOOD = ["points", "atk_kills", "atk_eff", "atk_kill_pct", "atk_k1_eff", "atk_k2_eff", "atk_block_out", "srv_aces", "srv_ace_pct", "srv_pressure", "srv_break", "rec_positive", "rec_sideout", "rec_first_ball", "rec_long", "rec_pressure", "blocks", "dig_positive", "dig_won", "wins", "balance", "side_out", "break_point"];
+const BAD = ["atk_errors", "atk_blocked", "atk_err_pct", "srv_errors", "srv_errors_net", "srv_errors_out", "srv_err_pct", "rec_errors", "rec_err_pct", "blk_errors", "blk_exploited", "dig_errors", "set_errors", "errors", "points_given", "faults", "losses"];
+
+export const COLUMN_TONE: Readonly<Record<string, StatTone>> = Object.fromEntries([
+  ...GOOD.map((k) => [k, "good"] as const),
+  ...BAD.map((k) => [k, "bad"] as const),
+]);
+
+export const toneOf = (c: { key: string }): StatTone | null => COLUMN_TONE[c.key] ?? null;
+
 const n = (k: keyof TouchCounters) => (d: TouchDelta) => d[k] ?? 0;
 
 /** O que uma linha de atleta precisa (partida: AthleteStats; agregado: AthleteAggregate). */

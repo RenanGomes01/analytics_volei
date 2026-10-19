@@ -43,6 +43,10 @@ interface Props<L> {
   value: string;
   context: DrillContext;
   onClose: () => void;
+  /** Linha extra do cabeçalho (ex.: o jogo, quando o recorte é uma partida só). */
+  subtitle?: string;
+  /** Abre "Em que momento do jogo" já expandido (gráficos jogo a jogo). */
+  occurrencesOpen?: boolean;
 }
 
 const DEFAULT_DIMENSIONS: DrillDimension[] = ["type", "outcome", "opponent", "set", "moment", "phase", "touch", "match"];
@@ -51,7 +55,7 @@ const DEFAULT_DIMENSIONS: DrillDimension[] = ["type", "outcome", "opponent", "se
  * Drill-down de um número (Fase 15): "15 erros" → onde foram (5 saques na rede, 3 fora, 7 de ataque),
  * em que set, em que momento do set, em K1 ou K2 e em quais lances. Nada de rua sem saída.
  */
-export function DrillPanel<L>({ title, column, value, context, onClose }: Props<L>) {
+export function DrillPanel<L>({ title, column, value, context, onClose, subtitle, occurrencesOpen = false }: Props<L>) {
   const multiMatch = useMemo(() => new Set(context.facts.map((f) => f.match_id)).size > 1, [context.facts]);
   const dimensions = (context.dimensions ?? DEFAULT_DIMENSIONS).filter((d) => d !== "match" || multiMatch);
   const [dimension, setDimension] = useState<DrillDimension>(() =>
@@ -97,6 +101,7 @@ export function DrillPanel<L>({ title, column, value, context, onClose }: Props<
         <header className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm text-zinc-400">{title}</p>
+            {subtitle && <p className="truncate text-sm text-zinc-400">{subtitle}</p>}
             <h2 className="text-xl font-bold">{column.full}</h2>
             <p className="text-sm text-zinc-400">{column.hint}</p>
           </div>
@@ -144,7 +149,7 @@ export function DrillPanel<L>({ title, column, value, context, onClose }: Props<
         )}
 
         {result.occurrences.length > 0 && (
-          <details className="rounded-2xl bg-zinc-950/60 p-3">
+          <details className="rounded-2xl bg-zinc-950/60 p-3" open={occurrencesOpen || undefined}>
             <summary className="min-h-11 cursor-pointer content-center text-sm font-semibold">Em que momento do jogo ({result.total})</summary>
             <ol className="mt-2 flex flex-col gap-1 text-sm tabular-nums">
               {result.occurrences.map((o, i) => (

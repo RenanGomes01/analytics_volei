@@ -4,8 +4,8 @@ import { athleteHref, EntityLink, teamHref } from "@/features/analytics/ui";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useState } from "react";
 import { TournamentEditSheet } from "./tournament-edit";
-import { athleteColumns, tableColumns, teamColumns, type PlayerLine } from "@/domain/stats/stat-columns";
-import { StatTable, type StatRow } from "@/features/stats/stat-table";
+import { athleteColumns, tableColumns, teamColumns, type PlayerLine, type StatColumn } from "@/domain/stats/stat-columns";
+import { StatTable, type Highlight, type StatRow } from "@/features/stats/stat-table";
 import { EmptyState } from "@/components/empty-state";
 import { toast } from "@/features/toast/toast";
 import { HardLink } from "@/components/hard-link";
@@ -112,15 +112,31 @@ function TeamsTable({ data, roster, detailed }: { data: CompetitionData; roster:
     line: t,
     label: <EntityLink href={teamHref(t.pair_key)}>{teamName(t.pair_key)}</EntityLink>,
   }));
+  const all = teamColumns({ modality: data.tournament.modality, showReception });
   return (
     <StatTable
       firstHeader={data.tournament.modality === "beach" ? "Dupla" : "Time"}
-      columns={tableColumns(teamColumns({ modality: data.tournament.modality, showReception }), { detailed })}
+      columns={tableColumns(all, { detailed })}
+      heat
+      highlights={highlightsOf(all, [
+        ["atk_eff", "Mais eficiente no ataque"],
+        ["side_out", "Melhor virada de bola"],
+        ["srv_aces", "Mais aces"],
+        ["points_given", "Mais pontos entregues"],
+      ])}
       rows={rows}
       minWidth={detailed ? 1600 : 1000}
       drill={(row) => ({ facts: factsIn(data.facts, { pair_key: row.key }), matchLabel: matchLabelOf(data), athleteLabel: (id) => roster.athleteById.get(id)?.name ?? id.slice(0, 6) })}
     />
   );
+}
+
+/** Destaques do torneio (Fase 19): colunas pela chave, na ordem pedida (as que existirem). */
+function highlightsOf<L>(columns: readonly StatColumn<L>[], picks: [string, string][]): Highlight<L>[] {
+  return picks.flatMap(([key, label]) => {
+    const column = columns.find((c) => c.key === key);
+    return column ? [{ label, column }] : [];
+  });
 }
 
 /** Rótulo da partida no drill-down: "Dupla A × Dupla B". */
@@ -143,10 +159,18 @@ function AthletesTable({ data, roster, detailed }: { data: CompetitionData; rost
     line: a,
     label: <EntityLink href={athleteHref(a.athlete_id)}>{athleteName(a.athlete_id)}</EntityLink>,
   }));
+  const all = athleteColumns({ modality: data.tournament.modality, aggregated: true, showReception });
   return (
     <StatTable
       firstHeader="Atleta"
-      columns={tableColumns(athleteColumns({ modality: data.tournament.modality, aggregated: true, showReception }), { detailed })}
+      columns={tableColumns(all, { detailed })}
+      heat
+      highlights={highlightsOf(all, [
+        ["points", "Mais pontos"],
+        ["atk_eff", "Mais eficiente no ataque"],
+        ["srv_aces", "Mais aces"],
+        ["points_given", "Mais pontos entregues"],
+      ])}
       rows={rows}
       minWidth={detailed ? 2400 : 1000}
       drill={(row) => ({ facts: factsIn(data.facts, { athlete_id: row.key }), matchLabel: matchLabelOf(data), athleteLabel: athleteName, defaultDimension: "match" })}

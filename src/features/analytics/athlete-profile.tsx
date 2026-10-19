@@ -29,9 +29,9 @@ import { formatStat, StatTable } from "@/features/stats/stat-table";
 import { DrillPanel } from "./drill/drill-panel";
 import type { TrendPoint } from "@/features/charts/trend-chart";
 import { replaceQuery, useSeasonData } from "./use-season-data";
-import { scoredBreakdown } from "@/domain/stats/drill";
+import { scoredBreakdown, scoredLabel } from "@/domain/stats/drill";
 import { buildAnalytics } from "@/domain/stats/facts";
-import { explainEfficiency, explainPass } from "@/features/stats/explain";
+import { explainEfficiency } from "@/features/stats/explain";
 import { ConcededCard } from "./drill/conceded-card";
 import { PointSourcesCard } from "./drill/point-sources-card";
 import { PrintButton } from "@/features/print/print-button";
@@ -40,12 +40,22 @@ import { ProfileMatches } from "./profile-matches";
 import { athleteDashboard, athleteMatchSeries } from "@/domain/stats/athlete-dashboard";
 import { CompareRatesChart, MatchBalanceChart } from "@/features/charts/athlete-charts";
 import { readQueryParam } from "@/features/matches/use-match-search";
-import { AttackIdentityWidget, BalanceWidget, MIN_VOLUME, ServeTargetWidget, SideOutWidget, WallWidget } from "./athlete-widgets";
+import { AttackIdentityWidget, BalanceWidget, MIN_VOLUME, ServeTargetWidget, SideOutWidget, WeaknessWidget, WeaponWidget } from "./athlete-widgets";
+import { attackDrill, lethalLabel, pointsDrill, weaknesses, weapon } from "@/domain/stats/athlete-insights";
+import { rallyOccurrences, touchOccurrences, type Occurrence } from "@/domain/stats/occurrences";
+import { matchTitles, OccurrencesSheet } from "./drill/occurrences-sheet";
 import type { SeasonMatch } from "@/domain/stats/season";
 
 const MIN_ATTACKS = 10;
-const MIN_RECEPTIONS = 10;
 const FRIENDLIES = "amistosos";
+
+/** Barra/ponto dos gráficos jogo a jogo: a coluna da tabela que ele resume (Fase 19). */
+type MatchDrillColumn = "points" | "points_given" | "atk_eff";
+
+interface Sheet {
+  title: string;
+  occurrences: Occurrence[];
+}
 
 /** Perfil do atleta: atravessa parcerias (no vôlei de praia a dupla muda; o atleta não). */
 export function AthleteProfile() {
@@ -107,6 +117,8 @@ export function AthleteProfile() {
       evolution: athleteMatchSeries(mine, id, season.aliases),
       facts,
       conceded,
+      weak: weaknesses(conceded, me?.matches ?? 0),
+      arm: weapon(facts),
       me,
       series: athleteSeries(mine, id, season.aliases),
       partners: athletePartners(mine, id, season.aliases),
@@ -124,7 +136,12 @@ export function AthleteProfile() {
   );
   const [detailed, setDetailed] = useState(false);
   /** Ponto do gráfico por torneio aberto no detalhamento por partida. */
-  const [trendDrill, setTrendDrill] = useState<{ point: TrendPoint; column: "atk_eff" | "rec_positive" } | null>(null);
+  const [trendDrill, setTrendDrill] = useState<TrendPoint | null>(null);
+  /** Barra/ponto dos gráficos jogo a jogo aberto no detalhamento daquele jogo. */
+  const [matchDrill, setMatchDrill] = useState<{ match_id: string; column: MatchDrillColumn } | null>(null);
+  /** Lances de uma barra (Raio-X, arma, origem, cedidos), por jogo e placar. */
+  const [sheet, setSheet] = useState<Sheet | null>(null);
+  const titles = useMemo(() => matchTitles(computed?.mine ?? []), [computed]);
 
   if (!season || !computed)
     return <p className="p-8 text-center text-zinc-400">Carregando atleta…</p>;
@@ -139,6 +156,7 @@ export function AthleteProfile() {
     const m = mine.find((x) => x.match.id === mid);
     return m ? `${m.match.team_a.name} × ${m.match.team_b.name}${m.tournament ? "" : " (amistoso)"}` : mid.slice(0, 6);
   };
+  const openSheet = (title: string, occurrences: Occurrence[]) => setSheet({ title, occurrences });
   /** Lances de um ponto da série: o torneio, ou os amistosos daquele mês. */
   const factsOfBucket = (key: string) => {
     if (!key.startsWith("amistosos:")) return computed.facts.filter((f) => f.tournament_id === key);
@@ -149,7 +167,7 @@ export function AthleteProfile() {
   const columnsAll = athleteColumns({ modality: mine[0]?.match.modality ?? "beach", aggregated: true, showReception: true });
   const wins = partners.reduce((s, p) => s + p.wins, 0);
   const losses = partners.reduce((s, p) => s + p.losses, 0);
-  // Passe na mão só com recepções avaliadas (o modo rápido não avalia o passe).
+  // Passe na mão só na tabela e só com recepções avaliadas (o modo rápido não avalia o passe).
   const showReception = !!me && me.reception.positive.den > 0;
   const scopeLabel = scope === FRIENDLIES ? "Amistosos" : (computed.tournaments.find(([tid]) => tid === scope)?.[1] ?? "Recorte");
 
@@ -262,19 +280,26 @@ export function AthleteProfile() {
               value={pct(me.attack.efficiency)}
               detail={explainEfficiency(me.attack)}
             />
-            {showReception ? (
-              <Stat
-                label="Passe na mão"
-                value={pct(me.reception.positive.pct)}
-                detail={explainPass(me.reception.positive, true)}
-              />
-            ) : (
-              <Stat
-                label="Bola de segunda"
-                value={`${me.attack.second_ball.kills}/${me.attack.second_ball.attempts}`}
-                detail="pontos / tentativas"
-              />
-            )}
+            <Stat
+              label="Bola de segunda"
+              value={`${me.attack.second_ball.kills}/${me.attack.second_ball.attempts}`}
+              detail="pontos / tentativas"
+            />
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-2">
+            <WeaknessWidget
+              data={computed.weak}
+              onSelect={(row) => openSheet(row.label, rallyOccurrences(computed.conceded.filter((f) => f.code === row.key), "conceded"))}
+            />
+            <WeaponWidget
+              data={computed.arm}
+              onSelect={(label) => openSheet(label, touchOccurrences(computed.facts, pointsDrill, { label: scoredLabel, athleteLabel: season.athleteName }).filter((o) => o.label === label))}
+              onSelectLethal={() => {
+                const label = computed.arm.lethal!.label;
+                openSheet(`${label}: todos os ataques`, touchOccurrences(computed.facts.filter((f) => lethalLabel(f) === label), attackDrill, { athleteLabel: season.athleteName }));
+              }}
+            />
           </div>
 
           {computed.dashboard && (
@@ -285,12 +310,16 @@ export function AthleteProfile() {
               </div>
               {computed.evolution.length > 1 && (
                 <div className="grid gap-3 lg:grid-cols-2">
-                  <Card title="Evolução jogo a jogo: acertos × erros" note="Uma partida por grupo de barras, em ordem de data">
-                    <MatchBalanceChart data={computed.evolution} />
+                  <Card title="Evolução jogo a jogo: acertos × erros" note="Uma partida por grupo de barras, em ordem de data · toque numa barra para ver os lances">
+                    <MatchBalanceChart
+                      data={computed.evolution}
+                      onSelect={(match_id, series) => setMatchDrill({ match_id, column: series === "hits" ? "points" : "points_given" })}
+                    />
                   </Card>
-                  <Card title="Evolução jogo a jogo: eficiência de ataque" note={`(PA − E) / TA em cada partida · pontos claros = menos de ${MIN_VOLUME} ataques`}>
+                  <Card title="Evolução jogo a jogo: eficiência de ataque" note={`(PA − E) / TA em cada partida · pontos claros = menos de ${MIN_VOLUME} ataques · toque num ponto para ver os ataques`}>
                     <TrendChart
                       name="Eficiência de ataque"
+                      onSelect={(point) => point.key && setMatchDrill({ match_id: point.key, column: "atk_eff" })}
                       data={computed.evolution.map((p) => ({
                         key: p.match_id,
                         label: p.label,
@@ -302,10 +331,9 @@ export function AthleteProfile() {
                   </Card>
                 </div>
               )}
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-2">
                 <ServeTargetWidget target={computed.dashboard.serveTarget} name={athlete.name} />
                 <AttackIdentityWidget attack={computed.dashboard.attack} />
-                <WallWidget wall={computed.dashboard.wall} />
               </div>
               {scope && computed.seasonDashboard && (
                 <Card title={`Resumo: ${scopeLabel} × temporada`} note="Mesmas métricas no recorte e na temporada inteira · barras claras = pouco volume">
@@ -324,47 +352,38 @@ export function AthleteProfile() {
           )}
 
           <div className="grid gap-3 lg:grid-cols-2">
-            <PointSourcesCard points={{ kills: me.attack.kills, aces: me.serve.aces, blocks: me.blocks }} rows={scoredBreakdown(computed.facts).rows} />
-            <ConcededCard title={`Pontos que ${athlete.name} cedeu`} rallies={computed.conceded} athleteView />
+            <PointSourcesCard
+              points={{ kills: me.attack.kills, aces: me.serve.aces, blocks: me.blocks }}
+              rows={scoredBreakdown(computed.facts).rows}
+              onSelectRow={(row) => openSheet(row.label, touchOccurrences(computed.facts, pointsDrill, { label: scoredLabel, athleteLabel: season.athleteName }).filter((o) => o.label === row.key))}
+            />
+            <ConcededCard
+              title={`Pontos que ${athlete.name} cedeu`}
+              rallies={computed.conceded}
+              athleteView
+              onSelectRow={(row) => {
+                const rallies = computed.conceded.filter((f) => f.code === row.key);
+                openSheet(rallies[0]?.conceded ?? row.label, rallyOccurrences(rallies, "conceded"));
+              }}
+            />
           </div>
 
-          <div className={`grid gap-3 ${showReception ? "lg:grid-cols-2" : ""}`}>
-            <Card
-              title="Eficiência de ataque por torneio"
-              note={`(PA − E) / TA somando cada torneio · pontos claros = menos de ${MIN_ATTACKS} ataques`}
-            >
-              <TrendChart
-                name="Eficiência de ataque"
-                onSelect={(point) => setTrendDrill({ point, column: "atk_eff" })}
-                data={series.map((p) => ({
-                  key: p.key,
-                  label: p.label,
-                  value: p.attack.efficiency,
-                  detail: `${p.attack.kills}-${p.attack.errors}/${p.attack.attempts}`,
-                  lowVolume: p.attack.attempts < MIN_ATTACKS,
-                }))}
-              />
-            </Card>
-            {showReception && (
-              <Card
-                title="Passe na mão por torneio"
-                note={`Só recepções avaliadas (modo detalhado) · pontos claros = menos de ${MIN_RECEPTIONS}`}
-              >
-                <TrendChart
-                  name="Passe na mão"
-                  color="#d95926"
-                  onSelect={(point) => setTrendDrill({ point, column: "rec_positive" })}
-                  data={series.map((p) => ({
-                    key: p.key,
-                    label: p.label,
-                    value: p.reception.positive.pct,
-                    detail: `${p.reception.positive.num}/${p.reception.positive.den}`,
-                    lowVolume: p.reception.positive.den < MIN_RECEPTIONS,
-                  }))}
-                />
-              </Card>
-            )}
-          </div>
+          <Card
+            title="Eficiência de ataque por torneio"
+            note={`(PA − E) / TA somando cada torneio · pontos claros = menos de ${MIN_ATTACKS} ataques`}
+          >
+            <TrendChart
+              name="Eficiência de ataque"
+              onSelect={(point) => setTrendDrill(point)}
+              data={series.map((p) => ({
+                key: p.key,
+                label: p.label,
+                value: p.attack.efficiency,
+                detail: `${p.attack.kills}-${p.attack.errors}/${p.attack.attempts}`,
+                lowVolume: p.attack.attempts < MIN_ATTACKS,
+              }))}
+            />
+          </Card>
 
           <p className="-mt-1 text-sm text-zinc-400" data-print="hide">
             Toque num ponto do gráfico para ver o torneio separado por partida (e em qual jogo foi o pico).
@@ -375,7 +394,7 @@ export function AthleteProfile() {
                 <button
                   key={p.key}
                   type="button"
-                  onClick={() => setTrendDrill({ point: { key: p.key, label: p.label, value: p.attack.efficiency, detail: "", lowVolume: false }, column: "atk_eff" })}
+                  onClick={() => setTrendDrill({ key: p.key, label: p.label, value: p.attack.efficiency, detail: "", lowVolume: false })}
                   className="min-h-11 rounded-xl bg-zinc-800 px-3 text-sm font-semibold"
                 >
                   {p.label}: por partida
@@ -384,19 +403,53 @@ export function AthleteProfile() {
             </div>
           )}
           {trendDrill && (() => {
-            const col = columnsAll.find((c) => c.key === trendDrill.column)!;
-            const facts = factsOfBucket(trendDrill.point.key ?? "");
-            const bucket = computed.byCompetition.find((c) => c.key === trendDrill.point.key)?.stats;
+            const col = columnsAll.find((c) => c.key === "atk_eff")!;
+            const facts = factsOfBucket(trendDrill.key ?? "");
+            const bucket = computed.byCompetition.find((c) => c.key === trendDrill.key)?.stats;
             return (
               <DrillPanel
-                title={`${athlete.name} · ${trendDrill.point.label}`}
+                title={`${athlete.name} · ${trendDrill.label}`}
                 column={col}
-                value={bucket ? formatStat(col, bucket) : (trendDrill.point.value === null ? "–" : pct(trendDrill.point.value))}
+                value={bucket ? formatStat(col, bucket) : (trendDrill.value === null ? "–" : pct(trendDrill.value))}
                 context={{ facts, matchLabel, athleteLabel: season.athleteName, defaultDimension: "match", dimensions: ["match", "type", "outcome", "opponent", "set", "moment", "phase"] }}
                 onClose={() => setTrendDrill(null)}
               />
             );
           })()}
+          {matchDrill && (() => {
+            const col = columnsAll.find((c) => c.key === matchDrill.column)!;
+            const point = computed.evolution.find((p) => p.match_id === matchDrill.match_id);
+            const value =
+              matchDrill.column === "points" ? String(point?.hits ?? 0) : matchDrill.column === "points_given" ? String(point?.errors ?? 0) : pct(point?.attackEfficiency ?? null);
+            return (
+              <DrillPanel
+                title={athlete.name}
+                subtitle={titles.label(matchDrill.match_id)}
+                column={col}
+                value={value}
+                occurrencesOpen
+                context={{
+                  facts: computed.facts.filter((f) => f.match_id === matchDrill.match_id),
+                  matchLabel,
+                  athleteLabel: season.athleteName,
+                  defaultDimension: matchDrill.column === "atk_eff" ? "outcome" : "type",
+                  dimensions: ["type", "outcome", "opponent", "set", "moment", "phase"],
+                }}
+                onClose={() => setMatchDrill(null)}
+              />
+            );
+          })()}
+          {sheet && (
+            <OccurrencesSheet
+              title={sheet.title}
+              subtitle={`${athlete.name} · ${scope ? scopeLabel : "temporada"}`}
+              occurrences={sheet.occurrences}
+              matchLabel={titles.label}
+              matchRank={titles.rank}
+              athleteLabel={season.athleteName}
+              onClose={() => setSheet(null)}
+            />
+          )}
 
           <Card
             title="Números por torneio"
