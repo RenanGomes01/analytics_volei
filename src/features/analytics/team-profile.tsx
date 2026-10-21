@@ -17,7 +17,10 @@ import { pointsConceded, pointsWon } from "@/domain/stats/rally-facts";
 import { ConcededCard } from "./drill/conceded-card";
 import { PointSourcesCard } from "./drill/point-sources-card";
 import { matchTitles, OccurrencesSheet } from "./drill/occurrences-sheet";
-import { rallyOccurrences, type Occurrence } from "@/domain/stats/occurrences";
+import { rallyOccurrences, touchOccurrences, type Occurrence } from "@/domain/stats/occurrences";
+import { attackDrill, lethalLabel, pointsDrill, weaknesses, weapon } from "@/domain/stats/athlete-insights";
+import { scoredLabel } from "@/domain/stats/drill";
+import { WeaknessWidget, WeaponWidget } from "./athlete-widgets";
 import { PrintButton } from "@/features/print/print-button";
 import { PrintHeader } from "@/features/print/print-header";
 import { ProfileMatches } from "./profile-matches";
@@ -36,12 +39,16 @@ export function TeamProfile() {
     if (!season) return null;
     const scope = filterSeason(season.matches, { year: yearParam === "all" ? undefined : Number(yearParam), includeFriendlies: true });
     const { series, opponents } = teamSeries(scope, key, season.aliases);
-    const { rallies } = buildAnalytics(scope.map((m) => ({ match: m.match, events: m.events, tournament_id: m.tournament?.id ?? null })), season.aliases);
+    const { rallies, touches } = buildAnalytics(scope.map((m) => ({ match: m.match, events: m.events, tournament_id: m.tournament?.id ?? null })), season.aliases);
     const mine = scope.filter(({ match }) => [match.team_a, match.team_b].some((t) => pairKey(t.athlete_ids, season.aliases) === key));
-    return { mine, series, opponents, won: pointsWon(rallies, { pair_key: key }), conceded: pointsConceded(rallies, { pair_key: key }), team: seasonStats(scope, season.aliases).teams[key], kinds: pointKinds(scope, season.aliases, key) };
+    const team = seasonStats(scope, season.aliases).teams[key];
+    const conceded = pointsConceded(rallies, { pair_key: key });
+    // Raio-X da dupla (Fase 21): as MESMAS contas do perfil da atleta, sobre os lances das duas na dupla.
+    const facts = touches.filter((f) => f.pair_key === key);
+    return { mine, series, opponents, won: pointsWon(rallies, { pair_key: key }), conceded, facts, weak: weaknesses(conceded, team?.matches ?? 0), arm: weapon(facts), team, kinds: pointKinds(scope, season.aliases, key) };
   }, [season, key, yearParam]);
 
-  /** Lances de uma barra de "Origem dos pontos"/"Pontos cedidos", por jogo e placar (Fase 19). */
+  /** Lances de uma barra (Raio-X, arma, origem, cedidos), por jogo e placar (Fases 19 e 21). */
   const [sheet, setSheet] = useState<{ title: string; occurrences: Occurrence[] } | null>(null);
   const titles = useMemo(() => matchTitles(computed?.mine ?? []), [computed]);
 
@@ -120,6 +127,25 @@ export function TeamProfile() {
             <Stat label="Sets" value={`${team.sets_won}-${team.sets_lost}`} detail={`saldo de pontos ${team.points_for - team.points_against > 0 ? "+" : ""}${team.points_for - team.points_against}`} />
             <Stat label="Virada de bola (K1)" value={pct(team.side_out.pct)} detail={explainSideOut(team.side_out)} />
             <Stat label="Quebra de saque (K2)" value={pct(team.break_point.pct)} detail={explainBreakPoint(team.break_point)} />
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-2">
+            <WeaknessWidget
+              subject="team"
+              data={computed.weak}
+              onSelect={(row) => setSheet({ title: row.label, occurrences: rallyOccurrences(computed.conceded.filter((f) => f.code === row.key), "conceded") })}
+            />
+            <WeaponWidget
+              subject="team"
+              data={computed.arm}
+              onSelect={(label) =>
+                setSheet({ title: label, occurrences: touchOccurrences(computed.facts, pointsDrill, { label: scoredLabel, athleteLabel: season.athleteName }).filter((o) => o.label === label) })
+              }
+              onSelectLethal={() => {
+                const label = computed.arm.lethal!.label;
+                setSheet({ title: `${label}: todos os ataques`, occurrences: touchOccurrences(computed.facts.filter((f) => lethalLabel(f) === label), attackDrill, { athleteLabel: season.athleteName }) });
+              }}
+            />
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">

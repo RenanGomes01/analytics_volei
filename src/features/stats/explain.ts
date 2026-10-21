@@ -37,9 +37,9 @@ export function explainWeakness({ count, share: s, perMatch }: { count: number; 
   return `${count} de ${plural(total, "ponto cedido", "pontos cedidos")} (${share(s)})${perMatch !== null ? ` · ${decimal(perMatch)} por jogo` : ""}`;
 }
 
-/** Maior arma (Fase 19): "8 pontos — 30% dos pontos dela". */
-export function explainWeapon({ count, share: s }: { count: number; share: number }): string {
-  return `${plural(count, "ponto", "pontos")} · ${share(s)} dos pontos dela`;
+/** Maior arma (Fase 19; dupla na Fase 21): "8 pontos · 30% dos pontos dela". */
+export function explainWeapon({ count, share: s }: { count: number; share: number }, subject: "athlete" | "team" = "athlete"): string {
+  return `${plural(count, "ponto", "pontos")} · ${share(s)} ${subject === "team" ? "dos pontos de ataque, saque e bloqueio da dupla" : "dos pontos dela"}`;
 }
 
 /** Mais letal (Fase 19): "6 pontos em 10 ataques (60% de aproveitamento)". */

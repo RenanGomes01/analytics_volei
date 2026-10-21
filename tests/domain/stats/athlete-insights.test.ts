@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { INSIGHT_MIN, LETHAL_MIN_ATTEMPTS, weaknesses, weapon } from "@/domain/stats/athlete-insights";
 import { factsIn, scoredBreakdown } from "@/domain/stats/drill";
 import { buildAnalytics } from "@/domain/stats/facts";
-import { causeRows, type RallyFact } from "@/domain/stats/rally-facts";
+import { causeRows, pointsConceded, type RallyFact } from "@/domain/stats/rally-facts";
 import { explainLethal, explainWeakness, explainWeapon } from "@/features/stats/explain";
 import { ledger, matchFixture } from "../../helpers";
 import { randomMatch } from "./random-ledger";
@@ -98,5 +98,24 @@ describe("maior arma", () => {
 
   it("sem pontos: nada coroado", () => {
     expect(weapon([])).toEqual({ total: 0, main: null, rows: [], lethal: null });
+  });
+});
+
+describe("raio-x da dupla (Fase 21)", () => {
+  it("consolida as duas atletas: as mesmas contas sobre os lances e os ralis da dupla", () => {
+    const { rallies, touches } = buildAnalytics([randomMatch(7, 300)]);
+    for (const side of ["A", "B"] as const) {
+      const key = touches.find((f) => f.team === side)!.pair_key;
+      const facts = touches.filter((f) => f.pair_key === key);
+      const ids = [...new Set(facts.map((f) => f.athlete_id))];
+      // A arma da dupla soma os pontos das duas (ataque + ace + bloqueio).
+      expect(weapon(facts).total).toBe(ids.reduce((n, id) => n + weapon(facts.filter((f) => f.athlete_id === id)).total, 0));
+      // O Raio-X lê os MESMOS ralis do card "Pontos cedidos" da dupla.
+      const conceded = pointsConceded(rallies, { pair_key: key });
+      const w = weaknesses(conceded, 1);
+      expect(w.total).toBe(conceded.length);
+      expect(w.own).toBe(conceded.filter((f) => f.fault === "own").length);
+      expect(w.rows[0]?.count ?? 0).toBe(causeRows(conceded, "conceded").filter((r) => r.fault !== "none")[0]?.count ?? 0);
+    }
   });
 });

@@ -149,6 +149,8 @@ export interface CauseRow {
   count: number;
   share: number;
   fault: Fault;
+  /** Grupo do placar (o tom do lado de quem ganhou sai daqui: ver `point-tone.ts`). */
+  group: PointGroup;
   /** Quem mais aparece como ator nesta causa (culpada nos cedidos, autora nos pontos). */
   leader: { athlete_id: string; count: number } | null;
 }
@@ -157,7 +159,7 @@ export interface CauseRow {
 export function causeRows(facts: readonly RallyFact[], side: "merit" | "conceded"): CauseRow[] {
   const groups = new Map<string, { row: CauseRow; actors: Map<string, number> }>();
   for (const f of facts) {
-    const g = groups.get(f.code) ?? { row: { code: f.code, label: f[side], count: 0, share: 0, fault: f.fault, leader: null }, actors: new Map() };
+    const g = groups.get(f.code) ?? { row: { code: f.code, label: f[side], count: 0, share: 0, fault: f.fault, group: f.group, leader: null }, actors: new Map() };
     g.row.count += 1;
     const actor = side === "merit" ? f.scorer : f.culprit;
     if (actor) g.actors.set(actor, (g.actors.get(actor) ?? 0) + 1);

@@ -172,3 +172,12 @@ Tudo é recalculado do ledger (nada persistido) e cada métrica é um contador b
 - **Ocorrências:** toda barra de "Origem dos pontos", "Pontos cedidos", Raio-X e arma abre os lances agrupados por jogo, com o set e o placar **antes** do rali, do ponto de vista de quem está sendo analisado.
 - **Mapa de calor das tabelas de torneio:** cada coluna tem um tom em `stat-columns.ts` (`COLUMN_TONE`): good = quanto mais, melhor; bad = quanto mais, pior; colunas de volume ficam neutras. A cor vai do mínimo ao máximo do recorte, sem a linha de total. ★ marca o líder nas colunas good e ▲ o maior ofensor nas bad (até 2 empatadas). Porcentagem com base menor que 5 fica sem cor e sem selo. Os cartões de **Destaques** pedem base de 10 ou mais, como os rankings.
 - **Passe na mão** saiu do perfil da atleta (gráfico e tile). Nas tabelas e no ranking ele continua condicional, como na Fase 7.
+
+## Cores semânticas e Raio-X da dupla (Fase 21)
+- **A cor da barra diz de quem foi o ponto** (`point-tone.ts`, cores em `TONE`):
+  - ganhos: **mérito próprio** (ataque, ace, bloqueio) na cor principal (amarelo); **erro do adversário** em cinza claro;
+  - cedidos: **erro próprio** em vermelho (alerta); **mérito do adversário** em azul;
+  - "sem detalhe" fica em cinza escuro.
+- Do lado de quem ganhou, o tom sai do **grupo do placar**, não do `fault`. O ponto de bloqueio tem `fault: "own"` (o ataque bloqueado é erro de quem atacou), mas para quem bloqueou é mérito.
+- A cor nunca fica sozinha: os cartões têm legenda e o rótulo da linha já diz a causa ("Erro do adversário: saque fora"). No PDF, o erro do adversário fica listrado.
+- **Perfil da dupla:** Raio-X de deficiências e Maior arma no topo, com as mesmas regras e mínimos da Fase 19. O Raio-X lê os mesmos ralis do card "Pontos cedidos" da dupla. A arma soma os lances das duas atletas **naquela dupla**: os pontos de ataque, saque e bloqueio, sem o erro do adversário.

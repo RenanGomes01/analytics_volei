@@ -151,6 +151,11 @@
 - **Mapa de calor:** o tom da coluna fica em `COLUMN_TONE` (`stat-columns.ts`). Métrica nova de acerto/erro entra lá. A escala sai de `columnScale` (`heat.ts`, sem a linha de total) e a base de uma % sai de `baseOf` (`Rate.den` ou `drill(counters)`). `StatTable` tem `heat` e `highlights` (destaques clicáveis). Informação nunca só por cor: ★/▲ com `aria-label`.
 - Saíram do perfil: Paredão (`wall`) e Passe na mão (gráfico e tile). Não volte com eles sem o pedido do usuário.
 
+## Cores semânticas e Raio-X da dupla (Fase 21)
+- **Cor de barra de ponto = só `PointTone`** (`src/domain/stats/point-tone.ts`) + `TONE` (`src/features/charts/palette.ts`). Ganho: `scoredTone(group, fault)` (pelo grupo do placar; bloqueio é mérito mesmo com `fault: "own"`); cedido: `concededTone(fault)`; fontes: `sourceTone`. Nunca pinte mérito e erro do adversário com a mesma cor.
+- `DrillBars` aceita `tone` na linha (sem tom = amarelo, como antes) e `ToneLegend` mostra a legenda: cor nunca sozinha. No PDF, `print-bar-gift` (listrado).
+- Perfil da dupla reusa `weaknesses`/`weapon` (`athlete-insights.ts`) e os widgets com `subject="team"`: Raio-X = `pointsConceded(…, { pair_key })`, arma = `touches` com `pair_key`. Nada de conta paralela.
+
 ## Dados de teste (`/dev/seed`)
 - Gerador puro em `src/domain/dev/rally-generator.ts` (semente fixa, modo detalhado, fim do rali sempre por `impliedPoint`); serviço em `src/services/dev/seed-service.ts`, gravando pelos services reais (`appendRallies` = vários ralis numa transação).
 - Os ids criados ficam em `meta["dev_seed"]`. `removeDemoData` apaga **só** esses ids (exceção deliberada ao append-only, restrita a dados sintéticos).

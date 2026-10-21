@@ -143,7 +143,8 @@ body {
     border: 0 !important;
   }
   .print-bar,
-  .print-bar-strong {
+  .print-bar-strong,
+  .print-bar-gift {
     display: block !important;
     height: 100% !important;
   }
@@ -153,9 +154,14 @@ body {
   .print-bar-strong {
     background-color: #000 !important;
   }
+  /* Ponto de erro do adversário / sem detalhe (Fase 21): listrado, para não depender de cor. */
+  .print-bar-gift {
+    background: repeating-linear-gradient(90deg, #555 0 4px, #fff 4px 6px) !important;
+  }
   .print-track,
   .print-bar,
-  .print-bar-strong {
+  .print-bar-strong,
+  .print-bar-gift {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }

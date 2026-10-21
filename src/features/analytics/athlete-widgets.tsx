@@ -2,7 +2,8 @@ import type { AthleteDashboard } from "@/domain/stats/athlete-dashboard";
 import { INSIGHT_MIN, LETHAL_MIN_ATTEMPTS, type Weapon, type Weaknesses, type WeaknessRow } from "@/domain/stats/athlete-insights";
 import { explainLethal, explainWeakness, explainWeapon } from "@/features/stats/explain";
 import type { Rate } from "@/domain/stats/types";
-import { LOW_VOLUME_OPACITY, pct, SERIES } from "@/features/charts/palette";
+import { concededTone, type PointTone } from "@/domain/stats/point-tone";
+import { LOW_VOLUME_OPACITY, pct, SERIES, TONE } from "@/features/charts/palette";
 import { Card } from "./ui";
 
 /**
@@ -149,10 +150,12 @@ interface InsightRow {
   count: number;
   share: number;
   tag?: string;
+  /** Cor semântica da barra (Fase 21). */
+  tone: PointTone;
 }
 
 /** Top causas/jogadas: cada linha é um botão que abre jogo e placar. */
-function InsightBars({ rows, color, onSelect }: { rows: InsightRow[]; color: string; onSelect?: (row: InsightRow) => void }) {
+function InsightBars({ rows, onSelect }: { rows: InsightRow[]; onSelect?: (row: InsightRow) => void }) {
   const max = Math.max(1, ...rows.map((r) => r.count));
   return (
     <ul className="flex flex-col gap-1">
@@ -174,7 +177,7 @@ function InsightBars({ rows, color, onSelect }: { rows: InsightRow[]; color: str
               <span className="ml-1 text-xs font-normal text-zinc-400">{Math.round(r.share * 100)}%</span>
             </span>
             <span className="col-span-2 h-2 overflow-hidden rounded-full bg-zinc-800 print-track">
-              <span className="block h-full rounded-full print-bar" style={{ width: `${(r.count / max) * 100}%`, background: color }} />
+              <span className={`block h-full rounded-full ${TONE[r.tone].bar} ${TONE[r.tone].print}`} style={{ width: `${(r.count / max) * 100}%` }} />
             </span>
           </button>
         </li>
@@ -183,11 +186,11 @@ function InsightBars({ rows, color, onSelect }: { rows: InsightRow[]; color: str
   );
 }
 
-/** Manchete do painel: rótulo pequeno, frase grande, explicação. A cor fica só no marcador. */
-function Headline({ kicker, title, detail, color }: { kicker: string; title: string; detail: string; color: string }) {
+/** Manchete do painel: rótulo pequeno, frase grande, explicação. A cor (tom da Fase 21) fica só no marcador. */
+function Headline({ kicker, title, detail, tone }: { kicker: string; title: string; detail: string; tone: PointTone }) {
   return (
     <div className="flex gap-3 rounded-xl bg-zinc-950/50 p-3">
-      <span aria-hidden className="w-1.5 shrink-0 rounded-full" style={{ background: color }} />
+      <span aria-hidden className={`w-1.5 shrink-0 rounded-full ${TONE[tone].bar} ${TONE[tone].print}`} />
       <div className="min-w-0">
         <p className="text-xs uppercase tracking-wide text-zinc-400">{kicker}</p>
         <p className="text-xl font-black leading-tight">{title}</p>
@@ -199,33 +202,38 @@ function Headline({ kicker, title, detail, color }: { kicker: string; title: str
 
 const FAULT_TAG = { own: "erro próprio", opponent: "mérito do adversário", none: "" } as const;
 
-export function WeaknessWidget({ data, onSelect }: { data: Weaknesses; onSelect?: (row: WeaknessRow) => void }) {
-  const rows = data.rows.map((r) => ({ ...r, tag: FAULT_TAG[r.fault] }));
+/** Atleta (Fase 19) ou dupla (Fase 21): as mesmas contas, só muda o texto. */
+type Subject = "athlete" | "team";
+
+export function WeaknessWidget({ data, subject = "athlete", onSelect }: { data: Weaknesses; subject?: Subject; onSelect?: (row: WeaknessRow) => void }) {
+  const rows = data.rows.map((r) => ({ ...r, tag: FAULT_TAG[r.fault], tone: concededTone(r.fault) }));
+  const team = subject === "team";
   return (
-    <Card title="Raio-X de deficiências" note={`Onde ela mais entrega pontos · ${data.own} de ${data.total} por erro próprio · toque para ver jogo e placar`}>
+    <Card title="Raio-X de deficiências" note={`Onde ${team ? "a dupla" : "ela"} mais entrega pontos · ${data.own} de ${data.total} por erro próprio · toque para ver jogo e placar`}>
       {data.main ? (
-        <Headline kicker="Maior fraqueza neste recorte" title={data.main.label} detail={explainWeakness(data.main, data.total)} color={SERIES[1]} />
+        <Headline kicker="Maior fraqueza neste recorte" title={data.main.label} detail={explainWeakness(data.main, data.total)} tone={concededTone(data.main.fault)} />
       ) : (
         <p className="text-sm text-zinc-400">
-          {data.total === 0 ? "Nenhum ponto cedido por ela neste recorte." : `Pouco volume para apontar uma fraqueza (nenhuma jogada com ${INSIGHT_MIN} ou mais pontos cedidos).`}
+          {data.total === 0 ? `Nenhum ponto cedido ${team ? "pela dupla" : "por ela"} neste recorte.` : `Pouco volume para apontar uma fraqueza (nenhuma jogada com ${INSIGHT_MIN} ou mais pontos cedidos).`}
         </p>
       )}
-      {rows.length > 0 && <InsightBars rows={rows} color={SERIES[1]} onSelect={onSelect ? (r) => onSelect(data.rows.find((x) => x.key === r.key)!) : undefined} />}
+      {rows.length > 0 && <InsightBars rows={rows} onSelect={onSelect ? (r) => onSelect(data.rows.find((x) => x.key === r.key)!) : undefined} />}
     </Card>
   );
 }
 
-export function WeaponWidget({ data, onSelect, onSelectLethal }: { data: Weapon; onSelect?: (label: string) => void; onSelectLethal?: () => void }) {
+export function WeaponWidget({ data, subject = "athlete", onSelect, onSelectLethal }: { data: Weapon; subject?: Subject; onSelect?: (label: string) => void; onSelectLethal?: () => void }) {
+  const team = subject === "team";
   return (
-    <Card title="Maior arma" note="A jogada que mais pontua e a mais letal · toque para ver jogo e placar">
+    <Card title="Maior arma" note={`A jogada que mais pontua e a mais letal${team ? " da parceria" : ""} · toque para ver jogo e placar`}>
       {data.main ? (
-        <Headline kicker="Mais pontuou com" title={data.main.label} detail={explainWeapon(data.main)} color={SERIES[0]} />
+        <Headline kicker="Mais pontuou com" title={data.main.label} detail={explainWeapon(data.main, subject)} tone="merit" />
       ) : (
         <p className="text-sm text-zinc-400">
-          {data.total === 0 ? "Nenhum ponto dela neste recorte." : `Pouco volume para apontar uma arma (nenhuma jogada com ${INSIGHT_MIN} ou mais pontos).`}
+          {data.total === 0 ? `Nenhum ponto ${team ? "da dupla" : "dela"} neste recorte.` : `Pouco volume para apontar uma arma (nenhuma jogada com ${INSIGHT_MIN} ou mais pontos).`}
         </p>
       )}
-      {data.rows.length > 0 && <InsightBars rows={data.rows} color={SERIES[0]} onSelect={onSelect ? (r) => onSelect(r.key) : undefined} />}
+      {data.rows.length > 0 && <InsightBars rows={data.rows.map((r) => ({ ...r, tone: "merit" as const }))} onSelect={onSelect ? (r) => onSelect(r.key) : undefined} />}
       {data.lethal ? (
         <button
           type="button"

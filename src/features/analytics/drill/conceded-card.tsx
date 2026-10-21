@@ -1,9 +1,11 @@
 import { causeRows, concededByAthlete, type CauseRow, type RallyFact } from "@/domain/stats/rally-facts";
 import type { DrillRow } from "@/domain/stats/drill";
-import { DrillBars } from "./drill-bars";
+import { concededTone } from "@/domain/stats/point-tone";
+import { DrillBars, ToneLegend } from "./drill-bars";
 
 const rowsOf = (rows: CauseRow[], total: number, nameOf?: (id: string) => string) =>
   rows.map((r) => ({
+    tone: concededTone(r.fault),
     key: r.code,
     label: nameOf && r.leader ? `${r.label} · ${nameOf(r.leader.athlete_id)}${r.leader.count < r.count ? ` (${r.leader.count})` : ""}` : r.label,
     count: r.count,
@@ -47,6 +49,7 @@ export function ConcededCard({
           {none ? ` · ${none} sem detalhe` : ""}
         </p>
       </header>
+      <ToneLegend tones={[...(own.length ? ["own_error" as const] : []), ...(merit.length ? ["opponent_merit" as const] : [])]} />
       {own.length > 0 && (
         <div className="flex flex-col gap-1">
           <h4 className="text-xs font-semibold uppercase tracking-wide text-red-300 print:text-black">Erros próprios</h4>
